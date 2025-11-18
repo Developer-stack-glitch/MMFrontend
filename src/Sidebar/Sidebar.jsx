@@ -5,8 +5,8 @@ import {
     Button,
     Avatar,
     Dropdown,
-    Modal,
     Tooltip,
+    Modal,
 } from "antd";
 import {
     Menu as MenuIcon,
@@ -14,33 +14,67 @@ import {
     LayoutDashboard,
     DollarSign,
     FileCheck2,
-    Heart,
     Settings,
-    HelpCircle,
     Bell,
     LogOut,
+    PlusIcon,
     Plus,
+    Wallet,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
+import "../css/Response.css";
 import Dashboard from "../Dashboard/Dashboard";
 import AddRecord from "../Dashboard/AddRecord";
 import AddCategories from "../Dashboard/AddCategeories";
 import IncomeExpense from "../Dashboard/IncomeExpense";
 import Approvals from "../Dashboard/Approvals";
-import { apiLogout, getUser } from "../../Api/action";
+import { apiLogout, getExpenseCategoriesApi, getIncomeCategoriesApi, getUser } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
 import { getApprovalsApi } from "../../Api/action";
 import SettingPage from "../Dashboard/Settings";
+import Modals from "../Dashboard/Modals";
+import dayjs from "dayjs";
+import WalletPage from "../Dashboard/Wallet";
 const { Sider, Content, Header } = Layout;
 
 export default function SideBarLayout() {
     const [collapsed, setCollapsed] = useState(false);
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const [user, setUser] = useState("");
     const [pendingCount, setPendingCount] = useState(0);
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+
+    const [branch, setBranch] = useState("Select Branch");
+    const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
+    const [total, setTotal] = useState("");
+    const [mainCategory, setMainCategory] = useState("Select Main Category");
+    const [subCategory, setSubCategory] = useState("Select Category");
+    const [description, setDescription] = useState("");
+
+    const [expenseCategories, setExpenseCategories] = useState({});
+    const [incomeCategories, setIncomeCategories] = useState([]);
+
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth <= 768) {
+                setIsMobile(true);
+                setCollapsed(true);
+            } else {
+                setIsMobile(false);
+                setCollapsed(false);
+            }
+        };
+
+        handleResize();
+        window.addEventListener("resize", handleResize);
+
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
 
     useEffect(() => {
         getUserData()
@@ -55,6 +89,28 @@ export default function SideBarLayout() {
         window.addEventListener("incomeExpenseUpdated", update);
 
         return () => window.removeEventListener("incomeExpenseUpdated", update);
+    }, []);
+
+    useEffect(() => {
+        async function loadCategories() {
+            const exp = await getExpenseCategoriesApi();
+            const inc = await getIncomeCategoriesApi();
+
+            const grouped = exp.reduce((acc, item) => {
+                const main = item.main_category;
+                const sub = item.sub_category;
+
+                if (!acc[main]) acc[main] = [];
+                acc[main].push(sub);
+
+                return acc;
+            }, {});
+
+            setExpenseCategories(grouped);
+            setIncomeCategories(inc.map(item => item.name));
+        }
+
+        loadCategories();
     }, []);
 
 
@@ -92,10 +148,10 @@ export default function SideBarLayout() {
 
     const menuKeyMap = {
         "/dashboard": "1",
-        "/add-record": "2",
+        "/categories": "2",
         "/income-expense": "3",
         "/approvals": "4",
-        "/budgets": "5",
+        "/wallet": "5",
         "/bills": "6",
         "/savings": "7",
         "/settings": "8",
@@ -107,16 +163,21 @@ export default function SideBarLayout() {
     const handleMenuClick = (e) => {
         const routeMap = {
             1: "/dashboard",
-            2: "/add-record",
+            2: "/categories",
             3: "/income-expense",
             4: "/approvals",
-            5: "/budgets",
+            5: "/wallet",
             6: "/bills",
             7: "/savings",
             8: "/settings",
             9: "/help",
         };
+
         navigate(routeMap[e.key]);
+
+        if (isMobile) {
+            setCollapsed(true);
+        }
     };
 
     // Profile dropdown
@@ -151,26 +212,34 @@ export default function SideBarLayout() {
 
     return (
         <Layout className="sidebar-layout">
-            {/* Add New Category Button */}
             <Button
                 className="new-category"
                 onClick={() => setIsCategoryModalOpen(true)}
             >
-                <Plus size={20} /> Add New Category
+                <Plus size={20} /> Add Expense
             </Button>
 
             {/* Add Category Modal */}
-            <Modal
+
+            <Modals
                 open={isCategoryModalOpen}
-                onCancel={() => setIsCategoryModalOpen(false)}
-                footer={null}
-                width={600}
-                centered
-                closeIcon={<X size={22} />}
-                className="category-main-modal"
-            >
-                <AddCategories />
-            </Modal>
+                type="expense"
+                onClose={() => setIsCategoryModalOpen(false)}
+                branch={branch}
+                setBranch={setBranch}
+                date={date}
+                setDate={setDate}
+                total={total}
+                setTotal={setTotal}
+                mainCategory={mainCategory}
+                setMainCategory={setMainCategory}
+                subCategory={subCategory}
+                setSubCategory={setSubCategory}
+                description={description}
+                setDescription={setDescription}
+                expenseCategories={expenseCategories}
+                incomeCategories={incomeCategories}
+            />
 
             {/* Sidebar */}
             <Sider
@@ -196,10 +265,9 @@ export default function SideBarLayout() {
                         className="premium-menu"
                         items={[
                             { key: "1", icon: <LayoutDashboard size={16} />, label: "Dashboard" },
-                            { key: "2", icon: <Plus size={16} />, label: "Add Record" },
                             { key: "3", icon: <DollarSign size={16} />, label: "Income / Expense" },
                             { key: "4", icon: <FileCheck2 size={16} />, label: "Approvals" },
-                            { key: "6", icon: <Heart size={16} />, label: "Savings" },
+                            { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
                         ]}
                     />
                 </div>
@@ -215,7 +283,7 @@ export default function SideBarLayout() {
                         className="premium-menu"
                         items={[
                             { key: "8", icon: <Settings size={16} />, label: "Settings" },
-                            { key: "9", icon: <HelpCircle size={16} />, label: "Help Center" },
+                            { key: "2", icon: <PlusIcon size={16} />, label: "Add Category" },
                         ]}
                     />
                 </div>
@@ -235,6 +303,16 @@ export default function SideBarLayout() {
             <Layout className="content-layout">
                 {/* Header */}
                 <Header className="dashboard-header">
+                    {isMobile && (
+                        <Button
+                            type="text"
+                            onClick={() => setCollapsed(!collapsed)}
+                            className="mobile-menu-btn"
+                        >
+                            {collapsed ? <MenuIcon size={22} /> : <X size={22} />}
+                        </Button>
+                    )}
+
                     <h2 className="header-title">Hello, {user.name}</h2>
                     <div className="header-right">
                         <Tooltip title="Approvals pending">
@@ -262,8 +340,10 @@ export default function SideBarLayout() {
                     <Routes>
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/add-record" element={<AddRecord />} />
+                        <Route path="/categories" element={<AddCategories />} />
                         <Route path="/income-expense" element={<IncomeExpense />} />
                         <Route path="/approvals" element={<Approvals />} />
+                        <Route path="/wallet" element={<WalletPage />} />
                         <Route path="/settings" element={<SettingPage />} />
                     </Routes>
                 </Content>

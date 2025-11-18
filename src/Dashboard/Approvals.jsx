@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Eye, Check, X } from "lucide-react";
 import * as Icons from "lucide-react";
+import { motion } from "framer-motion";
 import { Select, Button, Modal, Popconfirm, Tooltip } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
@@ -14,6 +15,7 @@ import {
 
 import { CommonToaster } from "../../Common/CommonToaster";
 import Filters from "../Filters/Filters";
+import { FullPageLoader } from "../../Common/FullPageLoader";
 
 export default function Approvals() {
 
@@ -28,7 +30,7 @@ export default function Approvals() {
     const [filterCategory, setFilterCategory] = useState("All");
     const [filterAmount, setFilterAmount] = useState("");
     const [searchText, setSearchText] = useState("");
-
+    const [loading, setLoading] = useState(true)
     const [requests, setRequests] = useState([]);
 
     // ✅ Details Modal
@@ -41,8 +43,10 @@ export default function Approvals() {
     }, []);
 
     const loadApprovals = async () => {
+        setLoading(true)
         const data = await getApprovalsApi();
         setRequests(Array.isArray(data) ? data : []);
+        setLoading(false)
     };
 
     // ✅ Helper
@@ -171,197 +175,214 @@ export default function Approvals() {
         return <img src={iconVal} className="avatar" alt="" />;
     };
 
+    const fadeUp = {
+        hidden: { opacity: 0, y: 30 },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.6 },
+        },
+    };
+
     return (
         <>
-            {/* ✅ FULL DASHBOARD FILTERS */}
-            <Filters onFilterChange={setFilters} />
+            {loading ? (<FullPageLoader />) : (
+                <>
+                    <Filters onFilterChange={setFilters} />
+                    <div className="approvals-container">
 
-            <div className="approvals-container">
-
-                <div className="approvals-header-top">
-                    <h1 className="approvals-title">Approvals</h1>
-                </div>
-
-                {/* ✅ Extra Filters */}
-                <div className="filter-dropdown">
-
-                    {/* Search */}
-                    <div className="filter-item">
-                        <label>Search (Name / Branch)</label>
-                        <input
-                            type="text"
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            placeholder="Search owner or category"
-                            style={{
-                                width: 240,
-                                padding: "8px 10px",
-                                border: "1px solid #ccc",
-                                borderRadius: 6,
-                                height: 40,
-                            }}
-                        />
-                    </div>
-
-                    {/* Category */}
-                    <div className="filter-item">
-                        <label>Category</label>
-                        <Select
-                            value={filterCategory}
-                            onChange={setFilterCategory}
-                            style={{ width: 200 }}
-                            options={categoryOptions.map((c) => ({
-                                value: c,
-                                label: c,
-                            }))}
-                        />
-                    </div>
-
-                    {/* Amount Sort */}
-                    <div className="filter-item">
-                        <label>Amount</label>
-                        <Select
-                            value={filterAmount}
-                            onChange={setFilterAmount}
-                            style={{ width: 180 }}
-                            options={[
-                                { value: "", label: "None" },
-                                { value: "low", label: "Low → High" },
-                                { value: "high", label: "High → Low" },
-                            ]}
-                        />
-                    </div>
-
-                    <Button className="clear-btn" onClick={clearAllFilters}>
-                        Clear All
-                    </Button>
-                </div>
-
-                {/* ✅ TABLE */}
-                <div className="approvals-table">
-
-                    <div className="approvals-header">
-                        <span>SPENDER NAME</span>
-                        <span>CATEGORY</span>
-                        <span>AMOUNT</span>
-                        <span>DATE</span>
-                        <span>ACTION</span>
-                    </div>
-
-                    {filteredRows.length === 0 ? (
-                        <div className="no-data-box">
-                            <img
-                                src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
-                                alt="no data"
-                                className="no-data-img"
-                            />
-                            <h3>No Data Found</h3>
-                            <p>No approval requests available.</p>
+                        <div className="approvals-header-top">
+                            <h1 className="approvals-title">Approvals</h1>
                         </div>
-                    ) : (
-                        filteredRows.map((row) => (
-                            <div className="approvals-row" key={row.id}>
-                                <div className="owner-cell">
-                                    {renderIcon(row.icon)}
-                                    <div>
-                                        <h4>{row.name}</h4>
-                                        <p>{row.role}</p>
-                                    </div>
+
+                        {/* ✅ Extra Filters */}
+                        <motion.div variants={fadeUp}
+                            initial="hidden"
+                            animate="visible" className="filter-dropdown">
+
+                            {/* Search */}
+                            <div className="filter-item">
+                                <label>Search (Name / Branch)</label>
+                                <input
+                                    type="text"
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    placeholder="Search owner or category"
+                                    style={{
+                                        width: 240,
+                                        padding: "8px 10px",
+                                        border: "1px solid #ccc",
+                                        borderRadius: 6,
+                                        height: 40,
+                                    }}
+                                />
+                            </div>
+
+                            {/* Category */}
+                            <div className="filter-item">
+                                <label>Category</label>
+                                <Select
+                                    value={filterCategory}
+                                    onChange={setFilterCategory}
+                                    style={{ width: 200 }}
+                                    options={categoryOptions.map((c) => ({
+                                        value: c,
+                                        label: c,
+                                    }))}
+                                />
+                            </div>
+
+                            {/* Amount Sort */}
+                            <div className="filter-item">
+                                <label>Amount</label>
+                                <Select
+                                    value={filterAmount}
+                                    onChange={setFilterAmount}
+                                    style={{ width: 180 }}
+                                    options={[
+                                        { value: "", label: "None" },
+                                        { value: "low", label: "Low → High" },
+                                        { value: "high", label: "High → Low" },
+                                    ]}
+                                />
+                            </div>
+
+                            <Button className="clear-btn" onClick={clearAllFilters}>
+                                Clear All
+                            </Button>
+                        </motion.div>
+
+                        {/* ✅ TABLE */}
+                        <div className="approvals-table-wrapper">
+                            <motion.div variants={fadeUp}
+                                initial="hidden"
+                                animate="visible" className="approvals-table">
+
+                                <div className="approvals-header">
+                                    <span>SPENDER NAME</span>
+                                    <span>CATEGORY</span>
+                                    <span>AMOUNT</span>
+                                    <span>DATE</span>
+                                    <span>ACTION</span>
                                 </div>
 
-                                <div className="category-cell">
-                                    <span
-                                        className="category-pill"
+                                {filteredRows.length === 0 ? (
+                                    <div className="no-data-box">
+                                        <img
+                                            src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
+                                            alt="no data"
+                                            className="no-data-img"
+                                        />
+                                        <h3>No Data Found</h3>
+                                        <p>No approval requests available.</p>
+                                    </div>
+                                ) : (
+                                    filteredRows.map((row) => (
+                                        <div className="approvals-row" key={row.id}>
+                                            <div className="owner-cell">
+                                                {renderIcon(row.icon)}
+                                                <div>
+                                                    <h4>{row.name}</h4>
+                                                    <p>{row.role}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="category-cell">
+                                                <span
+                                                    className="category-pill"
+                                                    style={{
+                                                        backgroundColor:
+                                                            row.categoryColor || row.color,
+                                                    }}
+                                                >
+                                                    {row.category}
+                                                </span>
+                                            </div>
+
+                                            <div className="amount-cell">{fmtAmt(row.amount)}</div>
+                                            <div className="freq-cell">{fmtDate(row.date)}</div>
+
+                                            <div className="action-cell">
+                                                <Tooltip title="View">
+                                                    <Eye
+                                                        size={19}
+                                                        className="icon view"
+                                                        onClick={() => openDetails(row)}
+                                                    />
+                                                </Tooltip>
+
+                                                <Popconfirm
+                                                    title="Approve this request?"
+                                                    okText="Yes"
+                                                    cancelText="No"
+                                                    onConfirm={() => doApprove(row)}
+                                                >
+                                                    <Tooltip title="Approve">
+                                                        <Check size={20} className="icon approve" />
+                                                    </Tooltip>
+                                                </Popconfirm>
+
+                                                <Popconfirm
+                                                    title="Reject this request?"
+                                                    okText="Yes"
+                                                    cancelText="No"
+                                                    onConfirm={() => doReject(row)}
+                                                >
+                                                    <Tooltip title="Reject">
+                                                        <X size={20} className="icon reject" />
+                                                    </Tooltip>
+                                                </Popconfirm>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </motion.div>
+                        </div>
+
+                        {/* ✅ DETAILS MODAL */}
+                        <Modal
+                            className="details-modal"
+                            open={showDetails}
+                            onCancel={() => setShowDetails(false)}
+                            footer={null}
+                            title="Request Details"
+                            centered
+                        >
+                            {selected && (
+                                <div className="details-grid" style={{ display: "grid", gap: 10 }}>
+                                    <div><b>Spender Name:</b> {selected.name}</div>
+                                    <div><b>Description:</b> {selected.role || "-"}</div>
+                                    <div><b>Branch:</b> {selected.branch || "-"}</div>
+                                    <div><b>Category:</b> {selected.sub_category}</div>
+                                    <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
+                                    <div><b>Date:</b> {fmtDate(selected.date)}</div>
+
+                                    <div
                                         style={{
-                                            backgroundColor:
-                                                row.categoryColor || row.color,
+                                            display: "flex",
+                                            gap: 8,
+                                            marginTop: 12,
+                                            border: "none",
                                         }}
                                     >
-                                        {row.category}
-                                    </span>
+                                        <Button onClick={() => setShowDetails(false)}>Close</Button>
+
+                                        <Popconfirm
+                                            title="Approve this request?"
+                                            okText="Yes"
+                                            cancelText="No"
+                                            onConfirm={() => doApprove(selected)}
+                                        >
+                                            <Button type="primary">Approve</Button>
+                                        </Popconfirm>
+                                    </div>
                                 </div>
+                            )}
+                        </Modal>
+                    </div>
+                </>
+            )}
 
-                                <div className="amount-cell">{fmtAmt(row.amount)}</div>
-                                <div className="freq-cell">{fmtDate(row.date)}</div>
-
-                                <div className="action-cell">
-                                    <Tooltip title="View">
-                                        <Eye
-                                            size={19}
-                                            className="icon view"
-                                            onClick={() => openDetails(row)}
-                                        />
-                                    </Tooltip>
-
-                                    <Popconfirm
-                                        title="Approve this request?"
-                                        okText="Yes"
-                                        cancelText="No"
-                                        onConfirm={() => doApprove(row)}
-                                    >
-                                        <Tooltip title="Approve">
-                                            <Check size={20} className="icon approve" />
-                                        </Tooltip>
-                                    </Popconfirm>
-
-                                    <Popconfirm
-                                        title="Reject this request?"
-                                        okText="Yes"
-                                        cancelText="No"
-                                        onConfirm={() => doReject(row)}
-                                    >
-                                        <Tooltip title="Reject">
-                                            <X size={20} className="icon reject" />
-                                        </Tooltip>
-                                    </Popconfirm>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-
-
-                {/* ✅ DETAILS MODAL */}
-                <Modal
-                    className="details-modal"
-                    open={showDetails}
-                    onCancel={() => setShowDetails(false)}
-                    footer={null}
-                    title="Request Details"
-                    centered
-                >
-                    {selected && (
-                        <div className="details-grid" style={{ display: "grid", gap: 10 }}>
-                            <div><b>Spender Name:</b> {selected.name}</div>
-                            <div><b>Description:</b> {selected.role || "-"}</div>
-                            <div><b>Branch:</b> {selected.branch || "-"}</div>
-                            <div><b>Category:</b> {selected.sub_category}</div>
-                            <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
-                            <div><b>Date:</b> {fmtDate(selected.date)}</div>
-
-                            <div
-                                style={{
-                                    display: "flex",
-                                    gap: 8,
-                                    marginTop: 12,
-                                    border: "none",
-                                }}
-                            >
-                                <Button onClick={() => setShowDetails(false)}>Close</Button>
-
-                                <Popconfirm
-                                    title="Approve this request?"
-                                    okText="Yes"
-                                    cancelText="No"
-                                    onConfirm={() => doApprove(selected)}
-                                >
-                                    <Button type="primary">Approve</Button>
-                                </Popconfirm>
-                            </div>
-                        </div>
-                    )}
-                </Modal>
-            </div>
         </>
     );
 }

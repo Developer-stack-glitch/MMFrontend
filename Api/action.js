@@ -138,9 +138,11 @@ export const addIncomeCategoryApi = async (payload) => {
 
 
 // ✅ ADD EXPENSE
-export const addExpenseApi = async (payload) => {
+export const addExpenseApi = async (formData) => {
     try {
-        const res = await api.post("/api/transactions/add-expense", payload);
+        const res = await api.post("/api/transactions/add-expense", formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+        });
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
@@ -148,9 +150,11 @@ export const addExpenseApi = async (payload) => {
 };
 
 // ✅ ADD INCOME
-export const addIncomeApi = async (payload) => {
+export const addIncomeApi = async (formData) => {
     try {
-        const res = await api.post("/api/transactions/add-income", payload);
+        const res = await api.post("/api/transactions/add-income", formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+        });
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
@@ -213,3 +217,25 @@ export const deleteUserApi = async (id) => {
     const res = await api.delete(`/api/auth/users/${id}`);
     return res.data;
 };
+
+
+// ADD WALLET AMOUNT
+export const addWalletApi = async (payload) => {
+    try {
+        const res = await api.post("/api/wallet/add", payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const getWalletBalanceApi = async (userId) => {
+    const res = await api.get(`/api/wallet/balance/${userId}`);
+    return res.data;
+};
+
+export const getWalletEntriesApi = async (userId) => {
+    const res = await api.get(`/api/wallet/wallet/${userId}`);
+    return res.data;
+};
+

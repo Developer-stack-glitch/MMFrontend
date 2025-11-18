@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getExpenseCategoriesApi, getIncomeCategoriesApi } from "../../Api/action";
 import { Modal, Tabs, Button, Input } from "antd";
-
+import { motion } from "framer-motion";
 import * as Icons from "lucide-react";
 import { Plus, X } from "lucide-react";
-
+import { FullPageLoader } from "../../Common/FullPageLoader";
 import { addExpenseCategoryApi, addIncomeCategoryApi } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
 
@@ -22,9 +22,11 @@ export default function AddCategories() {
     const [iconSearch, setIconSearch] = useState("");
     const [customColor, setCustomColor] = useState("");
     const colorInputRef = useRef(null);
+    const [loading, setLoading] = useState(true);
 
     const loadCategories = React.useCallback(async () => {
         try {
+            setLoading(true);
             const exp = await getExpenseCategoriesApi();
             const inc = await getIncomeCategoriesApi();
 
@@ -33,6 +35,9 @@ export default function AddCategories() {
 
         } catch (err) {
             console.error("Failed fetching categories", err);
+        }
+        finally {
+            setLoading(false);
         }
     }, []);
 
@@ -101,191 +106,208 @@ export default function AddCategories() {
         }
     };
 
+    const fadeUp = {
+        hidden: { opacity: 0, y: 30 },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.6 },
+        },
+    };
+
     return (
-        <div className="categories-container">
-            <div className="categories-header">
-                <h2>Manage Categories</h2>
-                <p className="subtitle">Organize and personalize your spending categories</p>
-            </div>
-
-            <div className="categories-tabs">
-                <Tabs activeKey={activeTab} onChange={setActiveTab} centered className="custom-tabs">
-
-                    {/* ✅ EXPENSES */}
-                    <TabPane tab="Expenses" key="expenses">
-                        <div className="category-list">
-                            {expenseData.map((cat, index) => (
-                                <div key={index} className="category-item premium">
-                                    <div className="category-left">
-                                        <div
-                                            className="category-icon"
-                                            style={{ background: cat.color }}
-                                        >
-                                            {renderIcon(cat.icon, 18)}
-                                        </div>
-
-                                        <div>
-                                            <h4>{cat.sub_category}</h4>
-                                            <p>0 transactions</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </TabPane>
-
-                    {/* ✅ INCOME */}
-                    <TabPane tab="Income" key="income">
-                        <div className="category-list">
-                            {incomeData.map((cat, index) => (
-                                <div key={index} className="category-item premium">
-                                    <div className="category-left">
-                                        <div
-                                            className="category-icon"
-                                            style={{ background: cat.color }}
-                                        >
-                                            {renderIcon(cat.icon, 18)}
-                                        </div>
-
-                                        <div>
-                                            <h4>{cat.name}</h4>
-                                            <p>0 transactions</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </TabPane>
-
-                </Tabs>
-            </div>
-
-            {/* ✅ Add button */}
-            <div className="categories-footer">
-                <Button
-                    icon={<Plus size={16} />}
-                    onClick={() => setIsModalOpen(true)}
-                    className="add-btn-premium"
-                >
-                    Add Category
-                </Button>
-            </div>
-
-            {/* ✅ CREATE CATEGORY MODAL */}
-            <Modal
-                open={isModalOpen}
-                onCancel={() => setIsModalOpen(false)}
-                footer={null}
-                width={480}
-                centered
-                className="create-category-modal"
-                closeIcon={<X size={20} />}
-            >
-                <h3 className="modal-title">Create a New Category</h3>
-                <p className="modal-subtitle">Choose color and icon to make it stand out.</p>
-
-                <Input
-                    placeholder={activeTab === "expenses" ? "Main category name" : "Income category name"}
-                    value={categoryName}
-                    onChange={(e) => setCategoryName(e.target.value)}
-                    className="category-input"
-                />
-
-                {activeTab === "expenses" && (
-                    <Input
-                        placeholder="Sub category name"
-                        value={subCategory}
-                        onChange={(e) => setSubCategory(e.target.value)}
-                        className="category-input"
-                        style={{ marginTop: 10 }}
-                    />
-                )}
-
-                {/* ✅ Color Picker */}
-                {/* ✅ Color Picker */}
-                <div className="color-section">
-                    <p>Category color</p>
-                    <div className="color-options">
-
-                        {/* ✅ Default 6 colors */}
-                        {colors.map((color) => (
-                            <div
-                                key={color}
-                                className={`color-circle ${selectedColor === color ? "selected" : ""}`}
-                                style={{ background: color }}
-                                onClick={() => {
-                                    setSelectedColor(color);
-                                    setCustomColor(""); // reset custom
-                                }}
-                            />
-                        ))}
-
-                        {/* ✅ Custom Color Picker */}
-                        <div
-                            className={`color-circle ${customColor ? "selected" : ""}`}
-                            style={{
-                                background: customColor || "#fff",
-                                border: customColor ? "2px solid #d4af37" : "2px dashed #b9b9b9",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 20,
-                                color: "#1c2431",
-                            }}
-                            onClick={() => colorInputRef.current.click()}
-                        >
-                            {!customColor && "+"}
-                        </div>
-
-                        {/* Hidden Color Input */}
-                        <input
-                            type="color"
-                            ref={colorInputRef}
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                                setCustomColor(e.target.value);
-                                setSelectedColor(e.target.value);
-                            }}
-                        />
-
+        <>
+            {loading ? (<FullPageLoader />) : (
+                <div className="categories-container">
+                    <div className="categories-header">
+                        <h2>Manage Categories</h2>
+                        <p className="subtitle">Organize and personalize your spending categories</p>
                     </div>
-                </div>
 
+                    <motion.div variants={fadeUp}
+                        initial="hidden"
+                        animate="visible" className="categories-tabs">
+                        <Tabs activeKey={activeTab} onChange={setActiveTab} centered className="custom-tabs">
 
-                {/* ✅ Icon Picker (AUTO-GENERATED) */}
-                {/* ✅ Icon Picker (AUTO-GENERATED) */}
-                <div className="icon-section">
-                    <p>Category icon</p>
+                            {/* ✅ EXPENSES */}
+                            <TabPane tab="Expenses" key="expenses">
+                                <div className="category-list">
+                                    {expenseData.map((cat, index) => (
+                                        <div key={index} className="category-item premium">
+                                            <div className="category-left">
+                                                <div
+                                                    className="category-icon"
+                                                    style={{ background: cat.color }}
+                                                >
+                                                    {renderIcon(cat.icon, 18)}
+                                                </div>
 
-                    {/* ✅ Search Field */}
-                    <div style={{ marginBottom: 12 }}>
+                                                <div>
+                                                    <h4>{cat.sub_category}</h4>
+                                                    <p>0 transactions</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </TabPane>
+
+                            {/* ✅ INCOME */}
+                            <TabPane tab="Income" key="income">
+                                <div className="category-list">
+                                    {incomeData.map((cat, index) => (
+                                        <div key={index} className="category-item premium">
+                                            <div className="category-left">
+                                                <div
+                                                    className="category-icon"
+                                                    style={{ background: cat.color }}
+                                                >
+                                                    {renderIcon(cat.icon, 18)}
+                                                </div>
+
+                                                <div>
+                                                    <h4>{cat.name}</h4>
+                                                    <p>0 transactions</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </TabPane>
+
+                        </Tabs>
+                    </motion.div>
+
+                    {/* ✅ Add button */}
+                    <div className="categories-footer">
+                        <Button
+                            icon={<Plus size={16} />}
+                            onClick={() => setIsModalOpen(true)}
+                            className="add-btn-premium"
+                        >
+                            Add New Category
+                        </Button>
+                    </div>
+
+                    {/* ✅ CREATE CATEGORY MODAL */}
+                    <Modal
+                        open={isModalOpen}
+                        onCancel={() => setIsModalOpen(false)}
+                        footer={null}
+                        width={480}
+                        centered
+                        className="create-category-modal"
+                        closeIcon={<X size={20} />}
+                    >
+                        <h3 className="modal-title">Create a New Category</h3>
+                        <p className="modal-subtitle">Choose color and icon to make it stand out.</p>
+
                         <Input
-                            style={{ height: 40 }}
-                            placeholder="Search icon..."
-                            value={iconSearch}
-                            onChange={(e) => setIconSearch(e.target.value)}
+                            placeholder={activeTab === "expenses" ? "Main category name" : "Income category name"}
+                            value={categoryName}
+                            onChange={(e) => setCategoryName(e.target.value)}
                             className="category-input"
                         />
-                    </div>
 
-                    <div className="icon-grid">
-                        {filteredIcons.map((iconName) => (
-                            <div
-                                key={iconName}
-                                className={`icon-circle ${selectedIcon === iconName ? "selected-icon" : ""}`}
-                                onClick={() => setSelectedIcon(iconName)}
-                            >
-                                {renderIcon(iconName, 20, "#000")}
+                        {activeTab === "expenses" && (
+                            <Input
+                                placeholder="Sub category name"
+                                value={subCategory}
+                                onChange={(e) => setSubCategory(e.target.value)}
+                                className="category-input"
+                                style={{ marginTop: 10 }}
+                            />
+                        )}
+
+                        {/* ✅ Color Picker */}
+                        {/* ✅ Color Picker */}
+                        <div className="color-section">
+                            <p>Category color</p>
+                            <div className="color-options">
+
+                                {/* ✅ Default 6 colors */}
+                                {colors.map((color) => (
+                                    <div
+                                        key={color}
+                                        className={`color-circle ${selectedColor === color ? "selected" : ""}`}
+                                        style={{ background: color }}
+                                        onClick={() => {
+                                            setSelectedColor(color);
+                                            setCustomColor(""); // reset custom
+                                        }}
+                                    />
+                                ))}
+
+                                {/* ✅ Custom Color Picker */}
+                                <div
+                                    className={`color-circle ${customColor ? "selected" : ""}`}
+                                    style={{
+                                        background: customColor || "#fff",
+                                        border: customColor ? "2px solid #d4af37" : "2px dashed #b9b9b9",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 20,
+                                        color: "#1c2431",
+                                    }}
+                                    onClick={() => colorInputRef.current.click()}
+                                >
+                                    {!customColor && "+"}
+                                </div>
+
+                                {/* Hidden Color Input */}
+                                <input
+                                    type="color"
+                                    ref={colorInputRef}
+                                    style={{ display: "none" }}
+                                    onChange={(e) => {
+                                        setCustomColor(e.target.value);
+                                        setSelectedColor(e.target.value);
+                                    }}
+                                />
+
                             </div>
-                        ))}
-                    </div>
+                        </div>
+
+
+                        {/* ✅ Icon Picker (AUTO-GENERATED) */}
+                        {/* ✅ Icon Picker (AUTO-GENERATED) */}
+                        <div className="icon-section">
+                            <p>Category icon</p>
+
+                            {/* ✅ Search Field */}
+                            <div style={{ marginBottom: 12 }}>
+                                <Input
+                                    style={{ height: 40 }}
+                                    placeholder="Search icon..."
+                                    value={iconSearch}
+                                    onChange={(e) => setIconSearch(e.target.value)}
+                                    className="category-input"
+                                />
+                            </div>
+
+                            <div className="icon-grid">
+                                {filteredIcons.map((iconName) => (
+                                    <div
+                                        key={iconName}
+                                        className={`icon-circle ${selectedIcon === iconName ? "selected-icon" : ""}`}
+                                        onClick={() => setSelectedIcon(iconName)}
+                                    >
+                                        {renderIcon(iconName, 20, "#000")}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+
+                        <Button type="primary" className="create-btn" onClick={handleCreateCategory}>
+                            Create Category
+                        </Button>
+                    </Modal>
                 </div>
+            )}
 
+        </>
 
-                <Button type="primary" className="create-btn" onClick={handleCreateCategory}>
-                    Create Category
-                </Button>
-            </Modal>
-        </div>
     );
 }
