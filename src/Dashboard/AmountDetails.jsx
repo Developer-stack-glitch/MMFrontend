@@ -25,12 +25,25 @@ export default function AmountDetails({
     // FETCH ALL WALLET ENTRIES FOR USER
     // ===============================================================
     useEffect(() => {
-        if (user?.role === "user") {
-            getWalletEntriesApi(user.id).then((res) => {
-                setWalletEntries(res || []);
-            });
-        }
-    }, [user]);
+        const loadWallet = () => {
+            if (user?.role === "user" && user?.id) {
+                getWalletEntriesApi(user.id).then((res) => {
+                    setWalletEntries(res.entries || []);
+                });
+            }
+        };
+
+        loadWallet();
+
+        // Reload wallet when transactions are updated
+        window.addEventListener("incomeExpenseUpdated", loadWallet);
+        window.addEventListener("summaryUpdated", loadWallet);
+
+        return () => {
+            window.removeEventListener("incomeExpenseUpdated", loadWallet);
+            window.removeEventListener("summaryUpdated", loadWallet);
+        };
+    }, [user?.id, user?.role]);
 
     if (loading) {
         return (
@@ -224,14 +237,7 @@ export default function AmountDetails({
     // ===============================================================
     // ANIMATION
     // ===============================================================
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.6 },
-        },
-    };
+
 
     return (
         <div className="stats-grid">
@@ -239,7 +245,7 @@ export default function AmountDetails({
                 <motion.div
                     key={i}
                     className="stat-card"
-                    variants={fadeUp}
+
                     initial="hidden"
                     animate="visible"
                 >

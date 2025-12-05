@@ -20,6 +20,7 @@ import {
     PlusIcon,
     Plus,
     Wallet,
+    Calendar,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
@@ -36,6 +37,7 @@ import SettingPage from "../Dashboard/Settings";
 import Modals from "../Dashboard/Modals";
 import dayjs from "dayjs";
 import WalletPage from "../Dashboard/Wallet";
+import CalendarPage from "../Dashboard/Calendar";
 const { Sider, Content, Header } = Layout;
 
 export default function SideBarLayout() {
@@ -52,11 +54,23 @@ export default function SideBarLayout() {
     const [mainCategory, setMainCategory] = useState("Select Main Category");
     const [subCategory, setSubCategory] = useState("Select Category");
     const [description, setDescription] = useState("");
-
+    const [vendorName, setVendorName] = useState("");
+    const [vendorNumber, setVendorNumber] = useState("");
+    const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [expenseCategories, setExpenseCategories] = useState({});
     const [incomeCategories, setIncomeCategories] = useState([]);
 
     const [isMobile, setIsMobile] = useState(false);
+    const isAdmin = user?.role === "admin";
+
+    useEffect(() => {
+        if (user?.role === "user") {
+            if (location.pathname === "/approvals" || location.pathname === "/wallet") {
+                navigate("/dashboard", { replace: true });
+            }
+        }
+    }, [user, location]);
+
 
     useEffect(() => {
         const handleResize = () => {
@@ -155,7 +169,7 @@ export default function SideBarLayout() {
         "/bills": "6",
         "/savings": "7",
         "/settings": "8",
-        "/help": "9",
+        "/calendar": "9",
     };
 
     const selectedKey = menuKeyMap[location.pathname] || "1";
@@ -170,7 +184,7 @@ export default function SideBarLayout() {
             6: "/bills",
             7: "/savings",
             8: "/settings",
-            9: "/help",
+            9: "/calendar",
         };
 
         navigate(routeMap[e.key]);
@@ -239,6 +253,12 @@ export default function SideBarLayout() {
                 setDescription={setDescription}
                 expenseCategories={expenseCategories}
                 incomeCategories={incomeCategories}
+                vendorName={vendorName}
+                setVendorName={setVendorName}
+                vendorNumber={vendorNumber}
+                setVendorNumber={setVendorNumber}
+                endDate={endDate}
+                setEndDate={setEndDate}
             />
 
             {/* Sidebar */}
@@ -249,9 +269,11 @@ export default function SideBarLayout() {
                 width={240}
                 className={`premium-sider ${collapsed ? "collapsed" : ""}`}
             >
-                <div className="sider-header">
-                    <div className="logo-circle">💸</div>
-                    {!collapsed && <h2 className="logo-text">FinancePro</h2>}
+                <div onClick={() => {
+                    navigate("/dashboard")
+                }} className="sider-header">
+                    <div className="logo-circle"><img src="/images/cashmaster_logo_main.png" alt="" /></div>
+                    {!collapsed && <img src="/images/cashmaster_logo.png" alt="" />}
                 </div>
 
                 {/* Main Menu */}
@@ -266,8 +288,11 @@ export default function SideBarLayout() {
                         items={[
                             { key: "1", icon: <LayoutDashboard size={16} />, label: "Dashboard" },
                             { key: "3", icon: <DollarSign size={16} />, label: "Income / Expense" },
-                            { key: "4", icon: <FileCheck2 size={16} />, label: "Approvals" },
-                            { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
+
+                            ...(isAdmin ? [
+                                { key: "4", icon: <FileCheck2 size={16} />, label: "Approvals" },
+                                { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
+                            ] : []),
                         ]}
                     />
                 </div>
@@ -283,6 +308,7 @@ export default function SideBarLayout() {
                         className="premium-menu"
                         items={[
                             { key: "8", icon: <Settings size={16} />, label: "Settings" },
+                            { key: "9", icon: <Calendar size={16} />, label: "Schedule Calendar" },
                             { key: "2", icon: <PlusIcon size={16} />, label: "Add Category" },
                         ]}
                     />
@@ -315,15 +341,17 @@ export default function SideBarLayout() {
 
                     <h2 className="header-title">Hello, {user.name}</h2>
                     <div className="header-right">
-                        <Tooltip title="Approvals pending">
-                            <Button onClick={() => navigate("/approvals")} type="text" className="icon-btn notification-btn">
-                                <Bell size={18} />
+                        {isAdmin ? (
+                            <Tooltip title="Approvals pending">
+                                <Button onClick={() => navigate("/approvals")} type="text" className="icon-btn notification-btn">
+                                    <Bell size={18} />
 
-                                {pendingCount > 0 && (
-                                    <span className="pending-badge">{pendingCount}</span>
-                                )}
-                            </Button>
-                        </Tooltip>
+                                    {pendingCount > 0 && (
+                                        <span className="pending-badge">{pendingCount}</span>
+                                    )}
+                                </Button>
+                            </Tooltip>
+                        ) : ""}
                         <Dropdown menu={profileMenu} placement="bottomRight" arrow>
                             <Avatar
                                 size={36}
@@ -345,6 +373,7 @@ export default function SideBarLayout() {
                         <Route path="/approvals" element={<Approvals />} />
                         <Route path="/wallet" element={<WalletPage />} />
                         <Route path="/settings" element={<SettingPage />} />
+                        <Route path="/calendar" element={<CalendarPage />} />
                     </Routes>
                 </Content>
             </Layout>

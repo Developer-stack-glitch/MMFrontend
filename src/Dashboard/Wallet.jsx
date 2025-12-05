@@ -8,24 +8,29 @@ import {
     UsersRound,
 } from "lucide-react";
 import { CommonToaster } from "../../Common/CommonToaster";
+import WalletBalanceTable from "./WalletBalance";
 
 export default function WalletPage() {
     const [amount, setAmount] = useState("");
     const [date, setDate] = useState(dayjs());
-    const [userId, setUserId] = useState("");
+    const [userId, setUserId] = useState("Select User");
     const [users, setUsers] = useState([]);
+    const formRef = React.useRef(null);
+    const [reloadTable, setReloadTable] = useState(0);
 
     useEffect(() => {
         async function loadUsers() {
             try {
                 const res = await getUsersApi();
-                setUsers(res);
+                const onlyUsers = res.filter(u => u.role !== "admin");
+                setUsers(onlyUsers);
             } catch (err) {
                 console.log(err);
             }
         }
         loadUsers();
     }, []);
+
 
     const handleSubmit = async () => {
         if (!amount || !date || !userId) {
@@ -42,7 +47,7 @@ export default function WalletPage() {
             setAmount("");
             setDate(dayjs());
             setUserId("");
-
+            setReloadTable(prev => prev + 1);
         } catch (err) {
             CommonToaster(err.message || "Error adding wallet", "error");
         }
@@ -58,6 +63,14 @@ export default function WalletPage() {
                 overflow: "hidden",
             }}
         >
+
+            <WalletBalanceTable
+                onAddWallet={(user) => {
+                    setUserId(user.id);
+                    formRef.current?.scrollIntoView({ behavior: "smooth" });
+                }}
+                reloadTrigger={reloadTable}
+            />
 
             {/* 🔵 Abstract Blurred Shape Left */}
             <div
@@ -106,6 +119,7 @@ export default function WalletPage() {
 
             {/* MAIN CARD (unchanged UI) */}
             <div
+                ref={formRef}
                 style={{
                     position: "relative",
                     zIndex: 2,

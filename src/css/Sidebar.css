@@ -54,15 +54,15 @@ body {
 .sider-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0px;
   padding: 24px 20px;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .logo-circle {
-  background: rgba(255, 255, 255, 0.2);
-  width: 38px;
-  height: 38px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -230,6 +230,14 @@ body {
   justify-content: center;
   padding: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.sider-header img{
+  width: 70%;
+}
+
+.logo-circle img{
+  width: 90%;
 }
 
 

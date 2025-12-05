@@ -222,7 +222,7 @@ export default function AddRecord() {
 
                     <div className="dashboard-container">
                         {/* ✅ QUICK ACCESS (No UI Change) */}
-                        <motion.div className="quick-access-card" variants={fadeUp}
+                        <motion.div className="quick-access-card"
                             initial="hidden"
                             animate="visible">
                             <h3 className="quick-access-title">Add New Records</h3>
@@ -297,7 +297,7 @@ export default function AddRecord() {
                         <div style={{ gridTemplateColumns: "1fr 1fr" }} className="graphs-grid">
 
                             {/* ✅ INCOME BAR CHART */}
-                            <motion.div className="chart-card" variants={fadeUp}
+                            <motion.div className="chart-card"
                                 initial="hidden"
                                 animate="visible">
                                 <div className="chart-header">
@@ -334,7 +334,7 @@ export default function AddRecord() {
                             </motion.div>
 
                             {/* ✅ EXPENSE POLAR CHART */}
-                            <motion.div className="chart-card" variants={fadeUp}
+                            <motion.div className="chart-card"
                                 initial="hidden"
                                 animate="visible">
                                 <div className="chart-header">

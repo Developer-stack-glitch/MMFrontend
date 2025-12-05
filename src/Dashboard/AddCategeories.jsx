@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getExpenseCategoriesApi, getIncomeCategoriesApi } from "../../Api/action";
-import { Modal, Tabs, Button, Input } from "antd";
+import { Modal, Tabs, Button, Input, Select, Radio } from "antd";
 import { motion } from "framer-motion";
 import * as Icons from "lucide-react";
 import { Plus, X } from "lucide-react";
@@ -23,6 +23,7 @@ export default function AddCategories() {
     const [customColor, setCustomColor] = useState("");
     const colorInputRef = useRef(null);
     const [loading, setLoading] = useState(true);
+    const [categoryType, setCategoryType] = useState("new"); // "new" | "existing"
 
     const loadCategories = React.useCallback(async () => {
         try {
@@ -98,21 +99,13 @@ export default function AddCategories() {
             setCategoryName("");
             setSubCategory("");
             setSelectedIcon("ShoppingBag");
+            setCategoryType("new");
 
             window.dispatchEvent(new Event("refreshCategories"));
         } catch (err) {
             console.error(err);
             CommonToaster("Failed to add category", "error");
         }
-    };
-
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.6 },
-        },
     };
 
     return (
@@ -124,7 +117,7 @@ export default function AddCategories() {
                         <p className="subtitle">Organize and personalize your spending categories</p>
                     </div>
 
-                    <motion.div variants={fadeUp}
+                    <motion.div
                         initial="hidden"
                         animate="visible" className="categories-tabs">
                         <Tabs activeKey={activeTab} onChange={setActiveTab} centered className="custom-tabs">
@@ -202,12 +195,52 @@ export default function AddCategories() {
                         <h3 className="modal-title">Create a New Category</h3>
                         <p className="modal-subtitle">Choose color and icon to make it stand out.</p>
 
-                        <Input
-                            placeholder={activeTab === "expenses" ? "Main category name" : "Income category name"}
-                            value={categoryName}
-                            onChange={(e) => setCategoryName(e.target.value)}
-                            className="category-input"
-                        />
+                        {activeTab === "expenses" ? (
+                            <div style={{ marginBottom: 5 }}>
+                                <Radio.Group
+                                    className="radio-group"
+                                    value={categoryType}
+                                    onChange={(e) => {
+                                        setCategoryType(e.target.value);
+                                        setCategoryName("");
+                                    }}
+                                >
+                                    <Radio value="new">New Main Category</Radio>
+                                    <Radio value="existing">Existing Main Category</Radio>
+                                </Radio.Group>
+
+                                {categoryType === "existing" ? (
+                                    <Select
+                                        placeholder="Select Main Category"
+                                        style={{ width: "100%", height: 40 }}
+                                        onChange={(value) => setCategoryName(value)}
+                                        value={categoryName || undefined}
+                                    >
+                                        {[...new Set(expenseData.map((item) => item.main_category).filter(Boolean))].map(
+                                            (cat) => (
+                                                <Select.Option key={cat} value={cat}>
+                                                    {cat}
+                                                </Select.Option>
+                                            )
+                                        )}
+                                    </Select>
+                                ) : (
+                                    <Input
+                                        placeholder="Main category name"
+                                        value={categoryName}
+                                        onChange={(e) => setCategoryName(e.target.value)}
+                                        className="category-input"
+                                    />
+                                )}
+                            </div>
+                        ) : (
+                            <Input
+                                placeholder="Income category name"
+                                value={categoryName}
+                                onChange={(e) => setCategoryName(e.target.value)}
+                                className="category-input"
+                            />
+                        )}
 
                         {activeTab === "expenses" && (
                             <Input
@@ -219,7 +252,6 @@ export default function AddCategories() {
                             />
                         )}
 
-                        {/* ✅ Color Picker */}
                         {/* ✅ Color Picker */}
                         <div className="color-section">
                             <p>Category color</p>
@@ -269,8 +301,6 @@ export default function AddCategories() {
                             </div>
                         </div>
 
-
-                        {/* ✅ Icon Picker (AUTO-GENERATED) */}
                         {/* ✅ Icon Picker (AUTO-GENERATED) */}
                         <div className="icon-section">
                             <p>Category icon</p>
@@ -306,8 +336,6 @@ export default function AddCategories() {
                     </Modal>
                 </div>
             )}
-
         </>
-
     );
 }

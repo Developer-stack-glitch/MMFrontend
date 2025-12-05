@@ -114,13 +114,13 @@ export const getUser = async () => {
 
 // ✅ GET expense categories
 export const getExpenseCategoriesApi = async () => {
-    const res = await api.get("/api/categories/expense");
+    const res = await api.get("/api/categories/expense-category");
     return res.data;
 };
 
 // ✅ GET income categories
 export const getIncomeCategoriesApi = async () => {
-    const res = await api.get("/api/categories/income");
+    const res = await api.get("/api/categories/income-category");
     return res.data;
 };
 
@@ -138,11 +138,9 @@ export const addIncomeCategoryApi = async (payload) => {
 
 
 // ✅ ADD EXPENSE
-export const addExpenseApi = async (formData) => {
+export const addExpenseApi = async (payload) => {
     try {
-        const res = await api.post("/api/transactions/add-expense", formData, {
-            headers: { "Content-Type": "multipart/form-data" }
-        });
+        const res = await api.post("/api/transactions/add-expense", payload);
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
@@ -150,11 +148,9 @@ export const addExpenseApi = async (formData) => {
 };
 
 // ✅ ADD INCOME
-export const addIncomeApi = async (formData) => {
+export const addIncomeApi = async (payload) => {
     try {
-        const res = await api.post("/api/transactions/add-income", formData, {
-            headers: { "Content-Type": "multipart/form-data" }
-        });
+        const res = await api.post("/api/transactions/add-income", payload);
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
@@ -162,13 +158,13 @@ export const addIncomeApi = async (formData) => {
 };
 
 
-export const getExpensesApi = async () => {
-    const res = await api.get("/api/transactions/expenses");
+export const getExpensesApi = async (page = 1) => {
+    const res = await api.get(`/api/transactions/expenses-transactions?page=${page}&limit=10`);
     return res.data;
 };
 
-export const getIncomeApi = async () => {
-    const res = await api.get("/api/transactions/income");
+export const getIncomeApi = async (page = 1) => {
+    const res = await api.get(`/api/transactions/income-transactions?page=${page}&limit=10`);
     return res.data;
 };
 
@@ -222,20 +218,161 @@ export const deleteUserApi = async (id) => {
 // ADD WALLET AMOUNT
 export const addWalletApi = async (payload) => {
     try {
-        const res = await api.post("/api/wallet/add", payload);
+        const res = await api.post("/api/wallet/add-wallet", payload);
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
     }
 };
 
-export const getWalletBalanceApi = async (userId) => {
-    const res = await api.get(`/api/wallet/balance/${userId}`);
-    return res.data;
-};
 
 export const getWalletEntriesApi = async (userId) => {
     const res = await api.get(`/api/wallet/wallet/${userId}`);
     return res.data;
+};
+
+export const getExpensesPaginatedApi = async (page, limit = 10) => {
+    const res = await api.get(`/api/transactions/expenses-paginated?page=${page}&limit=${limit}`);
+    return res.data;
+};
+
+export const getIncomePaginatedApi = async (page, limit = 10) => {
+    const res = await api.get(`/api/transactions/income-paginated?page=${page}&limit=${limit}`);
+    return res.data;
+};
+
+export const editExpenseApi = async (payload) => {
+    return await api.post("/api/transactions/edit-expense", payload);
+};
+
+export const getUserAllExpensesApi = async () => {
+    const res = await api.get("/api/transactions/user-all-expenses");
+    return res.data;
+};
+
+
+// ================================================================
+// ✅ CALENDAR APIs
+// ================================================================
+
+// ✅ CREATE EVENT
+export const createEventApi = async (payload) => {
+    try {
+        const res = await api.post("/api/calendar/add-event", payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ GET ALL EVENTS
+export const getEventsApi = async (filters = {}) => {
+    try {
+        const params = new URLSearchParams();
+        if (filters.startDate) params.append('start_date', filters.startDate);
+        if (filters.endDate) params.append('end_date', filters.endDate);
+        if (filters.category) params.append('category', filters.category);
+
+        const queryString = params.toString();
+        const endpoint = queryString ? `/api/calendar/events?${queryString}` : '/api/calendar/events';
+
+        const res = await api.get(endpoint);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ GET EVENT BY ID
+export const getEventByIdApi = async (eventId) => {
+    try {
+        const res = await api.get(`/api/calendar/event/${eventId}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ UPDATE EVENT
+export const updateEventApi = async (eventId, payload) => {
+    try {
+        const res = await api.put(`/api/calendar/event/${eventId}`, payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ DELETE EVENT
+export const deleteEventApi = async (eventId) => {
+    try {
+        console.log("📡 API: Deleting event with ID:", eventId);
+        const res = await api.delete(`/api/calendar/event/${eventId}`);
+        console.log("📡 API: Delete response:", res.data);
+        return res.data;
+    } catch (err) {
+        console.error("📡 API: Delete failed:", err);
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ MOVE EVENT TO NEXT DAY
+export const moveEventToNextDayApi = async (eventId) => {
+    try {
+        const res = await api.post(`/api/calendar/event/${eventId}/move-next-day`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ MOVE EVENT TO NEXT MONTH
+export const moveEventToNextMonthApi = async (eventId) => {
+    try {
+        const res = await api.post(`/api/calendar/event/${eventId}/move-next-month`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ GET PENDING ALERTS
+export const getPendingAlertsApi = async () => {
+    try {
+        const res = await api.get("/api/calendar/pending-alerts");
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ MARK ALERT AS SENT
+export const markAlertSentApi = async (eventId) => {
+    try {
+        const res = await api.post(`/api/calendar/alert/${eventId}/mark-sent`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ GET EVENTS BY DATE RANGE (for calendar view)
+export const getEventsByDateApi = async (month, year) => {
+    try {
+        const res = await api.get(`/api/calendar/events-by-date?month=${month}&year=${year}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ SEARCH EVENTS
+export const searchEventsApi = async (query) => {
+    try {
+        const res = await api.get(`/api/calendar/search?query=${encodeURIComponent(query)}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
 };
 

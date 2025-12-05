@@ -32,7 +32,10 @@ export default function Approvals() {
     const [searchText, setSearchText] = useState("");
     const [loading, setLoading] = useState(true)
     const [requests, setRequests] = useState([]);
-
+    // Invoice Modal
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [currentInvoices, setCurrentInvoices] = useState([]);
+    const [currentInvoiceIndex, setCurrentInvoiceIndex] = useState(0);
     // ✅ Details Modal
     const [showDetails, setShowDetails] = useState(false);
     const [selected, setSelected] = useState(null);
@@ -40,6 +43,15 @@ export default function Approvals() {
     // ✅ Load Approvals
     useEffect(() => {
         loadApprovals();
+
+        // Reload when transactions are updated
+        window.addEventListener("incomeExpenseUpdated", loadApprovals);
+        window.addEventListener("summaryUpdated", loadApprovals);
+
+        return () => {
+            window.removeEventListener("incomeExpenseUpdated", loadApprovals);
+            window.removeEventListener("summaryUpdated", loadApprovals);
+        };
     }, []);
 
     const loadApprovals = async () => {
@@ -134,6 +146,80 @@ export default function Approvals() {
         });
     };
 
+    // -------------------------------------
+    // Invoice
+    // -------------------------------------
+    // -------------------------------------
+    // Invoice
+    // -------------------------------------
+    const handleViewInvoice = (invoiceData) => {
+        if (!invoiceData) return;
+
+        const API_BASE = import.meta.env.VITE_API_URL;
+        let invoicesArray = [];
+
+        const normalizeEntry = (entry) => {
+            if (!entry) return null;
+
+            // Ensure it's a clean string
+            let str = String(entry).trim();
+
+            // Remove wrapping quotes if present:  "data:..."  →  data:...
+            str = str.replace(/^"+|"+$/g, "");
+
+            // If it's a Base64 / data URL → return as-is
+            if (str.startsWith("data:")) {
+                return str;
+            }
+
+            // Otherwise treat as filename
+            return `${API_BASE}/uploads/invoices/${str}`;
+        };
+
+        // 1) If it's already an array
+        if (Array.isArray(invoiceData)) {
+            invoicesArray = invoiceData
+                .map(normalizeEntry)
+                .filter(Boolean);
+        }
+        // 2) If it's a JSON string representing an array: '["data:...","file.jpg"]'
+        else if (typeof invoiceData === "string" && invoiceData.trim().startsWith("[")) {
+            try {
+                const parsed = JSON.parse(invoiceData);
+                if (Array.isArray(parsed)) {
+                    invoicesArray = parsed
+                        .map(normalizeEntry)
+                        .filter(Boolean);
+                }
+            } catch (e) {
+                // fallback to single entry handling below
+            }
+        }
+
+        // 3) Fallback: single string (either "data:..." or "filename.ext")
+        if (!invoicesArray.length) {
+            invoicesArray = [normalizeEntry(invoiceData)].filter(Boolean);
+        }
+
+        if (!invoicesArray.length) return;
+
+        setCurrentInvoices(invoicesArray);
+        setCurrentInvoiceIndex(0);
+        setShowInvoiceModal(true);
+    };
+
+
+    const handleNextInvoice = () => {
+        setCurrentInvoiceIndex((prev) =>
+            prev < currentInvoices.length - 1 ? prev + 1 : prev
+        );
+    };
+
+    const handlePrevInvoice = () => {
+        setCurrentInvoiceIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    };
+
+
 
     // ✅ Step 1: APPLY DATE FILTER
     let filteredRows = applyFilters(requests);
@@ -175,15 +261,6 @@ export default function Approvals() {
         return <img src={iconVal} className="avatar" alt="" />;
     };
 
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.6 },
-        },
-    };
-
     return (
         <>
             {loading ? (<FullPageLoader />) : (
@@ -196,7 +273,7 @@ export default function Approvals() {
                         </div>
 
                         {/* ✅ Extra Filters */}
-                        <motion.div variants={fadeUp}
+                        <motion.div
                             initial="hidden"
                             animate="visible" className="filter-dropdown">
 
@@ -254,89 +331,141 @@ export default function Approvals() {
 
                         {/* ✅ TABLE */}
                         <div className="approvals-table-wrapper">
-                            <motion.div variants={fadeUp}
+                            <motion.table
                                 initial="hidden"
-                                animate="visible" className="approvals-table">
+                                animate="visible"
+                                className="approvals-table real-table"
+                            >
+                                {/* HEADER */}
+                                <thead>
+                                    <tr className="table-header">
+                                        <th>SPENDER NAME</th>
+                                        <th>CATEGORY</th>
+                                        <th>AMOUNT</th>
+                                        <th>INVOICE</th>
+                                        <th>REQUEST DATE</th>
+                                        <th>END DATE</th>
+                                        <th>ACTION</th>
+                                    </tr>
+                                </thead>
 
-                                <div className="approvals-header">
-                                    <span>SPENDER NAME</span>
-                                    <span>CATEGORY</span>
-                                    <span>AMOUNT</span>
-                                    <span>DATE</span>
-                                    <span>ACTION</span>
-                                </div>
+                                {/* BODY */}
+                                <tbody>
+                                    {filteredRows.length === 0 ? (
 
-                                {filteredRows.length === 0 ? (
-                                    <div className="no-data-box">
-                                        <img
-                                            src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
-                                            alt="no data"
-                                            className="no-data-img"
-                                        />
-                                        <h3>No Data Found</h3>
-                                        <p>No approval requests available.</p>
-                                    </div>
-                                ) : (
-                                    filteredRows.map((row) => (
-                                        <div className="approvals-row" key={row.id}>
-                                            <div className="owner-cell">
-                                                {renderIcon(row.icon)}
-                                                <div>
-                                                    <h4>{row.name}</h4>
-                                                    <p>{row.role}</p>
-                                                </div>
-                                            </div>
+                                        <tr>
+                                            <td></td>
+                                            <td></td>
+                                            <td colSpan="6" className="no-data-box">
+                                                <img
+                                                    src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
+                                                    alt="no data"
+                                                    className="no-data-img"
+                                                />
+                                                <h3>No Data Found</h3>
+                                                <p>No approval requests available.</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredRows.map((row) => (
+                                            <tr key={row.id} className="table-row">
 
-                                            <div className="category-cell">
-                                                <span
-                                                    className="category-pill"
-                                                    style={{
-                                                        backgroundColor:
-                                                            row.categoryColor || row.color,
-                                                    }}
-                                                >
-                                                    {row.category}
-                                                </span>
-                                            </div>
+                                                {/* 1️⃣ SPENDER NAME */}
+                                                <td>
+                                                    <div className="owner-cell">
+                                                        {renderIcon(row.icon)}
+                                                        <div>
+                                                            <h4>{row.name}</h4>
+                                                            <p>{row.main_category}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
 
-                                            <div className="amount-cell">{fmtAmt(row.amount)}</div>
-                                            <div className="freq-cell">{fmtDate(row.date)}</div>
+                                                {/* 2️⃣ CATEGORY */}
+                                                <td>
+                                                    <div>
+                                                        <span
+                                                            className="category-pill"
+                                                            style={{
+                                                                backgroundColor: row.categoryColor || row.color,
+                                                            }}
+                                                        >
+                                                            {row.category}
+                                                        </span>
+                                                    </div>
+                                                </td>
 
-                                            <div className="action-cell">
-                                                <Tooltip title="View">
-                                                    <Eye
-                                                        size={19}
-                                                        className="icon view"
-                                                        onClick={() => openDetails(row)}
-                                                    />
-                                                </Tooltip>
+                                                {/* 3️⃣ AMOUNT */}
+                                                <td>
+                                                    {fmtAmt(row.amount)}<br></br>
+                                                    {row.original_expense_id && (
+                                                        <span className="editable-pill">
+                                                            Editable
+                                                        </span>
+                                                    )}
+                                                </td>
 
-                                                <Popconfirm
-                                                    title="Approve this request?"
-                                                    okText="Yes"
-                                                    cancelText="No"
-                                                    onConfirm={() => doApprove(row)}
-                                                >
-                                                    <Tooltip title="Approve">
-                                                        <Check size={20} className="icon approve" />
-                                                    </Tooltip>
-                                                </Popconfirm>
+                                                {/* 4️⃣ INVOICE */}
+                                                <td>
+                                                    {row.invoice ? (
+                                                        <button
+                                                            className="view-invoice-btn"
+                                                            onClick={() =>
+                                                                handleViewInvoice(row.invoice)
+                                                            }
+                                                        >
+                                                            View
+                                                        </button>
+                                                    ) : (
+                                                        <span className="no-invoice">No File</span>
+                                                    )}
+                                                </td>
 
-                                                <Popconfirm
-                                                    title="Reject this request?"
-                                                    okText="Yes"
-                                                    cancelText="No"
-                                                    onConfirm={() => doReject(row)}
-                                                >
-                                                    <Tooltip title="Reject">
-                                                        <X size={20} className="icon reject" />
-                                                    </Tooltip>
-                                                </Popconfirm>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </motion.div>
+                                                {/* 5️⃣ Request DATE */}
+                                                <td>{fmtDate(row.date)}</td>
+
+                                                {/* 6️⃣ END DATE */}
+                                                <td>{fmtDate(row.end_date)}</td>
+
+                                                {/* 7️⃣ ACTION */}
+                                                <td>
+                                                    <div className="action-cell">
+                                                        <Tooltip title="View">
+                                                            <Eye
+                                                                size={19}
+                                                                className="icon view"
+                                                                onClick={() => openDetails(row)}
+                                                            />
+                                                        </Tooltip>
+
+                                                        <Popconfirm
+                                                            title="Approve this request?"
+                                                            okText="Yes"
+                                                            cancelText="No"
+                                                            onConfirm={() => doApprove(row)}
+                                                        >
+                                                            <Tooltip title="Approve">
+                                                                <Check size={20} className="icon approve" />
+                                                            </Tooltip>
+                                                        </Popconfirm>
+
+                                                        <Popconfirm
+                                                            title="Reject this request?"
+                                                            okText="Yes"
+                                                            cancelText="No"
+                                                            onConfirm={() => doReject(row)}
+                                                        >
+                                                            <Tooltip title="Reject">
+                                                                <X size={20} className="icon reject" />
+                                                            </Tooltip>
+                                                        </Popconfirm>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </motion.table>
                         </div>
 
                         {/* ✅ DETAILS MODAL */}
@@ -355,14 +484,19 @@ export default function Approvals() {
                                     <div><b>Branch:</b> {selected.branch || "-"}</div>
                                     <div><b>Category:</b> {selected.sub_category}</div>
                                     <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
-                                    <div><b>Date:</b> {fmtDate(selected.date)}</div>
-
+                                    <div><b>Request Date:</b> {fmtDate(selected.date)}</div>
+                                    <div><b>End Date:</b> {fmtDate(selected.end_date)}</div>
+                                    <div><b>Vendor Name:</b> {selected.vendor_name}</div>
+                                    <div><b>Vendor Number:</b> {selected.vendor_number}</div>
+                                    <div><b>Spend Mode:</b> {selected.spend_mode}</div>
                                     <div
                                         style={{
                                             display: "flex",
                                             gap: 8,
                                             marginTop: 12,
                                             border: "none",
+                                            padding: 0,
+                                            justifyContent: "flex-start"
                                         }}
                                     >
                                         <Button onClick={() => setShowDetails(false)}>Close</Button>
@@ -382,7 +516,135 @@ export default function Approvals() {
                     </div>
                 </>
             )}
+            {showInvoiceModal && currentInvoices.length > 0 && (
+                <div
+                    className="invoice-modal-backdrop"
+                    onClick={() => setShowInvoiceModal(false)}
+                >
+                    <div
+                        className="invoice-modal"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: 15
+                            }}
+                        >
+                            <h3>
+                                Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})
+                            </h3>
 
+                            <button
+                                className="close-modal-btn"
+                                onClick={() => setShowInvoiceModal(false)}
+                            >
+                                <Icons.X size={20} />
+                            </button>
+                        </div>
+
+                        <div style={{ position: "relative", textAlign: "center" }}>
+
+                            {/* LEFT ARROW */}
+                            {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
+                                <button
+                                    className="invoice-nav-btn-left"
+                                    onClick={handlePrevInvoice}
+                                >
+                                    <Icons.ChevronLeft size={24} color="white" />
+                                </button>
+                            )}
+
+                            {/* PDF Placeholder OR Image */}
+                            {currentInvoices[currentInvoiceIndex]?.includes("application/pdf") ? (
+                                <div
+                                    style={{
+                                        width: "auto",
+                                        height: "500px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        background: "#f5f5f5",
+                                        borderRadius: 10
+                                    }}
+                                >
+                                    <Icons.FileText size={80} color="#666" />
+                                    <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
+                                        PDF Document
+                                    </p>
+                                    <a
+                                        href={currentInvoices[currentInvoiceIndex]}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                            marginTop: 10,
+                                            fontSize: 14,
+                                            color: "#d4af37",
+                                            textDecoration: "underline",
+                                            cursor: "pointer"
+                                        }}
+                                    >
+                                        Open in new tab
+                                    </a>
+                                </div>
+                            ) : (
+                                <img
+                                    src={currentInvoices[currentInvoiceIndex]}
+                                    alt="Invoice"
+                                    style={{
+                                        borderRadius: 10,
+                                        objectFit: "contain",
+                                        width: "500px",
+                                        height: "450px"
+                                    }}
+                                />
+                            )}
+
+                            {/* RIGHT ARROW */}
+                            {currentInvoices.length > 1 &&
+                                currentInvoiceIndex < currentInvoices.length - 1 && (
+                                    <button
+                                        className="invoice-nav-btn-right"
+                                        onClick={handleNextInvoice}
+                                    >
+                                        <Icons.ChevronRight size={24} color="white" />
+                                    </button>
+                                )}
+                        </div>
+
+                        {/* Dots Indicator */}
+                        {currentInvoices.length > 1 && (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    gap: 8,
+                                    marginTop: 20
+                                }}
+                            >
+                                {currentInvoices.map((_, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setCurrentInvoiceIndex(idx)}
+                                        style={{
+                                            width: idx === currentInvoiceIndex ? 24 : 8,
+                                            height: 8,
+                                            borderRadius: 4,
+                                            background:
+                                                idx === currentInvoiceIndex ? "#d4af37" : "#ccc",
+                                            cursor: "pointer",
+                                            transition: "0.3s"
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </>
     );
 }

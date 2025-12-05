@@ -18,7 +18,7 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.35);
+    background: rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(3px);
     z-index: 1;
 }
@@ -122,11 +122,10 @@
     }
 }
 
-
-
 .divider::before {
     left: 0;
 }
+
 .divider::after {
     right: 0;
 }
@@ -135,7 +134,7 @@
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 9px;
     text-align: left;
 }
 
@@ -152,7 +151,7 @@
     border-radius: 12px;
     background: #ffffff;
     transition: 0.25s ease;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.03);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.03);
 }
 
 .login-form input:focus {
@@ -226,6 +225,7 @@
         opacity: 0;
         transform: translateY(40px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

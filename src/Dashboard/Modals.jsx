@@ -1,16 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { X, Upload } from "lucide-react";
 import { Dropdown, Menu, Button, Space, DatePicker } from "antd";
-import { addExpenseApi, addIncomeApi } from "../../Api/action";
+import { addExpenseApi, addIncomeApi, editExpenseApi } from "../../Api/action";
 import { DownOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { CommonToaster } from "../../Common/CommonToaster";
-import { getLastMonthSummaryApi } from "../../Api/action";
+import { getLastMonthSummaryApi } from "../../Api/action"; // still here if you use later
 
 export default function Modals({
     open,
-    type,
+    type,              // 'expense' | 'income'
+    isEdit = false,    // true for edit mode
     onClose,
     branch,
     setBranch,
@@ -26,16 +27,100 @@ export default function Modals({
     setDescription,
     expenseCategories,
     incomeCategories,
-    setOpenModal,
+    vendorName,
+    setVendorName,
+    vendorNumber,
+    setVendorNumber,
+    endDate,
+    setEndDate,
+    editData,
 }) {
     if (!open) return null;
 
-    const [invoice, setInvoice] = useState(null);
+    const [invoices, setInvoices] = useState([]);
+    const [spendMode, setSpendMode] = useState("Select Spend Mode");
 
-    const handleDateChange = async (v) => {
+    const currentUser = JSON.parse(localStorage.getItem("loginDetails"));
+
+    useEffect(() => {
+        // When opening modal for edit, hydrate local invoice + spendMode
+        if (open && isEdit && editData) {
+            // invoices
+            if (Array.isArray(editData.invoice)) {
+                setInvoices(editData.invoice);
+            } else if (typeof editData.invoice === "string" && editData.invoice.trim()) {
+                if (editData.invoice.trim().startsWith("[")) {
+                    try {
+                        const parsed = JSON.parse(editData.invoice);
+                        if (Array.isArray(parsed)) setInvoices(parsed);
+                    } catch {
+                        setInvoices([editData.invoice]);
+                    }
+                } else {
+                    setInvoices([editData.invoice]);
+                }
+            } else {
+                setInvoices([]);
+            }
+
+            // spend mode
+            setSpendMode(editData.spend_mode || "Select Spend Mode");
+
+            // Vendor & End Date
+            setVendorName(editData.vendor_name || "");
+            setVendorNumber(editData.vendor_number || "");
+            setEndDate(editData.end_date || null);
+        }
+
+        if (open && !isEdit) {
+            setInvoices([]);
+            setSpendMode("Select Spend Mode");
+            setVendorName("");
+            setVendorNumber("");
+            setEndDate(null);
+        }
+    }, [open, isEdit, editData]);
+
+    const handleDateChange = (v) => {
         const d = v ? v.format("YYYY-MM-DD") : null;
         setDate(d);
-        if (d) await getLastMonthSummaryApi(d);
+    };
+
+    const handleEndDateChange = (v) => {
+        const d = v ? v.format("YYYY-MM-DD") : null;
+        setEndDate(d);
+    };
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+
+        const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+        if (totalSize > 5 * 1024 * 1024) {
+            CommonToaster("Total file size must be less than 5MB", "error");
+            return;
+        }
+
+        const filePromises = files.map((file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        });
+
+        Promise.all(filePromises)
+            .then((base64Files) => {
+                setInvoices((prev) => [...prev, ...base64Files]);
+            })
+            .catch(() => {
+                CommonToaster("Error reading files", "error");
+            });
+    };
+
+    const removeInvoice = (index) => {
+        setInvoices((prev) => prev.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async () => {
@@ -47,24 +132,54 @@ export default function Modals({
         if (type === "expense" && subCategory === "Select Category")
             return CommonToaster("Select sub category", "error");
 
-        const currentUser = JSON.parse(localStorage.getItem("loginDetails"));
+        if (type === "expense" && spendMode === "Select Spend Mode")
+            return CommonToaster("Select spend mode", "error");
 
-        const formData = new FormData();
-        formData.append("user_id", currentUser?.id);
-        formData.append("branch", branch);
-        formData.append("date", date);
-        formData.append("total", total);
-        formData.append("mainCategory", mainCategory);
-        formData.append("subCategory", type === "expense" ? subCategory : "");
-        formData.append("description", description || "");
-
-        if (invoice) {
-            formData.append("invoice", invoice);
-        }
+        const payloadBase = {
+            branch,
+            date,
+            total,
+            mainCategory,
+            subCategory: type === "expense" ? subCategory : "",
+            description: description || "",
+            vendor_name: vendorName || "",
+            vendor_number: vendorNumber || "",
+            end_date: endDate || "",
+            invoices: invoices.length > 0 ? invoices : [],
+            spend_mode: type === "expense" ? spendMode : ""
+        };
 
         try {
-            if (type === "expense") {
-                await addExpenseApi(formData);
+            if (type === "expense" && isEdit && editData) {
+                // EDIT EXPENSE FLOW
+                const updates = {
+                    total,
+                    branch,
+                    date,
+                    mainCategory,
+                    subCategory,
+                    description,
+                    invoices,
+                    vendor_name: vendorName,
+                    vendor_number: vendorNumber,
+                    end_date: endDate,
+                    spend_mode: spendMode
+                };
+
+                const res = await editExpenseApi({
+                    expense_id: editData.id,
+                    user_id: currentUser?.id,
+                    updates
+                });
+
+                CommonToaster(res.data?.message || "Expense updated!", "success");
+            } else if (type === "expense") {
+                // ADD EXPENSE FLOW
+                await addExpenseApi({
+                    user_id: currentUser?.id,
+                    ...payloadBase
+                });
+
                 CommonToaster(
                     currentUser?.role === "admin"
                         ? "Expense added & auto-approved!"
@@ -72,22 +187,26 @@ export default function Modals({
                     "success"
                 );
             } else {
-                await addIncomeApi(formData);
+                // ADD INCOME FLOW
+                await addIncomeApi({
+                    user_id: currentUser?.id,
+                    ...payloadBase
+                });
                 CommonToaster("Income added successfully!", "success");
             }
 
-            setBranch("Select Branch");
-            setDate(dayjs().format("YYYY-MM-DD"));
-            setTotal("");
-            setMainCategory("Select Main Category");
-            setSubCategory("Select Category");
-            setDescription("");
-            setInvoice(null);
+            // Reset local-only state
+            setInvoices([]);
+            setSpendMode("Select Spend Mode");
 
             onClose();
 
-            window.dispatchEvent(new Event("summaryUpdated"));
-            window.dispatchEvent(new Event("incomeExpenseUpdated"));
+            setTimeout(() => {
+                window.dispatchEvent(new Event("summaryUpdated"));
+            }, 50);
+            setTimeout(() => {
+                window.dispatchEvent(new Event("incomeExpenseUpdated"));
+            }, 50);
         } catch (err) {
             CommonToaster(err?.message || "Server Error", "error");
         }
@@ -119,69 +238,107 @@ export default function Modals({
         />
     );
 
+    const isExpense = type === "expense";
+
     return (
         <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="expense-modal" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
-
+            <motion.div
+                className="expense-modal"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+            >
                 {/* HEADER */}
                 <div className="modal-header">
-                    <h2>New {type === "expense" ? "Expense" : "Income"}</h2>
+                    <h2>
+                        {isExpense
+                            ? isEdit
+                                ? "Edit Expense"
+                                : "New Expense"
+                            : "New Income"}
+                    </h2>
                     <button className="close-btn" onClick={onClose}>
                         <X size={18} />
                     </button>
                 </div>
 
-                <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 15 }}>
-                    <button
-                        onClick={() => {
-                            onClose();
-                            setTimeout(() => {
-                                const event = new CustomEvent("openIncomeModal");
-                                window.dispatchEvent(event);
-                            }, 50);
-                        }}
-                        style={{
-                            padding: "8px 14px",
-                            borderRadius: 8,
-                            border: type === "income" ? "none" : "1px solid #ccc",
-                            background: type === "income" ? "#d4af37" : "#f1f1f1",
-                            color: type === "income" ? "white" : "black",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                        }}
-                    >
-                        Income
-                    </button>
+                {/* HIDE TABS IN EDIT MODE */}
+                {!isEdit && (
+                    <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 15 }}>
+                        {currentUser?.role === "admin" ? (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent("openIncomeModal"));
+                                        }, 50);
+                                    }}
+                                    style={{
+                                        padding: "8px 14px",
+                                        borderRadius: 8,
+                                        border: type === "income" ? "none" : "1px solid #ccc",
+                                        background: type === "income" ? "#d4af37" : "#f1f1f1",
+                                        color: type === "income" ? "white" : "black",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    Income
+                                </button>
 
-                    <button
-                        onClick={() => {
-                            onClose();
-                            setTimeout(() => {
-                                const event = new CustomEvent("openExpenseModal");
-                                window.dispatchEvent(event);
-                            }, 50);
-                        }}
-                        style={{
-                            padding: "8px 14px",
-                            borderRadius: 8,
-                            border: type === "expense" ? "none" : "1px solid #ccc",
-                            background: type === "expense" ? "#d4af37" : "#f1f1f1",
-                            color: type === "expense" ? "white" : "black",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                        }}
-                    >
-                        Expense
-                    </button>
-                </div>
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent("openExpenseModal"));
+                                        }, 50);
+                                    }}
+                                    style={{
+                                        padding: "8px 14px",
+                                        borderRadius: 8,
+                                        border: type === "expense" ? "none" : "1px solid #ccc",
+                                        background: type === "expense" ? "#d4af37" : "#f1f1f1",
+                                        color: type === "expense" ? "white" : "black",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    Expense
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent("openExpenseModal"));
+                                        }, 50);
+                                    }}
+                                    style={{
+                                        padding: "8px 14px",
+                                        borderRadius: 8,
+                                        border: type === "expense" ? "none" : "1px solid #ccc",
+                                        background: type === "expense" ? "#d4af37" : "#f1f1f1",
+                                        color: type === "expense" ? "white" : "black",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    Expense
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
+
 
                 <hr />
 
                 {/* BODY */}
                 <div className="modal-body">
-
                     <div className="form-section">
-
                         {/* Branch */}
                         <label>Branch <span style={{ color: "red" }}>*</span></label>
                         <Dropdown overlay={branchMenu} trigger={["click"]}>
@@ -201,6 +358,17 @@ export default function Modals({
                             style={{ width: "100%", height: 40 }}
                         />
 
+                        {isExpense && (
+                            <>
+                                <label>End Date <span style={{ color: "red" }}>*</span></label>
+                                <DatePicker
+                                    value={endDate ? dayjs(endDate) : null}
+                                    onChange={handleEndDateChange}
+                                    style={{ width: "100%", height: 40 }}
+                                />
+                            </>
+                        )}
+
                         {/* Total */}
                         <label>Total <span style={{ color: "red" }}>*</span></label>
                         <input
@@ -212,7 +380,7 @@ export default function Modals({
                         />
 
                         {/* EXPENSE CATEGORIES */}
-                        {type === "expense" && (
+                        {isExpense && (
                             <>
                                 <label>Main Category <span style={{ color: "red" }}>*</span></label>
                                 <Dropdown
@@ -264,7 +432,7 @@ export default function Modals({
                         )}
 
                         {/* INCOME CATEGORIES */}
-                        {type === "income" && (
+                        {!isExpense && (
                             <>
                                 <label>Income Category <span style={{ color: "red" }}>*</span></label>
                                 <Dropdown
@@ -286,6 +454,46 @@ export default function Modals({
                             </>
                         )}
 
+                        {isExpense && (
+                            <>
+                                <label>Vendor Name</label>
+                                <input
+                                    type="text"
+                                    value={vendorName}
+                                    onChange={(e) => setVendorName(e.target.value)}
+                                    placeholder="Add Vendor name"
+                                    style={{ height: 40 }}
+                                />
+
+                                <label>Vendor Number</label>
+                                <input
+                                    type="text"
+                                    value={vendorNumber}
+                                    onChange={(e) => setVendorNumber(e.target.value)}
+                                    placeholder="Add Vendor number"
+                                    style={{ height: 40 }}
+                                />
+
+                                <label>Spend Mode <span style={{ color: "red" }}>*</span></label>
+                                <Dropdown
+                                    overlay={
+                                        <Menu
+                                            onClick={(e) => setSpendMode(e.key)}
+                                            items={[
+                                                { key: "Cash", label: "Cash" },
+                                                { key: "Online", label: "Online" },
+                                            ]}
+                                        />
+                                    }
+                                    trigger={["click"]}
+                                >
+                                    <Button style={{ width: "100%", height: 40 }}>
+                                        <Space>{spendMode}<DownOutlined /></Space>
+                                    </Button>
+                                </Dropdown>
+                            </>
+                        )}
+
                         {/* Description */}
                         <label>Description</label>
                         <textarea
@@ -299,12 +507,13 @@ export default function Modals({
                     <div className="upload-section">
                         <div className="upload-box">
                             <Upload size={40} strokeWidth={1.5} />
-                            <p>Upload an invoice</p>
+                            <p>Upload invoices (Multiple files allowed)</p>
 
                             <input
                                 type="file"
                                 accept="image/*,application/pdf"
-                                onChange={(e) => setInvoice(e.target.files[0])}
+                                multiple
+                                onChange={handleFileChange}
                                 style={{
                                     marginTop: 10,
                                     position: "absolute",
@@ -315,10 +524,75 @@ export default function Modals({
                             />
                         </div>
 
-                        {invoice && (
-                            <p style={{ marginTop: 10, fontSize: 13, color: "#444", textAlign: "center" }}>
-                                <strong>Selected:</strong> {invoice.name}
-                            </p>
+                        {invoices.length > 0 && (
+                            <div style={{ marginTop: 15 }}>
+                                <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
+                                    Selected Invoices ({invoices.length})
+                                </p>
+                                <div style={{
+                                    display: "flex",
+                                    gap: 10,
+                                    flexWrap: "wrap",
+                                    maxHeight: 200,
+                                    overflowY: "auto"
+                                }}>
+                                    {invoices.map((inv, idx) => (
+                                        <div
+                                            key={idx}
+                                            style={{
+                                                position: "relative",
+                                                width: 80,
+                                                height: 80,
+                                                borderRadius: 8,
+                                                overflow: "hidden",
+                                                border: "2px solid #e0e0e0"
+                                            }}
+                                        >
+                                            {typeof inv === "string" && inv.includes("application/pdf") ? (
+                                                <div style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    background: "#f5f5f5",
+                                                    fontSize: 10,
+                                                    fontWeight: 600,
+                                                    color: "#666"
+                                                }}>
+                                                    PDF
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    src={inv}
+                                                    alt={`invoice-${idx}`}
+                                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                                />
+                                            )}
+                                            <button
+                                                onClick={() => removeInvoice(idx)}
+                                                style={{
+                                                    position: "absolute",
+                                                    top: 2,
+                                                    right: 2,
+                                                    background: "rgba(255, 0, 0, 0.8)",
+                                                    border: "none",
+                                                    borderRadius: "50%",
+                                                    width: 20,
+                                                    height: 20,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    cursor: "pointer",
+                                                    padding: 0
+                                                }}
+                                            >
+                                                <X size={14} color="white" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -326,10 +600,11 @@ export default function Modals({
                 {/* FOOTER */}
                 <div className="modal-footer">
                     <button className="btn-draft" onClick={handleSubmit}>
-                        Add {type === "expense" ? "Expense" : "Income"}
+                        {isExpense && isEdit
+                            ? "Update Expense"
+                            : `Add ${isExpense ? "Expense" : "Income"}`}
                     </button>
                 </div>
-
             </motion.div>
         </motion.div>
     );

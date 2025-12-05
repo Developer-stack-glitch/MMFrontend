@@ -25,6 +25,9 @@ import {
     Wallet,
     Receipt,
     X,
+    ChevronRight,
+    ChevronLeft,
+    FileText
 } from "lucide-react";
 
 import "../css/Dashboard.css";
@@ -65,7 +68,8 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("expense");
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-    const [invoiceSrc, setInvoiceSrc] = useState(null);
+    const [currentInvoices, setCurrentInvoices] = useState([]);
+    const [currentInvoiceIndex, setCurrentInvoiceIndex] = useState(0);
 
     const [branch, setBranch] = useState("Select Branch");
     const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -73,6 +77,9 @@ export default function Dashboard() {
     const [mainCategory, setMainCategory] = useState("Select Main Category");
     const [subCategory, setSubCategory] = useState("Select Category");
     const [description, setDescription] = useState("");
+    const [vendorName, setVendorName] = useState("");
+    const [vendorNumber, setVendorNumber] = useState("");
+    const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
 
     const [filters, setFilters] = useState({
         filterType: "date",
@@ -82,10 +89,23 @@ export default function Dashboard() {
 
     const user = JSON.parse(localStorage.getItem("loginDetails")) || {};
 
+    // PDF detect helper
+    const isPDF = (src) => {
+        if (!src || typeof src !== "string") return false;
+
+        let clean = src.replace(/^"+|"+$/g, "").trim(); // remove wrapping quotes
+
+        return (
+            clean.startsWith("data:application/pdf") ||
+            clean.toLowerCase().endsWith(".pdf")
+        );
+    };
+
+
     // -------------------------
     // Single loader for all APIs
     // -------------------------
-    const fetchOriginalData = useCallback(async () => {
+    const fetchOriginalData = async () => {
         try {
             setLoading(true);
 
@@ -113,13 +133,13 @@ export default function Dashboard() {
                 getExpensesApi().catch(() => []),
             ]);
 
-            setOriginalIncome(incomes || []);
-            setOriginalExpenses(expenses || []);
+            setOriginalIncome((incomes?.data) || []);
+            setOriginalExpenses((expenses?.data) || []);
 
             // wallet only for user role
             if (user?.role === "user") {
-                const wallets = await getWalletEntriesApi(user.id).catch(() => []);
-                setWalletEntries(wallets || []);
+                const wallets = await getWalletEntriesApi(user.id).catch(() => ({ entries: [] }));
+                setWalletEntries(wallets.entries || []);
             } else {
                 setWalletEntries([]);
             }
@@ -128,12 +148,12 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    }, [user?.role, user?.id]);
+    };
 
     // load once on mount
     useEffect(() => {
         fetchOriginalData();
-    }, [fetchOriginalData]);
+    }, []); // Empty dependency array - only run once on mount
 
     // reload hooks used by other parts of app
     useEffect(() => {
@@ -146,7 +166,7 @@ export default function Dashboard() {
             window.removeEventListener("incomeExpenseUpdated", reloadData);
             window.removeEventListener("summaryUpdated", reloadData);
         };
-    }, [fetchOriginalData]);
+    }, []); // Empty dependency array - set up listeners once
 
     // open modal triggers
     useEffect(() => {
@@ -162,17 +182,60 @@ export default function Dashboard() {
         };
     }, []);
 
-    const handleViewInvoice = (fileName) => {
-        if (!fileName) return;
-        const url = `${import.meta.env.VITE_API_URL}/uploads/invoices/${fileName}`;
+    const handleViewInvoice = (invoiceData) => {
+        if (!invoiceData) return;
 
-        if (fileName.toLowerCase().endsWith(".pdf")) {
-            window.open(url, "_blank");
-            return;
+        const BASE = import.meta.env.VITE_API_URL;
+        let invoicesArray = [];
+
+        // Clean helper
+        const normalize = (item) => {
+            if (!item) return null;
+
+            let str = String(item).trim().replace(/^"+|"+$/g, "");
+
+            if (str.startsWith("data:")) return str;
+            return `${BASE}/uploads/invoices/${str}`;
+        };
+
+        // Case 1: Already array
+        if (Array.isArray(invoiceData)) {
+            invoicesArray = invoiceData.map(normalize).filter(Boolean);
         }
-        setInvoiceSrc(url);
+
+        // Case 2: JSON string array
+        else if (typeof invoiceData === "string" && invoiceData.startsWith("[")) {
+            try {
+                const parsed = JSON.parse(invoiceData);
+                if (Array.isArray(parsed)) {
+                    invoicesArray = parsed.map(normalize).filter(Boolean);
+                }
+            } catch { }
+        }
+
+        // Case 3: Single entry (file or base64)
+        if (!invoicesArray.length) {
+            invoicesArray = [normalize(invoiceData)].filter(Boolean);
+        }
+
+        if (!invoicesArray.length) return;
+
+        setCurrentInvoices(invoicesArray);
+        setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
     };
+
+
+    const handleNextInvoice = () => {
+        setCurrentInvoiceIndex((prev) =>
+            prev < currentInvoices.length - 1 ? prev + 1 : prev
+        );
+    };
+
+    const handlePrevInvoice = () => {
+        setCurrentInvoiceIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    };
+
 
     // -------------------------
     // Filtering (memoized)
@@ -346,14 +409,7 @@ export default function Dashboard() {
     // -------------------------
     // UI animation
     // -------------------------
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.6 },
-        },
-    };
+
 
     return (
         <>
@@ -373,12 +429,12 @@ export default function Dashboard() {
                             filters={filters}
                             loading={loading}
                             user={user}
+                            walletEntries={walletEntries}
                         />
 
                         {/* QUICK ADD */}
                         <motion.div
                             className="quick-access-card"
-                            variants={fadeUp}
                             initial="hidden"
                             animate="visible"
                         >
@@ -423,7 +479,7 @@ export default function Dashboard() {
                         {/* CHARTS */}
                         <div className="graphs-grid">
                             {/* Cash Flow (Income for admin, Wallet for user) */}
-                            <motion.div className="chart-card" variants={fadeUp} initial="hidden" animate="visible">
+                            <motion.div className="chart-card" initial="hidden" animate="visible">
                                 <div className="chart-header">
                                     <h3>
                                         <TrendingUp size={18} style={{ marginRight: 8, color: "#d4af37" }} />
@@ -510,11 +566,17 @@ export default function Dashboard() {
                                     setDescription={setDescription}
                                     expenseCategories={expenseCategories}
                                     incomeCategories={incomeCategories}
+                                    vendorName={vendorName}
+                                    setVendorName={setVendorName}
+                                    vendorNumber={vendorNumber}
+                                    setVendorNumber={setVendorNumber}
+                                    endDate={endDate}
+                                    setEndDate={setEndDate}
                                 />
                             </AnimatePresence>
 
                             {/* Expense Breakdown */}
-                            <motion.div className="chart-card" variants={fadeUp} initial="hidden" animate="visible">
+                            <motion.div className="chart-card" initial="hidden" animate="visible">
                                 <div className="chart-header">
                                     <h3>
                                         <PieChart size={18} style={{ marginRight: 8, color: "#d4af37" }} />
@@ -557,7 +619,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* RECENT TRANSACTIONS */}
-                        <motion.div className="transactions-card" variants={fadeUp} initial="hidden" animate="visible">
+                        <motion.div className="transactions-card" initial="hidden" animate="visible">
                             <div className="transactions-header">
                                 <h3>
                                     <CreditCard size={18} style={{ marginRight: 8, color: "#d4af37" }} />
@@ -613,7 +675,7 @@ export default function Dashboard() {
                                                                     View
                                                                 </button>
                                                             ) : (
-                                                                "-"
+                                                                <span className="no-invoice">No File</span>
                                                             )}
                                                         </td>
                                                     </motion.tr>
@@ -652,7 +714,7 @@ export default function Dashboard() {
                                                                     View
                                                                 </button>
                                                             ) : (
-                                                                "-"
+                                                                <span className="no-invoice">No File</span>
                                                             )}
                                                         </td>
                                                     </motion.tr>
@@ -666,21 +728,137 @@ export default function Dashboard() {
                     </div>
                 </>
             )}
-            {showInvoiceModal && (
-                <div className="invoice-modal-backdrop" onClick={() => setShowInvoiceModal(false)}>
-                    <div className="invoice-modal" onClick={(e) => e.stopPropagation()}>
-                        <h3>Invoice Preview</h3>
-                        <div style={{ right: 15, top: 0, position: "absolute" }}>
-                            <button className="close-modal-btn" onClick={() => setShowInvoiceModal(false)}>
+            {showInvoiceModal && currentInvoices.length > 0 && (
+                <div
+                    className="invoice-modal-backdrop"
+                    onClick={() => setShowInvoiceModal(false)}
+                >
+                    <div
+                        className="invoice-modal"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: 15
+                            }}
+                        >
+                            <h3>
+                                Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})
+                            </h3>
+
+                            <button
+                                className="close-modal-btn"
+                                onClick={() => setShowInvoiceModal(false)}
+                            >
                                 <X size={20} />
                             </button>
                         </div>
-                        <div style={{ textAlign: "center" }}>
-                            <img src={invoiceSrc} alt="Invoice" style={{ width: "70%", borderRadius: 10 }} />
+
+                        <div style={{ position: "relative", textAlign: "center" }}>
+
+                            {/* Prev Arrow */}
+                            {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
+                                <button
+                                    className="invoice-nav-btn-left"
+                                    onClick={handlePrevInvoice}
+                                >
+                                    <ChevronLeft size={24} color="white" />
+                                </button>
+                            )}
+
+                            {/* Display PDF Placeholder OR Image */}
+                            {isPDF(currentInvoices[currentInvoiceIndex]) ? (
+                                <div
+                                    style={{
+                                        width: "auto",
+                                        height: "500px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        background: "#f5f5f5",
+                                        borderRadius: 10
+                                    }}
+                                >
+                                    <FileText size={80} color="#666" />
+                                    <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
+                                        PDF Document
+                                    </p>
+
+                                    <a
+                                        href={currentInvoices[currentInvoiceIndex]}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                            marginTop: 10,
+                                            fontSize: 14,
+                                            color: "#d4af37",
+                                            textDecoration: "underline",
+                                            cursor: "pointer"
+                                        }}
+                                    >
+                                        Open in New Tab
+                                    </a>
+                                </div>
+                            ) : (
+                                <img
+                                    src={currentInvoices[currentInvoiceIndex]}
+                                    alt="Invoice"
+                                    style={{
+                                        borderRadius: 10,
+                                        objectFit: "contain",
+                                        width: "500px",
+                                        height: "450px"
+                                    }}
+                                />
+                            )}
+
+                            {/* Next Arrow */}
+                            {currentInvoices.length > 1 &&
+                                currentInvoiceIndex < currentInvoices.length - 1 && (
+                                    <button
+                                        className="invoice-nav-btn-right"
+                                        onClick={handleNextInvoice}
+                                    >
+                                        <ChevronRight size={24} color="white" />
+                                    </button>
+                                )}
                         </div>
+
+                        {/* Dots Indicator */}
+                        {currentInvoices.length > 1 && (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    gap: 8,
+                                    marginTop: 20
+                                }}
+                            >
+                                {currentInvoices.map((_, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setCurrentInvoiceIndex(idx)}
+                                        style={{
+                                            width: idx === currentInvoiceIndex ? 24 : 8,
+                                            height: 8,
+                                            borderRadius: 4,
+                                            background:
+                                                idx === currentInvoiceIndex ? "#d4af37" : "#ccc",
+                                            cursor: "pointer",
+                                            transition: "0.3s"
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
+
         </>
     );
 }

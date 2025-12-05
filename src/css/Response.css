@@ -40,6 +40,10 @@
         margin-right: 0px !important;
     }
 
+    .radio-group {
+        display: grid !important;
+    }
+
     .header-title {
         font-size: 17px !important;
         line-height: 20px !important;
@@ -123,30 +127,29 @@
         padding: 15px !important;
     }
 
-    .expense-header{
+    .expense-header {
         align-items: center !important;
     }
 
-    .expense-header h1{
+    .expense-header h1 {
         margin: 0px !important;
     }
 
     .tabs-wrapper {
-    margin-bottom: 22px !important;
-    margin-top: 20px !important;
-}
+        margin-bottom: 22px !important;
+        margin-top: 20px !important;
+    }
 
-.filter-dropdown {
-    display: grid !important
-;
-    gap: 20px !important;
-    justify-items: center !important;
-    text-align: center !important;
-}
+    .filter-dropdown {
+        display: grid !important;
+        gap: 20px !important;
+        justify-items: center !important;
+        text-align: center !important;
+    }
 
-.clear-btn {
-    margin-top: 0px !important;
-}
+    .clear-btn {
+        margin-top: 0px !important;
+    }
 
     .expense-table-wrapper {
         -webkit-overflow-scrolling: touch !important;
@@ -154,38 +157,66 @@
     }
 
     .expense-row {
-    padding: 14px !important;
-}
+        padding: 14px !important;
+    }
 
-.invoice-modal {
-    width: 92% !important;
-}
+    .invoice-modal {
+        width: 92% !important;
+        height: 600px !important;
+        place-content: center !important;
+    }
 
-.approvals-title {
-    font-size: 28px !important;
-}
+    .approvals-table-wrapper {
+        overflow: auto;
+    }
 
-.color-circle{
-    width: 25px !important;
-    height: 25px !important;
-}
+    .category-pill {
+        font-size: 11px !important;
+    }
 
-.selected-icon {
-    border: 1px solid #d4af37 !important;
-    transform: scale(1.01) !important;
-}
+    .details-text {
+        padding: 7px !important;
+    }
 
-.icon-grid {
-    gap: 8px !important;
-    height: 200px !important;
-}
+    .invoice-modal img {
+        height: 200px !important;
+        width: auto !important;
+    }
 
-.create-btn {
-    font-weight: 400 !important;
-}
+    .approvals-title {
+        font-size: 28px !important;
+    }
 
-.category-input {
-    padding: 8px 14px !important;
-    font-size: 14px !important;
-}
+    .icon-btn {
+        height: 35px !important;
+        padding: 8px !important;
+    }
+
+    .header-right {
+        gap: 6px !important;
+    }
+
+    .color-circle {
+        width: 25px !important;
+        height: 25px !important;
+    }
+
+    .selected-icon {
+        border: 1px solid #d4af37 !important;
+        transform: scale(1.01) !important;
+    }
+
+    .icon-grid {
+        gap: 8px !important;
+        height: 200px !important;
+    }
+
+    .create-btn {
+        font-weight: 400 !important;
+    }
+
+    .category-input {
+        padding: 8px 14px !important;
+        font-size: 14px !important;
+    }
 }

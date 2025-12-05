@@ -80,14 +80,7 @@ export default function SettingPage() {
         }
     };
 
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.6 },
-        },
-    };
+
 
     return (
         <>
@@ -97,7 +90,7 @@ export default function SettingPage() {
                     <div className="settings-page">
 
                         {/* ✅ CREATE USER FORM (Admin Only) */}
-                        <motion.div variants={fadeUp}
+                        <motion.div
                             initial="hidden"
                             animate="visible">
                             {currentUser?.role === "admin" && (
@@ -166,7 +159,7 @@ export default function SettingPage() {
 
 
                         {/* ✅ USERS LIST */}
-                        <motion.div variants={fadeUp}
+                        <motion.div
                             initial="hidden"
                             animate="visible">
                             <Card className="card" title="Users List" bordered={false}>
