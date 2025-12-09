@@ -1,4 +1,3 @@
-// FIXED VERSION — WITH WORKING EDIT EXPENSE
 import React, { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Select, Button, Pagination } from "antd";
@@ -81,17 +80,17 @@ export default function IncomeExpense() {
         };
 
         loadWallet();
-
-        // Reload wallet when transactions are updated
         window.addEventListener("incomeExpenseUpdated", loadWallet);
         window.addEventListener("summaryUpdated", loadWallet);
 
         return () => {
-            window.removeEventListener("incomeExpenseUpdated", loadWallet); // FIXED
+            window.removeEventListener("incomeExpenseUpdated", loadWallet);
             window.removeEventListener("summaryUpdated", loadWallet);
         };
     }, [userId, userRole]);
 
+    const fmtAmt = (n) =>
+        `₹${Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0}`;
     // -------------------------------------
     // Invoice Slider
     // -------------------------------------
@@ -122,9 +121,7 @@ export default function IncomeExpense() {
         if (!invoicesArray.length) {
             invoicesArray = [normalize(invoiceData)].filter(Boolean);
         }
-
         if (!invoicesArray.length) return;
-
         setCurrentInvoices(invoicesArray);
         setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
@@ -209,19 +206,14 @@ export default function IncomeExpense() {
             let expenses;
 
             if (userRole === "admin") {
-                // 🔥 ADMIN — load only approved expenses (with pagination)
                 expenses = await getExpensesApi(page);
             } else {
-                // 🔥 USER — load ALL (Pending + Approved)
                 const res = await getUserAllExpensesApi();
                 expenses = { data: res.all || [], total: res.all?.length || 0 };
             }
-
             const income = await getIncomeApi(page);
-
             setExpenseData(expenses.data || []);
             setIncomeData(income.data || []);
-
             setPageTotal(
                 activeTab === "expense"
                     ? expenses.total
@@ -234,7 +226,6 @@ export default function IncomeExpense() {
         loadData();
     }, [page, activeTab, userRole, refreshKey]);
 
-
     // -------------------------------------
     // Live reload listener
     // -------------------------------------
@@ -246,7 +237,6 @@ export default function IncomeExpense() {
         window.addEventListener("incomeExpenseUpdated", reload);
         return () => window.removeEventListener("incomeExpenseUpdated", reload);
     }, []);
-
 
     // -------------------------------------
     // Open modals via window event
@@ -285,16 +275,11 @@ export default function IncomeExpense() {
     const filteredIncomeData = applyFilters(incomeData);
 
     const openEditModal = (item) => {
-        // Always pass correct id:
-        // - If pending => use its own id
-        // - If approved => use original id
         const resolvedId = item.original_expense_id || item.id;
-
         setEditData({
             ...item,
-            id: resolvedId   // << important
+            id: resolvedId
         });
-
         setBranch(item.branch || "Select Branch");
         setDate(item.date ? dayjs(item.date).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
         setTotal(item.total || "");
@@ -304,10 +289,8 @@ export default function IncomeExpense() {
         setVendorName(item.vendor_name || "");
         setVendorNumber(item.vendor_number || "");
         setEndDate(item.end_date || null);
-
         setOpenModal("edit-expense");
     };
-
 
     // -------------------------------------
     // BUILD TABLE ROWS
@@ -330,6 +313,7 @@ export default function IncomeExpense() {
                 vendorName: item.vendor_name,
                 vendorNumber: item.vendor_number,
                 spendMode: item.spend_mode,
+                original_expense_id: item.original_expense_id,
                 originalItem: {
                     ...item,
                     id: item.id
@@ -355,7 +339,8 @@ export default function IncomeExpense() {
         } else {
             baseRows = filteredWallet.map((item) => ({
                 date: dayjs(item.date).format("DD/MM/YYYY"),
-                title: item.note || "Wallet Entry",
+                title: "Wallet Deposit",
+                note: item.note || "-",
                 merchant: userDetails.name || "You",
                 amount: `₹${item.amount}`,
                 report: item.branch || "-",
@@ -433,9 +418,9 @@ export default function IncomeExpense() {
         resetForm();
     };
 
-    // -------------------------------------
-    // UI
-    // -------------------------------------
+    const isWalletTab = activeTab === "income" && userDetails?.role === "user";
+    const walletGridStyle = isWalletTab ? { gridTemplateColumns: "1.5fr 2fr 1fr 1fr 1fr" } : {};
+
     return (
         <>
             {loading ? (
@@ -463,7 +448,6 @@ export default function IncomeExpense() {
                         </div>
 
                         <motion.div initial="hidden" animate="visible">
-                            {/* HEADER */}
                             <div className="expense-header">
                                 <h1>
                                     {activeTab === "expense"
@@ -492,7 +476,7 @@ export default function IncomeExpense() {
 
                                             resetForm();
                                             setEditData(null);
-                                            setOpenModal(activeTab); // 'income' or 'expense'
+                                            setOpenModal(activeTab);
                                         }}
                                     >
                                         <Plus size={16} /> New {activeTab}
@@ -515,7 +499,6 @@ export default function IncomeExpense() {
                                         ]}
                                     />
                                 </div>
-
                                 <div className="filter-item">
                                     <label>Employee Name</label>
                                     <Select
@@ -528,7 +511,6 @@ export default function IncomeExpense() {
                                         ]}
                                     />
                                 </div>
-
                                 <div className="filter-item">
                                     <label>Branch</label>
                                     <Select
@@ -541,7 +523,6 @@ export default function IncomeExpense() {
                                         ]}
                                     />
                                 </div>
-
                                 <div className="filter-item">
                                     <label>Search</label>
                                     <input
@@ -558,7 +539,6 @@ export default function IncomeExpense() {
                                         }}
                                     />
                                 </div>
-
                                 <div className="filter-item">
                                     <Button className="clear-btn" onClick={clearAllFilters}>
                                         Clear All
@@ -570,18 +550,21 @@ export default function IncomeExpense() {
                             <div className="table-scroll-wrapper">
                                 <div className="expense-table-wrapper">
                                     <div className="expense-table">
-                                        <div className="expense-row expense-header-row">
+                                        <div
+                                            className="expense-row expense-header-row"
+                                            style={walletGridStyle}
+                                        >
                                             <div>DETAILS</div>
+                                            {isWalletTab && <div>NOTE</div>}
                                             {userDetails.role !== "user" && <div>EMPLOYEE NAME</div>}
                                             <div>AMOUNT</div>
                                             <div>BRANCH</div>
-                                            <div>INVOICE</div>
-                                            <div>VENDOR DETAILS</div>
-                                            <div>SPEND MODE</div>
+                                            {!isWalletTab && <div>INVOICE</div>}
+                                            {!isWalletTab && <div>VENDOR DETAILS</div>}
+                                            {!isWalletTab && <div>SPEND MODE</div>}
                                             <div>STATUS</div>
-                                            {userDetails.role !== "admin" && <div>ACTION</div>}
+                                            {userDetails.role !== "admin" && !isWalletTab && <div>ACTION</div>}
                                         </div>
-
                                         {filteredRows.length === 0 ? (
                                             <div className="no-data-box">
                                                 <img
@@ -593,7 +576,11 @@ export default function IncomeExpense() {
                                             </div>
                                         ) : (
                                             filteredRows.map((row, i) => (
-                                                <div key={i} className="expense-row">
+                                                <div
+                                                    key={i}
+                                                    className="expense-row"
+                                                    style={walletGridStyle}
+                                                >
                                                     {/* DETAILS */}
                                                     <div className="col details-col">
                                                         <div
@@ -610,57 +597,77 @@ export default function IncomeExpense() {
                                                         >
                                                             {row.icon}
                                                         </div>
-
                                                         <div className="details-text">
                                                             <span className="date">{row.date}</span>
                                                             <span className="title">{row.title}</span>
                                                         </div>
                                                     </div>
-
+                                                    {isWalletTab && <div>{row.note}</div>}
                                                     {userDetails.role !== "user" && <div>{row.merchant}</div>}
-                                                    <div>{row.amount}</div>
+                                                    <div>
+                                                        {/* Amount */}
+                                                        <span>{fmtAmt(row.amount)}</span><br></br>
+                                                        {/* Editable / Locked Badge */}
+                                                        {userDetails.role === "user" && activeTab === "expense" ? (
+                                                            row.original_expense_id && (
+                                                                <span className="editable-pill">
+                                                                    Editable
+                                                                </span>
+                                                            )
+                                                        ) : null}
+                                                    </div>
                                                     <div>{row.report}</div>
-
-                                                    <div>
-                                                        {row.invoice ? (
-                                                            <button
-                                                                className="view-invoice-btn"
-                                                                onClick={() => handleViewInvoice(row.invoice)}
-                                                            >
-                                                                View
-                                                            </button>
-                                                        ) : (
-                                                            <span className="no-invoice">No File</span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="vendor-col">
-                                                        <span className="title">{row.vendorName}</span>
-                                                        <span className="date">{row.vendorNumber}</span>
-                                                    </div>
-
-                                                    <div>
-                                                        {row.spendMode ? (
-                                                            <span
-                                                                className="spend-mode-badge"
-                                                                style={{
-                                                                    padding: "4px 12px",
-                                                                    borderRadius: "12px",
-                                                                    fontSize: "12px",
-                                                                    fontWeight: 600,
-                                                                    backgroundColor:
-                                                                        row.spendMode === "Cash" ? "#c0b4ff" : "#D4E7FF",
-                                                                    color:
-                                                                        row.spendMode === "Cash" ? "#3c138b" : "#1E3A8A",
-                                                                }}
-                                                            >
-                                                                {row.spendMode}
-                                                            </span>
-                                                        ) : (
-                                                            <span style={{ color: "#999" }}>-</span>
-                                                        )}
-                                                    </div>
-
+                                                    {!isWalletTab && (
+                                                        <div>
+                                                            {row.invoice ? (
+                                                                <button
+                                                                    className="view-invoice-btn"
+                                                                    onClick={() => handleViewInvoice(row.invoice)}
+                                                                >
+                                                                    View
+                                                                </button>
+                                                            ) : (
+                                                                <span className="no-invoice">No File</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {!isWalletTab && (
+                                                        <div className="vendor-col">
+                                                            {row.vendorName ? (
+                                                                <span className="title">{row.vendorName}</span>
+                                                            ) : (
+                                                                <span className="title">No Vendor</span>
+                                                            )}
+                                                            {row.vendorNumber ? (
+                                                                <span className="date">{row.vendorNumber}</span>
+                                                            ) : (
+                                                                <span className="date">No Number</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {!isWalletTab && (
+                                                        <div>
+                                                            {row.spendMode ? (
+                                                                <span
+                                                                    className="spend-mode-badge"
+                                                                    style={{
+                                                                        padding: "4px 12px",
+                                                                        borderRadius: "12px",
+                                                                        fontSize: "12px",
+                                                                        fontWeight: 600,
+                                                                        backgroundColor:
+                                                                            row.spendMode === "Cash" ? "#c0b4ff" : "#D4E7FF",
+                                                                        color:
+                                                                            row.spendMode === "Cash" ? "#3c138b" : "#1E3A8A",
+                                                                    }}
+                                                                >
+                                                                    {row.spendMode}
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ color: "#999" }}>-</span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <span
                                                             className={
@@ -674,8 +681,7 @@ export default function IncomeExpense() {
                                                             {row.status}
                                                         </span>
                                                     </div>
-
-                                                    {userDetails.role !== "admin" && (
+                                                    {userDetails.role !== "admin" && !isWalletTab && (
                                                         <div>
                                                             {activeTab === "expense" && (
                                                                 <button
@@ -797,7 +803,6 @@ export default function IncomeExpense() {
                                     <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
                                         PDF Document
                                     </p>
-
                                     <a
                                         href={currentInvoices[currentInvoiceIndex]}
                                         target="_blank"
@@ -826,7 +831,6 @@ export default function IncomeExpense() {
                                     }}
                                 />
                             )}
-
                             {currentInvoices.length > 1 && currentInvoiceIndex < currentInvoices.length - 1 && (
                                 <button
                                     onClick={handleNextInvoice}

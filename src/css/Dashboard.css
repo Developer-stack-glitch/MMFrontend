@@ -1563,6 +1563,17 @@ body {
   border-radius: 8px;
 }
 
+.locked-pill {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #e5e7eb;
+  color: #555;
+  border-radius: 8px;
+}
+
 /* Close button */
 .details-modal .ant-modal-close {
   color: #ffffffa8 !important;
@@ -1570,6 +1581,15 @@ body {
 
 .details-modal .ant-modal-close:hover {
   color: #d4af37 !important;
+}
+
+.ant-input-outlined:hover {
+  border-color: #d4af37 !important;
+}
+
+.ant-input-outlined:focus-within {
+  border-color: #d4af37 !important;
+  box-shadow: none !important;
 }
 
 /* Body */

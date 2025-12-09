@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { message, Modal, Popconfirm, Spin } from "antd";
+import { message, Modal, Popconfirm, Select, Spin } from "antd";
 import * as Icons from "lucide-react";
 import {
     createEventApi,
@@ -24,7 +24,8 @@ export default function CalendarPage() {
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-
+    const [highlightedIds, setHighlightedIds] = useState([]);
+    const calendarRef = React.useRef(null);
     // Form states
     const [formData, setFormData] = useState({
         title: "",
@@ -32,7 +33,6 @@ export default function CalendarPage() {
         notes: "",
         category: "general"
     });
-
     // Modal states
     const [isAddModalVisible, setIsAddModalVisible] = useState(false);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -44,17 +44,27 @@ export default function CalendarPage() {
         loadAlerts();
     }, []);
 
+    useEffect(() => {
+        const jumpHandler = (e) => {
+            const date = e.detail;
+            const calendarApi = calendarRef.current?.getApi();
+            if (calendarApi) {
+                calendarApi.gotoDate(date);
+            }
+        };
+        window.addEventListener("calendar-jump", jumpHandler);
+        return () => window.removeEventListener("calendar-jump", jumpHandler);
+    }, []);
+
     // Load all events
     const loadEvents = async () => {
         try {
             setLoading(true);
             const response = await getEventsApi();
-
-            // Transform events for FullCalendar
             const calendarEvents = response.events.map(event => ({
                 id: event.id,
                 title: event.title,
-                start: event.event_date,
+                start: new Date(event.event_date),
                 extendedProps: {
                     description: event.description,
                     notes: event.notes,
@@ -64,7 +74,6 @@ export default function CalendarPage() {
                 backgroundColor: getCategoryColor(event.category),
                 borderColor: getCategoryColor(event.category)
             }));
-
             setEvents(calendarEvents);
         } catch (error) {
             console.error("Error loading events:", error);
@@ -139,7 +148,6 @@ export default function CalendarPage() {
             CommonToaster("Please enter event title", "error");
             return;
         }
-
         try {
             setLoading(true);
             await createEventApi({
@@ -149,7 +157,6 @@ export default function CalendarPage() {
                 notes: formData.notes,
                 category: formData.category
             });
-
             CommonToaster("Event created successfully!", "success");
             setIsAddModalVisible(false);
             loadEvents();
@@ -168,7 +175,6 @@ export default function CalendarPage() {
             CommonToaster("Please enter event title", "error");
             return;
         }
-
         try {
             setLoading(true);
             await updateEventApi(selectedEvent.id, {
@@ -191,24 +197,18 @@ export default function CalendarPage() {
 
     const handleDeleteEvent = async () => {
         const eventId = selectedEvent?.id;
-
         if (!eventId) {
             CommonToaster("Invalid event selected.", "error");
             return;
         }
-
         try {
             setLoading(true);
             const response = await deleteEventApi(eventId);
-
             CommonToaster("Event deleted successfully!", "success");
-
             setIsEditModalVisible(false);
             setEvents([]);
-
             await loadEvents();
             await loadAlerts();
-
         } catch (error) {
             console.error("❌ Delete error:", error);
             CommonToaster(error.response?.data?.message || "Failed to delete event", "error");
@@ -217,28 +217,27 @@ export default function CalendarPage() {
         }
     };
 
-
-
     // Handle alert actions
     const handleAlertAction = async (eventId, action) => {
         try {
             setLoading(true);
-
             switch (action) {
                 case "cancel":
                     await deleteEventApi(eventId);
                     CommonToaster("Event cancelled", "success");
+                    setIsAlertModalVisible(false);
                     break;
                 case "nextDay":
                     await moveEventToNextDayApi(eventId);
                     CommonToaster("Event moved to next day", "success");
+                    setIsAlertModalVisible(false);
                     break;
                 case "nextMonth":
                     await moveEventToNextMonthApi(eventId);
                     CommonToaster("Event moved to next month", "success");
+                    setIsAlertModalVisible(false);
                     break;
             }
-
             loadEvents();
             loadAlerts();
         } catch (error) {
@@ -246,24 +245,31 @@ export default function CalendarPage() {
             CommonToaster(error.message || "Failed to perform action", "error");
         } finally {
             setLoading(false);
+            setIsAlertModalVisible(false);
         }
     };
 
     // Search events
     const handleSearch = async () => {
         if (!searchQuery.trim()) {
+            setHighlightedIds([]);
             loadEvents();
             return;
         }
-
         try {
             setLoading(true);
             const response = await searchEventsApi(searchQuery);
 
+            if (!response.events.length) {
+                message.warning("No matching events found");
+                setEvents([]);
+                setHighlightedIds([]);
+                return;
+            }
             const calendarEvents = response.events.map(event => ({
                 id: event.id,
                 title: event.title,
-                start: event.event_date,
+                start: new Date(event.event_date),
                 extendedProps: {
                     description: event.description,
                     notes: event.notes,
@@ -272,11 +278,15 @@ export default function CalendarPage() {
                 backgroundColor: getCategoryColor(event.category),
                 borderColor: getCategoryColor(event.category)
             }));
-
+            setHighlightedIds(response.events.map(e => e.id));
             setEvents(calendarEvents);
+            const firstEventDate = new Date(response.events[0].event_date);
+            window.dispatchEvent(
+                new CustomEvent("calendar-jump", { detail: firstEventDate })
+            );
             message.success(`Found ${response.events.length} event(s)`);
         } catch (error) {
-            console.error("Error searching events:", error);
+            console.error("Search error:", error);
             message.error("Failed to search events");
         } finally {
             setLoading(false);
@@ -286,11 +296,9 @@ export default function CalendarPage() {
     return (
         <div className="calendar-wrapper">
             <Spin spinning={loading}>
-                {/* Alerts Banner */}
                 {alerts.length > 0 && (<div className="alerts-banner" onClick={() => setIsAlertModalVisible(true)}> <span className="alert-icon">🔔</span> <span>You have {alerts.length} event(s) tomorrow!</span> <button className="view-alerts-btn">View Alerts</button> </div>)}
                 <div className="calendar-header">
                     <h1 className="page-title">📅 Calendar & Events</h1>
-
                     {/* Search Bar */}
                     <div className="search-bar">
                         <input
@@ -333,6 +341,7 @@ export default function CalendarPage() {
                 {/* Calendar */}
                 <div className="calendar-box">
                     <FullCalendar
+                        ref={calendarRef}
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                         initialView="dayGridMonth"
                         selectable={true}
@@ -340,6 +349,11 @@ export default function CalendarPage() {
                         eventClick={handleEventClick}
                         events={events}
                         height="75vh"
+                        eventDidMount={(info) => {
+                            if (highlightedIds.includes(Number(info.event.id))) {
+                                info.el.classList.add("highlighted-event");
+                            }
+                        }}
                         headerToolbar={{
                             left: "prev,next today",
                             center: "title",
@@ -350,30 +364,28 @@ export default function CalendarPage() {
 
                 {/* Add Event Modal */}
                 <Modal
-                    title={`Add Event - ${selectedDate}`}
+                    title={`Add Note - ${selectedDate}`}
                     open={isAddModalVisible}
                     onOk={handleAddEvent}
                     onCancel={() => setIsAddModalVisible(false)}
-                    okText="Add Event"
+                    okText="Add Note"
                     cancelText="Cancel"
                 >
                     <div className="event-form">
                         <input
                             type="text"
-                            placeholder="Event Title *"
+                            placeholder="Note Title *"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                             className="form-input"
                         />
-
                         <textarea
-                            placeholder="Description"
+                            placeholder="Note Description"
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             className="form-textarea"
                             rows={3}
                         />
-
                         <textarea
                             placeholder="Notes"
                             value={formData.notes}
@@ -381,19 +393,20 @@ export default function CalendarPage() {
                             className="form-textarea"
                             rows={4}
                         />
-
-                        <select
+                        <Select
                             value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                            onChange={(value) => setFormData({ ...formData, category: value })}
                             className="form-select"
-                        >
-                            <option value="general">General</option>
-                            <option value="work">Work</option>
-                            <option value="personal">Personal</option>
-                            <option value="health">Health</option>
-                            <option value="finance">Finance</option>
-                            <option value="social">Social</option>
-                        </select>
+                            style={{ width: '100%' }}
+                            options={[
+                                { value: "general", label: "General" },
+                                { value: "work", label: "Work" },
+                                { value: "personal", label: "Personal" },
+                                { value: "health", label: "Health" },
+                                { value: "finance", label: "Finance" },
+                                { value: "social", label: "Social" },
+                            ]}
+                        />
                     </div>
                 </Modal>
 
@@ -418,7 +431,6 @@ export default function CalendarPage() {
                                 Delete
                             </button>
                         </Popconfirm>,
-
                         <button
                             key="cancel"
                             onClick={() => setIsEditModalVisible(false)}
@@ -426,7 +438,6 @@ export default function CalendarPage() {
                         >
                             Close
                         </button>,
-
                         <button
                             key="update"
                             onClick={handleUpdateEvent}
@@ -446,7 +457,6 @@ export default function CalendarPage() {
                                     day: 'numeric'
                                 })}
                             </div>
-
                             <input
                                 type="text"
                                 placeholder="Event Title *"
@@ -454,7 +464,6 @@ export default function CalendarPage() {
                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                 className="form-input"
                             />
-
                             <textarea
                                 placeholder="Description"
                                 value={formData.description}
@@ -462,7 +471,6 @@ export default function CalendarPage() {
                                 className="form-textarea"
                                 rows={3}
                             />
-
                             <textarea
                                 placeholder="Notes"
                                 value={formData.notes}
@@ -470,19 +478,20 @@ export default function CalendarPage() {
                                 className="form-textarea"
                                 rows={4}
                             />
-
-                            <select
+                            <Select
                                 value={formData.category}
-                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                onChange={(value) => setFormData({ ...formData, category: value })}
                                 className="form-select"
-                            >
-                                <option value="general">General</option>
-                                <option value="work">Work</option>
-                                <option value="personal">Personal</option>
-                                <option value="health">Health</option>
-                                <option value="finance">Finance</option>
-                                <option value="social">Social</option>
-                            </select>
+                                style={{ width: '100%' }}
+                                options={[
+                                    { value: "general", label: "General" },
+                                    { value: "work", label: "Work" },
+                                    { value: "personal", label: "Personal" },
+                                    { value: "health", label: "Health" },
+                                    { value: "finance", label: "Finance" },
+                                    { value: "social", label: "Social" },
+                                ]}
+                            />
                         </div>
                     )}
                 </Modal>
@@ -506,18 +515,15 @@ export default function CalendarPage() {
                                         {alert.category}
                                     </span>
                                 </div>
-
                                 {alert.description && (
                                     <p className="alert-description">{alert.description}</p>
                                 )}
-
                                 {alert.notes && (
                                     <div className="alert-notes">
                                         <strong style={{ display: "flex", alignItems: "center", gap: "5px" }}><Icons.StickyNote color="#d4af37" size={14} />Notes:</strong>
                                         <p>{alert.notes}</p>
                                     </div>
                                 )}
-
                                 <div className="alert-date">
                                     <Icons.Calendar size={18} className="next-month-icon" /> {new Date(alert.event_date).toLocaleDateString('en-US', {
                                         weekday: 'long',
@@ -526,7 +532,6 @@ export default function CalendarPage() {
                                         day: 'numeric'
                                     })}
                                 </div>
-
                                 <div className="alert-actions">
                                     <button
                                         onClick={() => handleAlertAction(alert.id, "cancel")}

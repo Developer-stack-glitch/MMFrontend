@@ -2,14 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Table, Button, Input } from "antd";
 import { getUsersApi, getWalletEntriesApi } from "../../Api/action";
 import { Wallet2, Plus } from "lucide-react";
-import dayjs from "dayjs";
 
 export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    // 🔥 ONLY SEARCH FILTER LEFT
     const [searchText, setSearchText] = useState("");
 
     // Load Users + Wallet Balance
@@ -18,7 +15,6 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             try {
                 const userList = await getUsersApi();
                 const filtered = userList.filter(u => u.role !== "admin");
-
                 const usersWithBalance = await Promise.all(
                     filtered.map(async (u) => {
                         try {
@@ -29,16 +25,13 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                         }
                     })
                 );
-
                 setUsers(usersWithBalance);
                 setFilteredUsers(usersWithBalance);
                 setLoading(false);
-
             } catch (err) {
                 console.log(err);
             }
         }
-
         loadUsers();
     }, [reloadTrigger]);
 
@@ -52,9 +45,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                 (u.email || "").toLowerCase().includes(searchText.toLowerCase())
             );
         }
-
         setFilteredUsers(data);
-
     }, [searchText, users]);
 
     const columns = [
@@ -65,7 +56,6 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             render: (text, record) => (
                 <div className="wallet-user-flex">
                     <div className="wallet-avatar">{record.name.charAt(0)}</div>
-
                     <div className="wallet-user-info">
                         <div className="wallet-user-name">{record.name}</div>
                         <div className="wallet-user-email">{record.email || "No Email"}</div>
@@ -83,11 +73,23 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             title: "Wallet Balance",
             dataIndex: "wallet",
             key: "wallet",
-            render: (amount) => (
-                <span className="wallet-amount">
-                    ₹{Number(amount).toLocaleString()}
-                </span>
-            ),
+            render: (amount) => {
+                const num = Number(amount);
+                return (
+                    <span
+                        className="wallet-amount"
+                        style={{
+                            fontWeight: 600,
+                            color:
+                                num > 0 ? "green" :
+                                    num < 0 ? "red" :
+                                        "#555",
+                        }}
+                    >
+                        ₹{num.toLocaleString()}
+                    </span>
+                );
+            },
         },
         {
             title: "Action",
@@ -110,8 +112,6 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             <h2 className="wallet-table-title">
                 <Wallet2 size={24} color="#d4af37" /> User Wallet List
             </h2>
-
-            {/* 🔍 ONLY SEARCH FILTER NOW */}
             <div className="wallet-filter-box">
                 <Input
                     placeholder="Search name or email"
@@ -120,7 +120,6 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                     className="wallet-filter-input"
                 />
             </div>
-
             <Table
                 className="wallet-table"
                 loading={loading}

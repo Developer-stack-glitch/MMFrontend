@@ -283,8 +283,7 @@
 }
 
 .form-input,
-.form-textarea,
-.form-select {
+.form-textarea {
     padding: 11px 15px;
     border: 1px solid #c5c5c5;
     border-radius: 6px;
@@ -296,9 +295,15 @@
     outline: none;
 }
 
+.fc-event.highlighted-event {
+    border: 3px solid #facc15 !important;
+    box-shadow: 0 0 8px #facc15 !important;
+    background-color: #fffbe6 !important;
+}
+
+
 .form-input:focus,
-.form-textarea:focus,
-.form-select:focus {
+.form-textarea:focus {
     border-color: #d4af37;
     box-shadow: 0 0 5px rgba(212, 175, 55, 0.2);
     background: white;

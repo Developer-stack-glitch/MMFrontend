@@ -219,4 +219,19 @@
         padding: 8px 14px !important;
         font-size: 14px !important;
     }
+
+    .fc .fc-toolbar {
+        display: grid !important;
+        gap: 15px !important;
+        justify-content: center !important;
+    }
+
+    .wallet-table .ant-table {
+        overflow: scroll !important;
+    }
+
+    .transactions-table {
+        width: 150% !important;
+        overflow: scroll !important;
+    }
 }

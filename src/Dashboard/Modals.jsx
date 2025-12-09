@@ -6,12 +6,12 @@ import { addExpenseApi, addIncomeApi, editExpenseApi } from "../../Api/action";
 import { DownOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { CommonToaster } from "../../Common/CommonToaster";
-import { getLastMonthSummaryApi } from "../../Api/action"; // still here if you use later
+import { getLastMonthSummaryApi } from "../../Api/action";
 
 export default function Modals({
     open,
-    type,              // 'expense' | 'income'
-    isEdit = false,    // true for edit mode
+    type,
+    isEdit = false,
     onClose,
     branch,
     setBranch,
@@ -45,7 +45,6 @@ export default function Modals({
     useEffect(() => {
         // When opening modal for edit, hydrate local invoice + spendMode
         if (open && isEdit && editData) {
-            // invoices
             if (Array.isArray(editData.invoice)) {
                 setInvoices(editData.invoice);
             } else if (typeof editData.invoice === "string" && editData.invoice.trim()) {
@@ -241,12 +240,19 @@ export default function Modals({
     const isExpense = type === "expense";
 
     return (
-        <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div
+            className="modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+        >
             <motion.div
                 className="expense-modal"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
             >
                 {/* HEADER */}
                 <div className="modal-header">
@@ -332,10 +338,7 @@ export default function Modals({
                         )}
                     </div>
                 )}
-
-
                 <hr />
-
                 {/* BODY */}
                 <div className="modal-body">
                     <div className="form-section">

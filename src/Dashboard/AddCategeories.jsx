@@ -7,7 +7,6 @@ import { Plus, X } from "lucide-react";
 import { FullPageLoader } from "../../Common/FullPageLoader";
 import { addExpenseCategoryApi, addIncomeCategoryApi } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
-
 const { TabPane } = Tabs;
 
 export default function AddCategories() {
@@ -24,7 +23,6 @@ export default function AddCategories() {
     const colorInputRef = useRef(null);
     const [loading, setLoading] = useState(true);
     const [categoryType, setCategoryType] = useState("new"); // "new" | "existing"
-
     const loadCategories = React.useCallback(async () => {
         try {
             setLoading(true);
@@ -45,7 +43,6 @@ export default function AddCategories() {
     useEffect(() => {
         loadCategories();
         window.addEventListener("refreshCategories", loadCategories);
-
         return () => {
             window.removeEventListener("refreshCategories", loadCategories);
         };
@@ -64,8 +61,6 @@ export default function AddCategories() {
         icon.toLowerCase().includes(iconSearch.toLowerCase())
     );
 
-
-    // ✅ Render icon component from name
     const renderIcon = (iconName, size = 20, color = "#fff") => {
         const IconComponent = Icons[iconName];
         return IconComponent ? <IconComponent size={size} color={color} /> : null;
@@ -73,18 +68,15 @@ export default function AddCategories() {
 
     const handleCreateCategory = async () => {
         if (!categoryName.trim()) return CommonToaster("Enter category name", "error");
-
         try {
             if (activeTab === "expenses") {
                 if (!subCategory.trim()) return CommonToaster("Enter sub category", "error");
-
                 await addExpenseCategoryApi({
                     mainCategory: categoryName,
                     subCategory,
                     color: selectedColor,
                     icon: selectedIcon,
                 });
-
             } else {
                 await addIncomeCategoryApi({
                     name: categoryName,
@@ -92,15 +84,12 @@ export default function AddCategories() {
                     icon: selectedIcon,
                 });
             }
-
             CommonToaster("Category created", "success");
             setIsModalOpen(false);
-
             setCategoryName("");
             setSubCategory("");
             setSelectedIcon("ShoppingBag");
             setCategoryType("new");
-
             window.dispatchEvent(new Event("refreshCategories"));
         } catch (err) {
             console.error(err);
@@ -121,7 +110,6 @@ export default function AddCategories() {
                         initial="hidden"
                         animate="visible" className="categories-tabs">
                         <Tabs activeKey={activeTab} onChange={setActiveTab} centered className="custom-tabs">
-
                             {/* ✅ EXPENSES */}
                             <TabPane tab="Expenses" key="expenses">
                                 <div className="category-list">
@@ -134,7 +122,6 @@ export default function AddCategories() {
                                                 >
                                                     {renderIcon(cat.icon, 18)}
                                                 </div>
-
                                                 <div>
                                                     <h4>{cat.sub_category}</h4>
                                                     <p>0 transactions</p>
@@ -157,7 +144,6 @@ export default function AddCategories() {
                                                 >
                                                     {renderIcon(cat.icon, 18)}
                                                 </div>
-
                                                 <div>
                                                     <h4>{cat.name}</h4>
                                                     <p>0 transactions</p>
@@ -167,7 +153,6 @@ export default function AddCategories() {
                                     ))}
                                 </div>
                             </TabPane>
-
                         </Tabs>
                     </motion.div>
 
@@ -194,7 +179,6 @@ export default function AddCategories() {
                     >
                         <h3 className="modal-title">Create a New Category</h3>
                         <p className="modal-subtitle">Choose color and icon to make it stand out.</p>
-
                         {activeTab === "expenses" ? (
                             <div style={{ marginBottom: 5 }}>
                                 <Radio.Group
@@ -208,7 +192,6 @@ export default function AddCategories() {
                                     <Radio value="new">New Main Category</Radio>
                                     <Radio value="existing">Existing Main Category</Radio>
                                 </Radio.Group>
-
                                 {categoryType === "existing" ? (
                                     <Select
                                         placeholder="Select Main Category"
@@ -256,8 +239,6 @@ export default function AddCategories() {
                         <div className="color-section">
                             <p>Category color</p>
                             <div className="color-options">
-
-                                {/* ✅ Default 6 colors */}
                                 {colors.map((color) => (
                                     <div
                                         key={color}
@@ -265,7 +246,7 @@ export default function AddCategories() {
                                         style={{ background: color }}
                                         onClick={() => {
                                             setSelectedColor(color);
-                                            setCustomColor(""); // reset custom
+                                            setCustomColor("");
                                         }}
                                     />
                                 ))}
@@ -297,15 +278,12 @@ export default function AddCategories() {
                                         setSelectedColor(e.target.value);
                                     }}
                                 />
-
                             </div>
                         </div>
 
                         {/* ✅ Icon Picker (AUTO-GENERATED) */}
                         <div className="icon-section">
                             <p>Category icon</p>
-
-                            {/* ✅ Search Field */}
                             <div style={{ marginBottom: 12 }}>
                                 <Input
                                     style={{ height: 40 }}
@@ -315,7 +293,6 @@ export default function AddCategories() {
                                     className="category-input"
                                 />
                             </div>
-
                             <div className="icon-grid">
                                 {filteredIcons.map((iconName) => (
                                     <div
@@ -328,8 +305,6 @@ export default function AddCategories() {
                                 ))}
                             </div>
                         </div>
-
-
                         <Button type="primary" className="create-btn" onClick={handleCreateCategory}>
                             Create Category
                         </Button>

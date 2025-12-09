@@ -14,9 +14,17 @@ export default function WalletPage() {
     const [amount, setAmount] = useState("");
     const [date, setDate] = useState(dayjs());
     const [userId, setUserId] = useState("Select User");
-    const [users, setUsers] = useState([]);
+    const [branch, setBranch] = useState(null);
+    const [note, setNote] = useState("");
+    const [users, setUsers] = useState(["Select User"]);
     const formRef = React.useRef(null);
     const [reloadTable, setReloadTable] = useState(0);
+    const branches = [
+        "Velachery", "Anna Nagar", "Tambaram", "Porur", "Tnagar", "OMR", "Siruseri",
+        "Thiruvanmiyur", "Maraimalai Nagar", "Electronic City", "BTM Layout",
+        "Marathahalli", "Hebbal", "Rajaji Nagar", "Jayanagar", "Kalyan Nagar",
+        "Indira Nagar", "HSR Layout"
+    ];
 
     useEffect(() => {
         async function loadUsers() {
@@ -31,22 +39,24 @@ export default function WalletPage() {
         loadUsers();
     }, []);
 
-
     const handleSubmit = async () => {
-        if (!amount || !date || !userId) {
-            return CommonToaster("All fields are required", "error");
+        if (!amount || !date || !userId || !branch) {
+            return CommonToaster("All fields including Branch are required", "error");
         }
-
         try {
             await addWalletApi({
                 amount,
                 date: date.format("YYYY-MM-DD"),
-                user_id: userId
+                user_id: userId,
+                branch,
+                note
             });
             CommonToaster("Wallet added successfully!", "success");
             setAmount("");
             setDate(dayjs());
             setUserId("");
+            setBranch(null);
+            setNote("");
             setReloadTable(prev => prev + 1);
         } catch (err) {
             CommonToaster(err.message || "Error adding wallet", "error");
@@ -58,12 +68,11 @@ export default function WalletPage() {
             style={{
                 position: "relative",
                 minHeight: "100vh",
-                padding: "60px 20px",
+                padding: "20px 20px",
                 background: "#261d011a",
                 overflow: "hidden",
             }}
         >
-
             <WalletBalanceTable
                 onAddWallet={(user) => {
                     setUserId(user.id);
@@ -71,8 +80,6 @@ export default function WalletPage() {
                 }}
                 reloadTrigger={reloadTable}
             />
-
-            {/* 🔵 Abstract Blurred Shape Left */}
             <div
                 style={{
                     position: "absolute",
@@ -86,8 +93,6 @@ export default function WalletPage() {
                     zIndex: 0,
                 }}
             />
-
-            {/* 🟣 Abstract Blurred Shape Right */}
             <div
                 style={{
                     position: "absolute",
@@ -101,8 +106,6 @@ export default function WalletPage() {
                     zIndex: 0,
                 }}
             />
-
-            {/* 🟠 Top Right Soft Glow */}
             <div
                 style={{
                     position: "absolute",
@@ -116,8 +119,6 @@ export default function WalletPage() {
                     zIndex: 0,
                 }}
             />
-
-            {/* MAIN CARD (unchanged UI) */}
             <div
                 ref={formRef}
                 style={{
@@ -138,7 +139,6 @@ export default function WalletPage() {
                         border: "1px solid #f1f1f1",
                     }}
                 >
-                    {/* Header */}
                     <div style={{ textAlign: "center", marginBottom: 25 }}>
                         <div
                             style={{
@@ -154,7 +154,6 @@ export default function WalletPage() {
                         >
                             <Wallet2 size={34} color="#d4af37" />
                         </div>
-
                         <h2
                             style={{
                                 marginTop: 14,
@@ -165,14 +164,12 @@ export default function WalletPage() {
                         >
                             Add Wallet Amount
                         </h2>
-
                         <p style={{ color: "#777", marginTop: 4 }}>
                             Add funds to user wallet for tracking
                         </p>
                     </div>
 
-                    <div style={{ display: "grid", gap: 22 }}>
-
+                    <div style={{ display: "grid", gap: 20 }}>
                         {/* Wallet Amount */}
                         <div className="wallet-input" style={{ display: "flex", flexDirection: "column" }}>
                             <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
@@ -187,12 +184,11 @@ export default function WalletPage() {
                                 onChange={(e) => setAmount(e.target.value)}
                                 style={{
                                     borderRadius: 10,
-                                    height: 44,
+                                    height: 40,
                                     fontSize: 15,
                                 }}
                             />
                         </div>
-
                         {/* Added Date */}
                         <div style={{ display: "flex", flexDirection: "column" }}>
                             <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
@@ -205,16 +201,15 @@ export default function WalletPage() {
                                 style={{
                                     width: "100%",
                                     borderRadius: 10,
-                                    height: 48,
+                                    height: 40,
                                     fontSize: 15,
                                 }}
                                 suffixIcon={<CalendarDays size={18} />}
                             />
                         </div>
-
                         {/* Alloting For */}
                         <div style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
+                            <label style={{ fontWeight: 500, marginBottom: 0, fontSize: 16 }}>
                                 Alloting For
                             </label>
                             <Select
@@ -238,7 +233,47 @@ export default function WalletPage() {
                                 ))}
                             </Select>
                         </div>
-
+                        {/* Branch */}
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                            <label style={{ fontWeight: 500, marginBottom: 0, fontSize: 16 }}>
+                                Branch
+                            </label>
+                            <Select
+                                size="large"
+                                placeholder="Select Branch"
+                                value={branch}
+                                onChange={setBranch}
+                                style={{
+                                    width: "100%",
+                                    borderRadius: 10,
+                                    height: 55,
+                                    fontSize: 15,
+                                    alignItems: "center"
+                                }}
+                            >
+                                {branches.map((b) => (
+                                    <Select.Option key={b} value={b}>
+                                        {b}
+                                    </Select.Option>
+                                ))}
+                            </Select>
+                        </div>
+                        {/* Note */}
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                            <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
+                                Note
+                            </label>
+                            <Input.TextArea
+                                placeholder="Add a note (optional)"
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                style={{
+                                    borderRadius: 10,
+                                    fontSize: 15,
+                                }}
+                                rows={3}
+                            />
+                        </div>
                         {/* Button */}
                         <Button
                             type="primary"

@@ -9,7 +9,6 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
-
 import {
     Chart as ChartJS,
     ArcElement,
@@ -17,7 +16,6 @@ import {
     Legend,
 } from "chart.js";
 import { Pie } from "react-chartjs-2";
-
 import {
     TrendingUp,
     PieChart,
@@ -29,11 +27,9 @@ import {
     ChevronLeft,
     FileText
 } from "lucide-react";
-
 import "../css/Dashboard.css";
 import AmountDetails from "./AmountDetails";
 import Filters from "../Filters/Filters";
-
 import {
     getIncomeApi,
     getExpensesApi,
@@ -41,36 +37,30 @@ import {
     getIncomeCategoriesApi,
     getWalletEntriesApi,
 } from "../../Api/action";
-
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { FullPageLoader } from "../../Common/FullPageLoader";
 import Modals from "./Modals";
 import { CommonToaster } from "../../Common/CommonToaster";
-
 dayjs.extend(isBetween);
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
 export default function Dashboard() {
-    // Raw DB Data (fetched once)
     const [originalIncome, setOriginalIncome] = useState([]);
     const [originalExpenses, setOriginalExpenses] = useState([]);
     const [walletEntries, setWalletEntries] = useState([]);
     const [expenseCategories, setExpenseCategories] = useState({});
     const [incomeCategories, setIncomeCategories] = useState([]);
-
     // Derived / UI state
     const [incomeData, setIncomeData] = useState([]);
     const [expenseDataDb, setExpenseDataDb] = useState([]);
     const [recentTransactions, setRecentTransactions] = useState({ income: [], expense: [] });
-
     const [openModal, setOpenModal] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("expense");
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [currentInvoices, setCurrentInvoices] = useState([]);
     const [currentInvoiceIndex, setCurrentInvoiceIndex] = useState(0);
-
     const [branch, setBranch] = useState("Select Branch");
     const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [total, setTotal] = useState("");
@@ -80,20 +70,17 @@ export default function Dashboard() {
     const [vendorName, setVendorName] = useState("");
     const [vendorNumber, setVendorNumber] = useState("");
     const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
-
     const [filters, setFilters] = useState({
         filterType: "date",
         compareMode: false,
         value: dayjs(),
     });
-
     const user = JSON.parse(localStorage.getItem("loginDetails")) || {};
 
-    // PDF detect helper
     const isPDF = (src) => {
         if (!src || typeof src !== "string") return false;
 
-        let clean = src.replace(/^"+|"+$/g, "").trim(); // remove wrapping quotes
+        let clean = src.replace(/^"+|"+$/g, "").trim();
 
         return (
             clean.startsWith("data:application/pdf") ||
@@ -101,21 +88,16 @@ export default function Dashboard() {
         );
     };
 
-
     // -------------------------
     // Single loader for all APIs
     // -------------------------
     const fetchOriginalData = async () => {
         try {
             setLoading(true);
-
-            // fetch categories in parallel
             const [expCat, incCat] = await Promise.all([
                 getExpenseCategoriesApi(),
                 getIncomeCategoriesApi(),
-            ]).catch(() => [[], []]); // tolerate failures
-
-            // group expense categories
+            ]).catch(() => [[], []]);
             const grouped = (expCat || []).reduce((acc, item) => {
                 const main = item.main_category;
                 const sub = item.sub_category;
@@ -123,20 +105,14 @@ export default function Dashboard() {
                 acc[main].push(sub);
                 return acc;
             }, {});
-
             setExpenseCategories(grouped);
             setIncomeCategories((incCat || []).map((i) => i.name));
-
-            // fetch incomes and expenses in parallel
             const [incomes, expenses] = await Promise.all([
                 getIncomeApi().catch(() => []),
                 getExpensesApi().catch(() => []),
             ]);
-
             setOriginalIncome((incomes?.data) || []);
             setOriginalExpenses((expenses?.data) || []);
-
-            // wallet only for user role
             if (user?.role === "user") {
                 const wallets = await getWalletEntriesApi(user.id).catch(() => ({ entries: [] }));
                 setWalletEntries(wallets.entries || []);
@@ -150,25 +126,21 @@ export default function Dashboard() {
         }
     };
 
-    // load once on mount
     useEffect(() => {
         fetchOriginalData();
-    }, []); // Empty dependency array - only run once on mount
+    }, []);
 
-    // reload hooks used by other parts of app
     useEffect(() => {
         const reloadData = () => fetchOriginalData();
 
         window.addEventListener("incomeExpenseUpdated", reloadData);
         window.addEventListener("summaryUpdated", reloadData);
-
         return () => {
             window.removeEventListener("incomeExpenseUpdated", reloadData);
             window.removeEventListener("summaryUpdated", reloadData);
         };
-    }, []); // Empty dependency array - set up listeners once
+    }, []);
 
-    // open modal triggers
     useEffect(() => {
         const openIncome = () => setOpenModal("income");
         const openExpense = () => setOpenModal("expense");
@@ -184,11 +156,8 @@ export default function Dashboard() {
 
     const handleViewInvoice = (invoiceData) => {
         if (!invoiceData) return;
-
         const BASE = import.meta.env.VITE_API_URL;
         let invoicesArray = [];
-
-        // Clean helper
         const normalize = (item) => {
             if (!item) return null;
 
@@ -197,13 +166,9 @@ export default function Dashboard() {
             if (str.startsWith("data:")) return str;
             return `${BASE}/uploads/invoices/${str}`;
         };
-
-        // Case 1: Already array
         if (Array.isArray(invoiceData)) {
             invoicesArray = invoiceData.map(normalize).filter(Boolean);
         }
-
-        // Case 2: JSON string array
         else if (typeof invoiceData === "string" && invoiceData.startsWith("[")) {
             try {
                 const parsed = JSON.parse(invoiceData);
@@ -212,19 +177,14 @@ export default function Dashboard() {
                 }
             } catch { }
         }
-
-        // Case 3: Single entry (file or base64)
         if (!invoicesArray.length) {
             invoicesArray = [normalize(invoiceData)].filter(Boolean);
         }
-
         if (!invoicesArray.length) return;
-
         setCurrentInvoices(invoicesArray);
         setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
     };
-
 
     const handleNextInvoice = () => {
         setCurrentInvoiceIndex((prev) =>
@@ -236,16 +196,10 @@ export default function Dashboard() {
         setCurrentInvoiceIndex((prev) => (prev > 0 ? prev - 1 : prev));
     };
 
-
-    // -------------------------
-    // Filtering (memoized)
-    // -------------------------
     const applyFilters = useCallback(
         (items) => {
             if (!filters.value || !items?.length) return items || [];
-
             const type = filters.filterType;
-
             if (!filters.compareMode) {
                 return items.filter((item) => {
                     const d = dayjs(item.date);
@@ -256,10 +210,7 @@ export default function Dashboard() {
                     return true;
                 });
             }
-
-            // compare mode expects an array [start, end]
             if (!Array.isArray(filters.value)) return items;
-
             const [start, end] = filters.value;
             return items.filter((item) => {
                 const d = dayjs(item.date);
@@ -272,21 +223,15 @@ export default function Dashboard() {
         },
         [filters]
     );
-
-    // derive filtered arrays via memo (fast)
     const filteredIncome = useMemo(() => applyFilters(originalIncome), [originalIncome, applyFilters]);
     const filteredExpenses = useMemo(() => applyFilters(originalExpenses), [originalExpenses, applyFilters]);
     const filteredWalletEntries = useMemo(() => (user?.role === "user" ? applyFilters(walletEntries) : []), [walletEntries, applyFilters, user?.role]);
 
-    // reflect filtered arrays into local state used by child components
     useEffect(() => {
         setIncomeData(filteredIncome);
         setExpenseDataDb(filteredExpenses);
-
         let latestIncomeOrWallet = [];
-
         if (user.role === "admin") {
-            // ADMIN → show Income
             latestIncomeOrWallet = [...filteredIncome]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5)
@@ -301,7 +246,6 @@ export default function Dashboard() {
                     color: "#B6F3C0",
                 }));
         } else {
-            // USER → show Wallet
             latestIncomeOrWallet = [...filteredWalletEntries]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5)
@@ -406,11 +350,6 @@ export default function Dashboard() {
         </div>
     );
 
-    // -------------------------
-    // UI animation
-    // -------------------------
-
-
     return (
         <>
             {loading ? (
@@ -418,9 +357,7 @@ export default function Dashboard() {
             ) : (
                 <>
                     <Filters onFilterChange={setFilters} />
-
                     <div className="dashboard-container">
-                        {/* TOP CARDS */}
                         <AmountDetails
                             filteredIncome={incomeData}
                             filteredExpenses={expenseDataDb}
@@ -439,7 +376,6 @@ export default function Dashboard() {
                             animate="visible"
                         >
                             <h3 className="quick-access-title">Add New Records</h3>
-
                             <div className="quick-access-grid">
                                 {[
                                     {
@@ -478,7 +414,6 @@ export default function Dashboard() {
 
                         {/* CHARTS */}
                         <div className="graphs-grid">
-                            {/* Cash Flow (Income for admin, Wallet for user) */}
                             <motion.div className="chart-card" initial="hidden" animate="visible">
                                 <div className="chart-header">
                                     <h3>
@@ -486,7 +421,6 @@ export default function Dashboard() {
                                         {user.role === "admin" ? "Income Cash Flow" : "Wallet Cash Flow"}
                                     </h3>
                                 </div>
-
                                 {user.role === "admin" ? (
                                     incomeChartData.length === 0 ? (
                                         <NoDataBox title="No Data Found" subtitle="No Income Data available." />
@@ -583,7 +517,6 @@ export default function Dashboard() {
                                         Expense Breakdown
                                     </h3>
                                 </div>
-
                                 <div className="chart-wrapper">
                                     {expensePieData.labels.length === 0 ? (
                                         <NoDataBox title="No Data Found" subtitle="No Expense Data available." />
@@ -626,7 +559,6 @@ export default function Dashboard() {
                                     Recent Transactions
                                 </h3>
                             </div>
-
                             <div className="rt-tabs">
                                 <button
                                     className={`rt-tab ${activeTab === "income" ? "active" : ""}`}
@@ -634,7 +566,6 @@ export default function Dashboard() {
                                 >
                                     {user.role === "admin" ? "Income" : "Wallet"}
                                 </button>
-
                                 <button
                                     className={`rt-tab ${activeTab === "expense" ? "active" : ""}`}
                                     onClick={() => setActiveTab("expense")}
@@ -642,7 +573,6 @@ export default function Dashboard() {
                                     Expense
                                 </button>
                             </div>
-
                             <div className="rt-content">
                                 {activeTab === "income" ? (
                                     <table className="transactions-table">
@@ -748,7 +678,6 @@ export default function Dashboard() {
                             <h3>
                                 Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})
                             </h3>
-
                             <button
                                 className="close-modal-btn"
                                 onClick={() => setShowInvoiceModal(false)}
@@ -758,8 +687,6 @@ export default function Dashboard() {
                         </div>
 
                         <div style={{ position: "relative", textAlign: "center" }}>
-
-                            {/* Prev Arrow */}
                             {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
                                 <button
                                     className="invoice-nav-btn-left"
@@ -768,8 +695,6 @@ export default function Dashboard() {
                                     <ChevronLeft size={24} color="white" />
                                 </button>
                             )}
-
-                            {/* Display PDF Placeholder OR Image */}
                             {isPDF(currentInvoices[currentInvoiceIndex]) ? (
                                 <div
                                     style={{
@@ -787,7 +712,6 @@ export default function Dashboard() {
                                     <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
                                         PDF Document
                                     </p>
-
                                     <a
                                         href={currentInvoices[currentInvoiceIndex]}
                                         target="_blank"
@@ -815,8 +739,6 @@ export default function Dashboard() {
                                     }}
                                 />
                             )}
-
-                            {/* Next Arrow */}
                             {currentInvoices.length > 1 &&
                                 currentInvoiceIndex < currentInvoices.length - 1 && (
                                     <button
@@ -858,7 +780,6 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
-
         </>
     );
 }

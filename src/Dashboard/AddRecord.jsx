@@ -31,16 +31,13 @@ import {
 import AmountDetails from "./AmountDetails";
 import Filters from "../Filters/Filters";
 import Modals from "./Modals";
-
 import {
     getExpenseCategoriesApi,
     getIncomeCategoriesApi,
     getExpensesApi,
     getIncomeApi,
 } from "../../Api/action";
-
 import { FullPageLoader } from "../../Common/FullPageLoader";
-
 ChartJS.register(ArcElement, RadialLinearScale, ChartTooltip, Legend);
 
 export default function AddRecord() {
@@ -51,77 +48,54 @@ export default function AddRecord() {
     const [mainCategory, setMainCategory] = useState("Select Main Category");
     const [subCategory, setSubCategory] = useState("Select Category");
     const [description, setDescription] = useState("");
-
     // ✅ API DATA (LOADED ONCE)
     const [originalIncome, setOriginalIncome] = useState([]);
     const [originalExpenses, setOriginalExpenses] = useState([]);
-
     const [expenseCategories, setExpenseCategories] = useState({});
     const [incomeCategories, setIncomeCategories] = useState([]);
-
     // ✅ FILTERED DATA
     const [incomeData, setIncomeData] = useState([]);
     const [expenseData, setExpenseData] = useState([]);
-
     // ✅ CHART STATE
     const [incomeChartData, setIncomeChartData] = useState([]);
     const [expenseChartData, setExpenseChartData] = useState({
         labels: [],
         datasets: [],
     });
-
     const [loading, setLoading] = useState(true);
-
     const [filters, setFilters] = useState({
         filterType: "year",
         compareMode: false,
         value: dayjs(),
     });
 
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
-    };
-
-    // ✅ FILTER HANDLER (local filtering only)
     const applyFilters = (items) => {
         if (!filters.value) return items;
-
         const type = filters.filterType;
-
         if (!filters.compareMode) {
             return items.filter((item) => {
                 const d = dayjs(item.date);
-
                 if (type === "date") return d.isSame(filters.value, "day");
                 if (type === "week") return d.isSame(filters.value, "week");
                 if (type === "month") return d.isSame(filters.value, "month");
                 if (type === "year") return d.isSame(filters.value, "year");
-
                 return true;
             });
         }
 
-        // ✅ Compare Mode
         if (!Array.isArray(filters.value) || filters.value.length !== 2) return [];
-
         const [start, end] = filters.value;
-
         return items.filter((item) => {
             const d = dayjs(item.date);
             return d.isBetween(start, end, type, "[]");
         });
     };
 
-    // ✅ LOAD ALL API DATA ONLY ONCE
     useEffect(() => {
         async function loadInitial() {
             setLoading(true);
-
-            // ✅ CALL CATEGORIES ONLY ONCE
             const expCat = await getExpenseCategoriesApi();
             const incCat = await getIncomeCategoriesApi();
-
             const grouped = expCat.reduce((acc, item) => {
                 const main = item.main_category;
                 const sub = item.sub_category;
@@ -129,45 +103,33 @@ export default function AddRecord() {
                 acc[main].push(sub);
                 return acc;
             }, {});
-
             setExpenseCategories(grouped);
             setIncomeCategories(incCat.map((item) => item.name));
-
-            // ✅ CALL INCOME/EXPENSE API ONLY ONCE
             const incomeRes = await getIncomeApi();
             const expenseRes = await getExpensesApi();
-
             setOriginalIncome(incomeRes);
             setOriginalExpenses(expenseRes);
-
             setLoading(false);
         }
-
         loadInitial();
     }, []);
 
-    // ✅ APPLY FILTERS LOCALLY WHENEVER FILTERS CHANGE
     useEffect(() => {
         if (loading) return;
-
         const filteredIncome = applyFilters(originalIncome);
         const filteredExpense = applyFilters(originalExpenses);
-
         setIncomeData(filteredIncome);
         setExpenseData(filteredExpense);
-
         buildIncomeChart(filteredIncome);
         buildExpenseChart(filteredExpense);
     }, [filters, originalIncome, originalExpenses, loading]);
 
-    // ✅ BUILD MONTHLY INCOME CHART
     const buildIncomeChart = (incomeRes) => {
         const map = incomeRes.reduce((acc, item) => {
             const month = dayjs(item.date).format("MMM");
             acc[month] = (acc[month] || 0) + Number(item.total);
             return acc;
         }, {});
-
         setIncomeChartData(
             Object.keys(map).map((month) => ({
                 month,
@@ -176,17 +138,14 @@ export default function AddRecord() {
         );
     };
 
-    // ✅ BUILD EXPENSE CATEGORY POLAR CHART
     const buildExpenseChart = (expenseRes) => {
         const grouped = expenseRes.reduce((acc, item) => {
             const cat = item.main_category;
             acc[cat] = (acc[cat] || 0) + Number(item.total);
             return acc;
         }, {});
-
         const labels = Object.keys(grouped);
         const values = Object.values(grouped);
-
         setExpenseChartData(
             labels.length === 0
                 ? { labels: [], datasets: [] }
@@ -221,12 +180,10 @@ export default function AddRecord() {
                     <Filters onFilterChange={setFilters} />
 
                     <div className="dashboard-container">
-                        {/* ✅ QUICK ACCESS (No UI Change) */}
                         <motion.div className="quick-access-card"
                             initial="hidden"
                             animate="visible">
                             <h3 className="quick-access-title">Add New Records</h3>
-
                             <div className="quick-access-grid">
                                 {[
                                     {
@@ -261,7 +218,6 @@ export default function AddRecord() {
                             </div>
                         </motion.div>
 
-                        {/* ✅ AMOUNT SUMMARY (UI unchanged) */}
                         <AmountDetails
                             filteredIncome={incomeData}
                             filteredExpenses={expenseData}
@@ -293,10 +249,7 @@ export default function AddRecord() {
                             />
                         </AnimatePresence>
 
-                        {/* ✅ CHARTS (UI NOT CHANGED AT ALL) */}
                         <div style={{ gridTemplateColumns: "1fr 1fr" }} className="graphs-grid">
-
-                            {/* ✅ INCOME BAR CHART */}
                             <motion.div className="chart-card"
                                 initial="hidden"
                                 animate="visible">
@@ -306,7 +259,6 @@ export default function AddRecord() {
                                         Income Breakdown
                                     </h3>
                                 </div>
-
                                 {incomeChartData.length === 0 ? (
                                     <div className="no-data-box">
                                         <img src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png" className="no-data-img" />
@@ -343,7 +295,6 @@ export default function AddRecord() {
                                         Expense Breakdown
                                     </h3>
                                 </div>
-
                                 {expenseChartData.datasets.length === 0 ? (
                                     <div className="no-data-box">
                                         <img src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png" className="no-data-img" />
@@ -379,7 +330,6 @@ export default function AddRecord() {
                                     </div>
                                 )}
                             </motion.div>
-
                         </div>
                     </div>
                 </>

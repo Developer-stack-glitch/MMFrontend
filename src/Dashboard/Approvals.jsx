@@ -6,27 +6,21 @@ import { Select, Button, Modal, Popconfirm, Tooltip } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
-
 import {
     getApprovalsApi,
     approveExpenseApi,
     rejectExpenseApi,
 } from "../../Api/action";
-
 import { CommonToaster } from "../../Common/CommonToaster";
 import Filters from "../Filters/Filters";
 import { FullPageLoader } from "../../Common/FullPageLoader";
 
 export default function Approvals() {
-
-    // ✅ FILTERS (from Filter.js)
     const [filters, setFilters] = useState({
         filterType: "year",
         compareMode: false,
         value: dayjs(),
     });
-
-    // ✅ Other custom filters
     const [filterCategory, setFilterCategory] = useState("All");
     const [filterAmount, setFilterAmount] = useState("");
     const [searchText, setSearchText] = useState("");
@@ -43,11 +37,8 @@ export default function Approvals() {
     // ✅ Load Approvals
     useEffect(() => {
         loadApprovals();
-
-        // Reload when transactions are updated
         window.addEventListener("incomeExpenseUpdated", loadApprovals);
         window.addEventListener("summaryUpdated", loadApprovals);
-
         return () => {
             window.removeEventListener("incomeExpenseUpdated", loadApprovals);
             window.removeEventListener("summaryUpdated", loadApprovals);
@@ -111,10 +102,7 @@ export default function Approvals() {
     // ✅ ✅ ✅ APPLY DATE FILTER (From Dashboard)
     const applyFilters = (items) => {
         if (!filters.value) return items;
-
         const type = filters.filterType;
-
-        // ✅ Normal Mode (not compare)
         if (!filters.compareMode) {
             return items.filter((item) => {
                 const d = dayjs(item.date);
@@ -131,17 +119,13 @@ export default function Approvals() {
         // ✅ Compare Mode
         if (!Array.isArray(filters.value) || filters.value.length !== 2)
             return items;
-
         const [start, end] = filters.value;
-
         return items.filter((item) => {
             const d = dayjs(item.date);
-
             if (type === "date") return d.isBetween(start, end, "day", "[]");
             if (type === "week") return d.isBetween(start, end, "week", "[]");
             if (type === "month") return d.isBetween(start, end, "month", "[]");
             if (type === "year") return d.isBetween(start, end, "year", "[]");
-
             return true;
         });
     };
@@ -149,40 +133,24 @@ export default function Approvals() {
     // -------------------------------------
     // Invoice
     // -------------------------------------
-    // -------------------------------------
-    // Invoice
-    // -------------------------------------
     const handleViewInvoice = (invoiceData) => {
         if (!invoiceData) return;
-
         const API_BASE = import.meta.env.VITE_API_URL;
         let invoicesArray = [];
-
         const normalizeEntry = (entry) => {
             if (!entry) return null;
-
-            // Ensure it's a clean string
             let str = String(entry).trim();
-
-            // Remove wrapping quotes if present:  "data:..."  →  data:...
             str = str.replace(/^"+|"+$/g, "");
-
-            // If it's a Base64 / data URL → return as-is
             if (str.startsWith("data:")) {
                 return str;
             }
-
-            // Otherwise treat as filename
             return `${API_BASE}/uploads/invoices/${str}`;
         };
-
-        // 1) If it's already an array
         if (Array.isArray(invoiceData)) {
             invoicesArray = invoiceData
                 .map(normalizeEntry)
                 .filter(Boolean);
         }
-        // 2) If it's a JSON string representing an array: '["data:...","file.jpg"]'
         else if (typeof invoiceData === "string" && invoiceData.trim().startsWith("[")) {
             try {
                 const parsed = JSON.parse(invoiceData);
@@ -192,39 +160,27 @@ export default function Approvals() {
                         .filter(Boolean);
                 }
             } catch (e) {
-                // fallback to single entry handling below
             }
         }
-
-        // 3) Fallback: single string (either "data:..." or "filename.ext")
         if (!invoicesArray.length) {
             invoicesArray = [normalizeEntry(invoiceData)].filter(Boolean);
         }
-
         if (!invoicesArray.length) return;
-
         setCurrentInvoices(invoicesArray);
         setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
     };
-
 
     const handleNextInvoice = () => {
         setCurrentInvoiceIndex((prev) =>
             prev < currentInvoices.length - 1 ? prev + 1 : prev
         );
     };
-
     const handlePrevInvoice = () => {
         setCurrentInvoiceIndex((prev) => (prev > 0 ? prev - 1 : prev));
     };
 
-
-
-    // ✅ Step 1: APPLY DATE FILTER
     let filteredRows = applyFilters(requests);
-
-    // ✅ Step 2: APPLY SEARCH
     if (searchText.trim()) {
         filteredRows = filteredRows.filter((r) =>
             `${r.name} ${r.category} ${r.branch} ${fmtDate(r.date)}`
@@ -232,13 +188,9 @@ export default function Approvals() {
                 .includes(searchText.toLowerCase())
         );
     }
-
-    // ✅ Step 3: APPLY CATEGORY
     if (filterCategory !== "All") {
         filteredRows = filteredRows.filter((r) => r.category === filterCategory);
     }
-
-    // ✅ Step 4: APPLY AMOUNT SORT
     const parseAmt = (n) =>
         Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
 
@@ -247,7 +199,6 @@ export default function Approvals() {
     } else if (filterAmount === "high") {
         filteredRows.sort((a, b) => parseAmt(b.amount) - parseAmt(a.amount));
     }
-
 
     const clearAllFilters = () => {
         setFilterCategory("All");
@@ -267,17 +218,12 @@ export default function Approvals() {
                 <>
                     <Filters onFilterChange={setFilters} />
                     <div className="approvals-container">
-
                         <div className="approvals-header-top">
                             <h1 className="approvals-title">Approvals</h1>
                         </div>
-
-                        {/* ✅ Extra Filters */}
                         <motion.div
                             initial="hidden"
                             animate="visible" className="filter-dropdown">
-
-                            {/* Search */}
                             <div className="filter-item">
                                 <label>Search (Name / Branch)</label>
                                 <input
@@ -352,7 +298,6 @@ export default function Approvals() {
                                 {/* BODY */}
                                 <tbody>
                                     {filteredRows.length === 0 ? (
-
                                         <tr>
                                             <td></td>
                                             <td></td>
@@ -369,7 +314,6 @@ export default function Approvals() {
                                     ) : (
                                         filteredRows.map((row) => (
                                             <tr key={row.id} className="table-row">
-
                                                 {/* 1️⃣ SPENDER NAME */}
                                                 <td>
                                                     <div className="owner-cell">
@@ -380,7 +324,6 @@ export default function Approvals() {
                                                         </div>
                                                     </div>
                                                 </td>
-
                                                 {/* 2️⃣ CATEGORY */}
                                                 <td>
                                                     <div>
@@ -394,7 +337,6 @@ export default function Approvals() {
                                                         </span>
                                                     </div>
                                                 </td>
-
                                                 {/* 3️⃣ AMOUNT */}
                                                 <td>
                                                     {fmtAmt(row.amount)}<br></br>
@@ -404,7 +346,6 @@ export default function Approvals() {
                                                         </span>
                                                     )}
                                                 </td>
-
                                                 {/* 4️⃣ INVOICE */}
                                                 <td>
                                                     {row.invoice ? (
@@ -420,13 +361,10 @@ export default function Approvals() {
                                                         <span className="no-invoice">No File</span>
                                                     )}
                                                 </td>
-
                                                 {/* 5️⃣ Request DATE */}
                                                 <td>{fmtDate(row.date)}</td>
-
                                                 {/* 6️⃣ END DATE */}
                                                 <td>{fmtDate(row.end_date)}</td>
-
                                                 {/* 7️⃣ ACTION */}
                                                 <td>
                                                     <div className="action-cell">
@@ -500,7 +438,6 @@ export default function Approvals() {
                                         }}
                                     >
                                         <Button onClick={() => setShowDetails(false)}>Close</Button>
-
                                         <Popconfirm
                                             title="Approve this request?"
                                             okText="Yes"
@@ -536,7 +473,6 @@ export default function Approvals() {
                             <h3>
                                 Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})
                             </h3>
-
                             <button
                                 className="close-modal-btn"
                                 onClick={() => setShowInvoiceModal(false)}
@@ -546,8 +482,6 @@ export default function Approvals() {
                         </div>
 
                         <div style={{ position: "relative", textAlign: "center" }}>
-
-                            {/* LEFT ARROW */}
                             {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
                                 <button
                                     className="invoice-nav-btn-left"
@@ -556,8 +490,6 @@ export default function Approvals() {
                                     <Icons.ChevronLeft size={24} color="white" />
                                 </button>
                             )}
-
-                            {/* PDF Placeholder OR Image */}
                             {currentInvoices[currentInvoiceIndex]?.includes("application/pdf") ? (
                                 <div
                                     style={{
@@ -602,8 +534,6 @@ export default function Approvals() {
                                     }}
                                 />
                             )}
-
-                            {/* RIGHT ARROW */}
                             {currentInvoices.length > 1 &&
                                 currentInvoiceIndex < currentInvoices.length - 1 && (
                                     <button

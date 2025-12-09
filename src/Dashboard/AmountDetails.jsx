@@ -5,7 +5,6 @@ import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { Skeleton } from "antd";
 import { getWalletEntriesApi } from "../../Api/action";
-
 dayjs.extend(isBetween);
 
 export default function AmountDetails({
@@ -18,12 +17,8 @@ export default function AmountDetails({
     user,
 }) {
     const navigate = useNavigate();
-
     const [walletEntries, setWalletEntries] = useState([]);
 
-    // ===============================================================
-    // FETCH ALL WALLET ENTRIES FOR USER
-    // ===============================================================
     useEffect(() => {
         const loadWallet = () => {
             if (user?.role === "user" && user?.id) {
@@ -32,13 +27,9 @@ export default function AmountDetails({
                 });
             }
         };
-
         loadWallet();
-
-        // Reload wallet when transactions are updated
         window.addEventListener("incomeExpenseUpdated", loadWallet);
         window.addEventListener("summaryUpdated", loadWallet);
-
         return () => {
             window.removeEventListener("incomeExpenseUpdated", loadWallet);
             window.removeEventListener("summaryUpdated", loadWallet);
@@ -61,49 +52,33 @@ export default function AmountDetails({
         );
     }
 
-    // ===============================================================
-    // FILTER WALLET FOR SELECTED PERIOD
-    // ===============================================================
     const filteredWallet = walletEntries.filter((entry) => {
         const d = dayjs(entry.date);
-
         if (!filters.value) return true;
-
         if (!filters.compareMode) {
             if (filters.filterType === "date")
                 return d.isSame(filters.value, "day");
-
             if (filters.filterType === "week")
                 return d.isSame(filters.value, "week");
-
             if (filters.filterType === "month")
                 return d.isSame(filters.value, "month");
-
             if (filters.filterType === "year")
                 return d.isSame(filters.value, "year");
         }
-
         if (filters.compareMode && Array.isArray(filters.value)) {
             const [start, end] = filters.value;
             return d.isBetween(start, end, "day", "[]");
         }
-
         return true;
     });
-
     const walletTotal = filteredWallet.reduce(
         (sum, entry) => sum + Number(entry.amount),
         0
     );
-
-    // ===============================================================
-    // CURRENT TOTALS
-    // ===============================================================
     const totalIncome =
         user?.role === "admin"
             ? filteredIncome.reduce((a, b) => a + Number(b.total), 0)
             : 0;
-
     const totalExpenses = filteredExpenses.reduce(
         (a, b) => a + Number(b.total),
         0
@@ -113,22 +88,15 @@ export default function AmountDetails({
         user?.role === "admin"
             ? totalIncome - totalExpenses
             : walletTotal - totalExpenses;
-
-    // ===============================================================
-    // PREVIOUS PERIOD CALCULATION
-    // ===============================================================
     let lastIncome = 0;
     let lastExpenses = 0;
     let lastWallet = 0;
     let lastBalance = 0;
-
     if (filters.value && !filters.compareMode) {
         const type = filters.filterType;
         const selected = dayjs(filters.value);
-
         let prevStart = null;
         let prevEnd = null;
-
         if (type === "date") {
             prevStart = selected.subtract(1, "day");
             prevEnd = selected.subtract(1, "day");
@@ -145,7 +113,6 @@ export default function AmountDetails({
             prevStart = selected.subtract(1, "year").startOf("year");
             prevEnd = selected.subtract(1, "year").endOf("year");
         }
-
         if (prevStart && prevEnd) {
             lastIncome = originalIncome
                 .filter((i) =>
@@ -172,28 +139,17 @@ export default function AmountDetails({
         }
     }
 
-    // ===============================================================
-    // DIFF TEXTER
-    // ===============================================================
     const diffText = (current, previous) => {
         if (!filters.value) return "";
         if (current === previous) return "No Datas";
-
         const diff = current - previous;
-
         return diff > 0
             ? `+ ₹${diff.toLocaleString()} compared to previous period`
             : `- ₹${Math.abs(diff).toLocaleString()} compared to previous period`;
     };
 
-    // Wallet diff text
     const walletDiff = diffText(walletTotal, lastWallet);
-
-    // ===============================================================
-    // ROLE BASED UI DATA
-    // ===============================================================
     let stats = [];
-
     if (user?.role === "admin") {
         stats = [
             {
@@ -234,11 +190,6 @@ export default function AmountDetails({
         ];
     }
 
-    // ===============================================================
-    // ANIMATION
-    // ===============================================================
-
-
     return (
         <div className="stats-grid">
             {stats.map((stat, i) => (
@@ -260,9 +211,7 @@ export default function AmountDetails({
                             See Detail →
                         </span>
                     </div>
-
                     <h2>₹ {stat.value.toLocaleString()}</h2>
-
                     {stat.diff && (
                         <p
                             className={`stat-change ${stat.diff.startsWith("+")
