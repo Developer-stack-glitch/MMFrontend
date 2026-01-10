@@ -92,23 +92,22 @@
    ================================================ */
 
 .alerts-banner {
-    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    background: linear-gradient(117deg, #0b0f19 0%, #1c2431 20%, #c79f1e 160%) !important;
     color: white;
     padding: 15px 20px;
     border-radius: 12px;
-    margin-bottom: 20px;
+    margin: 20px 20px 8px 20px;
     display: flex;
     align-items: center;
-    gap: 15px;
+    font-size: 18px;
+    gap: 10px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
     transition: all 0.3s ease;
     animation: pulse 2s infinite;
 }
 
 .alerts-banner:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
 }
 
 @keyframes pulse {
@@ -150,12 +149,13 @@
     margin-left: auto;
     padding: 8px 16px;
     background: white;
-    color: #f59e0b;
+    color: #2a2a2a;
     border: none;
     border-radius: 6px;
-    font-weight: 600;
+    font-weight: 800;
     cursor: pointer;
     transition: all 0.3s ease;
+    letter-spacing: 0.8px;
 }
 
 .view-alerts-btn:hover {
@@ -271,6 +271,55 @@
     background: #fffdf4 !important;
 }
 
+/* Day cell background colors based on event status */
+/* Target the main td cell */
+.fc-daygrid-day.day-has-pending {
+    background-color: #fee2e2 !important;
+}
+
+.fc-daygrid-day.day-all-completed {
+    background-color: #d1fae5 !important;
+}
+
+/* Target the day frame container */
+.fc-daygrid-day.day-has-pending .fc-daygrid-day-frame {
+    background-color: #fee2e2 !important;
+}
+
+.fc-daygrid-day.day-all-completed .fc-daygrid-day-frame {
+    background-color: #d1fae5 !important;
+}
+
+/* Target the background layer */
+.fc-daygrid-day.day-has-pending .fc-daygrid-day-bg {
+    background-color: #fee2e2 !important;
+}
+
+.fc-daygrid-day.day-all-completed .fc-daygrid-day-bg {
+    background-color: #d1fae5 !important;
+}
+
+/* Target the top section with the date number */
+.fc-daygrid-day.day-has-pending .fc-daygrid-day-top {
+    background-color: #fee2e2 !important;
+}
+
+.fc-daygrid-day.day-all-completed .fc-daygrid-day-top {
+    background-color: #d1fae5 !important;
+}
+
+/* Target the events container */
+.fc-daygrid-day.day-has-pending .fc-daygrid-day-events {
+    background-color: #fee2e2 !important;
+}
+
+.fc-daygrid-day.day-all-completed .fc-daygrid-day-events {
+    background-color: #d1fae5 !important;
+}
+
+
+
+
 /* ================================================
    EVENT FORM STYLES
    ================================================ */
@@ -336,7 +385,8 @@
 
 .delete-event-btn,
 .cancel-event-btn,
-.update-event-btn {
+.update-event-btn,
+.complete-event-btn {
     padding: 8px 16px;
     border: none;
     border-radius: 6px;
@@ -385,6 +435,21 @@
 .update-event-btn:hover {
     background: #e8c962;
     transform: translateY(-2px);
+}
+
+.complete-event-btn {
+    background: #d4af37;
+    color: white;
+}
+
+.complete-event-btn:hover:not(:disabled) {
+    background: #e8c962;
+    transform: translateY(-2px);
+}
+
+.complete-event-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 /* ================================================
@@ -576,7 +641,7 @@
 }
 
 .ant-btn-primary:hover {
-    background: #e8c962;
+    background: #e8c962 !important;
     border-color: #e8c962;
 }
 
@@ -584,9 +649,6 @@
    LOADING SPINNER
    ================================================ */
 
-.ant-spin-container {
-    min-height: 200px;
-}
 
 .ant-spin-dot-item {
     background-color: #d4af37;

@@ -43,7 +43,7 @@
     font-size: 24px;
     margin-top: 0;
     font-weight: 700;
-    margin-bottom: 18px;
+    margin-bottom: 0px;
     color: #1e1e1e;
 }
 
@@ -84,10 +84,10 @@
 
 /* DIVIDER */
 .divider {
-    margin: 25px 0;
+    margin: 5px 0 25px 0;
     text-align: center;
     color: #999;
-    font-size: 14px;
+    font-size: 16px;
     position: relative;
 }
 
@@ -216,6 +216,10 @@
 
 .eye-icon:hover {
     color: #333;
+}
+
+.login_logo {
+    width: 100%;
 }
 
 

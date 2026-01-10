@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { Skeleton } from "antd";
-import { getWalletEntriesApi } from "../../Api/action";
+import { getWalletEntriesApi, getAllWalletDetailsApi } from "../../Api/action";
 dayjs.extend(isBetween);
 
 export default function AmountDetails({
@@ -15,26 +15,23 @@ export default function AmountDetails({
     filters,
     loading,
     user,
+    walletEntries = []
 }) {
     const navigate = useNavigate();
-    const [walletEntries, setWalletEntries] = useState([]);
 
-    useEffect(() => {
-        const loadWallet = () => {
-            if (user?.role === "user" && user?.id) {
-                getWalletEntriesApi(user.id).then((res) => {
-                    setWalletEntries(res.entries || []);
-                });
-            }
-        };
-        loadWallet();
-        window.addEventListener("incomeExpenseUpdated", loadWallet);
-        window.addEventListener("summaryUpdated", loadWallet);
-        return () => {
-            window.removeEventListener("incomeExpenseUpdated", loadWallet);
-            window.removeEventListener("summaryUpdated", loadWallet);
-        };
-    }, [user?.id, user?.role]);
+    // Calculate Summary (Unfiltered) from walletEntries prop AND originalExpenses (only if not User)
+    const isUser = user?.role === "user";
+
+    const walletSummary = {
+        income: walletEntries
+            .filter(e => (e.type || "").toLowerCase() === 'income')
+            .reduce((sum, e) => sum + Number(e.amount), 0),
+        expense: (walletEntries
+            .filter(e => (e.type || "").toLowerCase() === 'expense')
+            .reduce((sum, e) => sum + Number(e.amount), 0)) +
+            (isUser ? 0 : (originalExpenses || []).reduce((sum, e) => sum + Number(e.total), 0)),
+        get wallet() { return this.income - this.expense }
+    };
 
     if (loading) {
         return (
@@ -71,101 +68,126 @@ export default function AmountDetails({
         }
         return true;
     });
-    const walletTotal = filteredWallet.reduce(
-        (sum, entry) => sum + Number(entry.amount),
-        0
-    );
-    const totalIncome =
-        user?.role === "admin"
-            ? filteredIncome.reduce((a, b) => a + Number(b.total), 0)
-            : 0;
-    const totalExpenses = filteredExpenses.reduce(
-        (a, b) => a + Number(b.total),
-        0
-    );
 
-    const balance =
-        user?.role === "admin"
-            ? totalIncome - totalExpenses
-            : walletTotal - totalExpenses;
-    let lastIncome = 0;
-    let lastExpenses = 0;
-    let lastWallet = 0;
-    let lastBalance = 0;
+    // Calculate totals from filtered wallet entries + filtered expenses (only if not User)
+    const calculateTotals = (wEntries, eEntries = []) => {
+        const income = wEntries
+            .filter(e => (e.type || "").toLowerCase() === 'income')
+            .reduce((sum, e) => sum + Number(e.amount), 0);
+
+        const expense = (wEntries
+            .filter(e => (e.type || "").toLowerCase() === 'expense')
+            .reduce((sum, e) => sum + Number(e.amount), 0)) +
+            (isUser ? 0 : eEntries.reduce((sum, e) => sum + Number(e.total), 0));
+
+        return { income, expense, balance: income - expense };
+    };
+
+    const currentTotals = calculateTotals(filteredWallet, filteredExpenses);
+
+    // Calculate Previous Period Totals
+    let lastTotals = { income: 0, expense: 0, balance: 0 };
+
     if (filters.value && !filters.compareMode) {
         const type = filters.filterType;
         const selected = dayjs(filters.value);
         let prevStart = null;
         let prevEnd = null;
+
         if (type === "date") {
             prevStart = selected.subtract(1, "day");
             prevEnd = selected.subtract(1, "day");
-        }
-        if (type === "week") {
+        } else if (type === "week") {
             prevStart = selected.subtract(1, "week").startOf("week");
             prevEnd = selected.subtract(1, "week").endOf("week");
-        }
-        if (type === "month") {
+        } else if (type === "month") {
             prevStart = selected.subtract(1, "month").startOf("month");
             prevEnd = selected.subtract(1, "month").endOf("month");
-        }
-        if (type === "year") {
+        } else if (type === "year") {
             prevStart = selected.subtract(1, "year").startOf("year");
             prevEnd = selected.subtract(1, "year").endOf("year");
         }
+
         if (prevStart && prevEnd) {
-            lastIncome = originalIncome
-                .filter((i) =>
-                    dayjs(i.date).isBetween(prevStart, prevEnd, "day", "[]")
-                )
-                .reduce((a, b) => a + Number(b.total), 0);
-
-            lastExpenses = originalExpenses
-                .filter((e) =>
-                    dayjs(e.date).isBetween(prevStart, prevEnd, "day", "[]")
-                )
-                .reduce((a, b) => a + Number(b.total), 0);
-
-            lastWallet = walletEntries
-                .filter((w) =>
-                    dayjs(w.date).isBetween(prevStart, prevEnd, "day", "[]")
-                )
-                .reduce((a, b) => a + Number(b.amount), 0);
-
-            lastBalance =
-                user?.role === "admin"
-                    ? lastIncome - lastExpenses
-                    : lastWallet - lastExpenses;
+            const prevWallet = walletEntries.filter((w) =>
+                dayjs(w.date).isBetween(prevStart, prevEnd, "day", "[]")
+            );
+            const prevExpenses = (originalExpenses || []).filter((e) =>
+                dayjs(e.date).isBetween(prevStart, prevEnd, "day", "[]")
+            );
+            lastTotals = calculateTotals(prevWallet, prevExpenses);
         }
     }
 
     const diffText = (current, previous) => {
         if (!filters.value) return "";
         if (current === previous) return "No Datas";
+
+        // Get the previous period month name
+        const type = filters.filterType;
+        const selected = dayjs(filters.value);
+        let prevPeriod = "";
+
+        if (type === "date") {
+            prevPeriod = selected.subtract(1, "day").format("MMMM");
+        } else if (type === "week") {
+            prevPeriod = selected.subtract(1, "week").format("MMMM");
+        } else if (type === "month") {
+            prevPeriod = selected.subtract(1, "month").format("MMMM");
+        } else if (type === "year") {
+            prevPeriod = selected.subtract(1, "year").format("YYYY");
+        }
+
         const diff = current - previous;
+        const periodText = prevPeriod ? ` (${prevPeriod})` : "";
+
         return diff > 0
-            ? `+ ₹${diff.toLocaleString()} compared to previous period`
-            : `- ₹${Math.abs(diff).toLocaleString()} compared to previous period`;
+            ? `+ ₹${diff.toLocaleString()} compared to previous period${periodText}`
+            : `- ₹${Math.abs(diff).toLocaleString()} compared to previous period${periodText}`;
     };
 
-    const walletDiff = diffText(walletTotal, lastWallet);
+    // Get current period text for stat titles
+    const getPeriodText = () => {
+        if (!filters.value) return "";
+        const selected = dayjs(filters.value);
+        const type = filters.filterType;
+
+        if (filters.compareMode && Array.isArray(filters.value)) {
+            const [start, end] = filters.value;
+            return ` (${dayjs(start).format("MMM DD")} - ${dayjs(end).format("MMM DD")})`;
+        }
+
+        if (type === "date") {
+            return ` (${selected.format("MMM DD, YYYY")})`;
+        } else if (type === "week") {
+            return ` (${selected.startOf("week").format("MMM DD")} - ${selected.endOf("week").format("MMM DD")})`;
+        } else if (type === "month") {
+            return ` (${selected.format("MMMM YYYY")})`;
+        } else if (type === "year") {
+            return ` (${selected.format("YYYY")})`;
+        }
+        return "";
+    };
+
+    const periodText = getPeriodText();
+
     let stats = [];
     if (user?.role === "admin") {
         stats = [
             {
-                title: "Balance",
-                value: balance,
-                diff: diffText(balance, lastBalance),
+                title: `Overall Balance${periodText}`,
+                value: filters.value ? currentTotals.balance : walletSummary.wallet,
+                diff: diffText(currentTotals.balance, lastTotals.balance),
             },
             {
-                title: "Income",
-                value: totalIncome,
-                diff: diffText(totalIncome, lastIncome),
+                title: `Total Received${periodText}`,
+                value: filters.value ? currentTotals.income : walletSummary.income,
+                diff: diffText(currentTotals.income, lastTotals.income),
             },
             {
-                title: "Expenses",
-                value: totalExpenses,
-                diff: diffText(totalExpenses, lastExpenses),
+                title: `Overall Expenses${periodText}`,
+                value: filters.value ? currentTotals.expense : walletSummary.expense,
+                diff: diffText(currentTotals.expense, lastTotals.expense),
             },
         ];
     }
@@ -173,19 +195,19 @@ export default function AmountDetails({
     if (user?.role === "user") {
         stats = [
             {
-                title: "Balance",
-                value: balance,
-                diff: diffText(balance, lastBalance),
+                title: `Balance`,
+                value: filters.value ? currentTotals.balance : walletSummary.wallet,
+                diff: diffText(currentTotals.balance, lastTotals.balance),
             },
             {
-                title: "Wallet",
-                value: walletTotal,
-                diff: walletDiff,
+                title: `Received`,
+                value: filters.value ? currentTotals.income : walletSummary.income,
+                diff: diffText(currentTotals.income, lastTotals.income),
             },
             {
-                title: "Expenses",
-                value: totalExpenses,
-                diff: diffText(totalExpenses, lastExpenses),
+                title: `Expenses`,
+                value: filters.value ? currentTotals.expense : walletSummary.expense,
+                diff: diffText(currentTotals.expense, lastTotals.expense),
             },
         ];
     }

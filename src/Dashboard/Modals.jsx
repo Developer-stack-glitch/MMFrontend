@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { X, Upload } from "lucide-react";
-import { Dropdown, Menu, Button, Space, DatePicker } from "antd";
-import { addExpenseApi, addIncomeApi, editExpenseApi } from "../../Api/action";
+import { Dropdown, Menu, Button, Space, DatePicker, Checkbox, Radio, Select, Modal } from "antd";
+import { addExpenseApi, addApprovalApi, addIncomeApi, editExpenseApi, safeGetLocalStorage, getUsersApi, getVendorsApi, addVendorApi } from "../../Api/action";
 import { DownOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { CommonToaster } from "../../Common/CommonToaster";
-import { getLastMonthSummaryApi } from "../../Api/action";
+import AddCategoryModal from "./AddCategoryModal";
 
 export default function Modals({
     open,
@@ -27,20 +27,50 @@ export default function Modals({
     setDescription,
     expenseCategories,
     incomeCategories,
-    vendorName,
-    setVendorName,
-    vendorNumber,
-    setVendorNumber,
-    endDate,
-    setEndDate,
     editData,
 }) {
     if (!open) return null;
 
-    const [invoices, setInvoices] = useState([]);
+    const [invoices, setInvoices] = useState([]); // Now stores File objects
+    const [invoiceFiles, setInvoiceFiles] = useState([]); // Actual File objects for upload
     const [spendMode, setSpendMode] = useState("Select Spend Mode");
+    const [gst, setGst] = useState("No");
+    const [activeModalTab, setActiveModalTab] = useState(type);
+    const [transactionFrom, setTransactionFrom] = useState(null);
+    const [transactionTo, setTransactionTo] = useState("");
+    const [usersList, setUsersList] = useState([]);
+    const [endDate, setEndDate] = useState(null);
 
-    const currentUser = JSON.parse(localStorage.getItem("loginDetails"));
+    // Vendor State
+    const [vendorType, setVendorType] = useState("Regular");
+    const [vendorList, setVendorList] = useState([]);
+    const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
+    const [newVendorName, setNewVendorName] = useState("");
+    const [newVendorNumber, setNewVendorNumber] = useState("");
+
+    // Add Category Modal State
+    const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+    const [addCategoryInitialMain, setAddCategoryInitialMain] = useState("");
+
+    const currentUser = safeGetLocalStorage("loginDetails", {});
+
+    // Update activeModalTab when type prop changes
+    useEffect(() => {
+        setActiveModalTab(type);
+    }, [type]);
+
+    // Fetch users for "Transaction From"
+    useEffect(() => {
+        if (open) {
+            getUsersApi().then((res) => {
+                setUsersList(res || []);
+            }).catch(err => console.error("Failed to load users", err));
+
+            getVendorsApi().then((res) => {
+                setVendorList(res || []);
+            }).catch(err => console.error("Failed to load vendors", err));
+        }
+    }, [open]);
 
     useEffect(() => {
         // When opening modal for edit, hydrate local invoice + spendMode
@@ -61,21 +91,30 @@ export default function Modals({
             } else {
                 setInvoices([]);
             }
+            setInvoiceFiles([]); // Reset file objects for edit
 
             // spend mode
-            setSpendMode(editData.spend_mode || "Select Spend Mode");
+            let sm = editData.spend_mode || "Select Spend Mode";
+            if (/^\d{4}-\d{2}-\d{2}$/.test(sm)) {
+                sm = "Select Spend Mode";
+            }
+            setSpendMode(sm);
 
             // Vendor & End Date
-            setVendorName(editData.vendor_name || "");
-            setVendorNumber(editData.vendor_number || "");
-            setEndDate(editData.end_date || null);
+            setGst(editData.gst === "Yes" || editData.gst === true ? "Yes" : "No");
+            setTransactionFrom(editData.transaction_from || null);
+            setTransactionTo(editData.transaction_to || "");
+            setEndDate(editData.end_date ? dayjs(editData.end_date) : null);
         }
 
         if (open && !isEdit) {
             setInvoices([]);
+            setInvoiceFiles([]);
             setSpendMode("Select Spend Mode");
-            setVendorName("");
-            setVendorNumber("");
+
+            setGst("No");
+            setTransactionFrom(null);
+            setTransactionTo("");
             setEndDate(null);
         }
     }, [open, isEdit, editData]);
@@ -85,33 +124,28 @@ export default function Modals({
         setDate(d);
     };
 
-    const handleEndDateChange = (v) => {
-        const d = v ? v.format("YYYY-MM-DD") : null;
-        setEndDate(d);
-    };
+
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
 
-        const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-        if (totalSize > 5 * 1024 * 1024) {
-            CommonToaster("Total file size must be less than 5MB", "error");
-            return;
-        }
+        // Store actual File objects
+        setInvoiceFiles((prev) => [...prev, ...files]);
 
-        const filePromises = files.map((file) => {
+        // Create preview URLs for display
+        const previewPromises = files.map((file) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
+                reader.onloadend = () => resolve({ preview: reader.result, type: file.type, name: file.name });
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
         });
 
-        Promise.all(filePromises)
-            .then((base64Files) => {
-                setInvoices((prev) => [...prev, ...base64Files]);
+        Promise.all(previewPromises)
+            .then((previews) => {
+                setInvoices((prev) => [...prev, ...previews]);
             })
             .catch(() => {
                 CommonToaster("Error reading files", "error");
@@ -120,6 +154,23 @@ export default function Modals({
 
     const removeInvoice = (index) => {
         setInvoices((prev) => prev.filter((_, i) => i !== index));
+        setInvoiceFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSaveNewVendor = async () => {
+        if (!newVendorName) return CommonToaster("Vendor name is required", "error");
+        try {
+            await addVendorApi({ name: newVendorName, number: newVendorNumber });
+            CommonToaster("Vendor added!", "success");
+            const updatedVendors = await getVendorsApi();
+            setVendorList(updatedVendors);
+            setTransactionTo(newVendorName); // Auto-select
+            setIsAddVendorOpen(false);
+            setNewVendorName("");
+            setNewVendorNumber("");
+        } catch (err) {
+            CommonToaster("Failed to add vendor", "error");
+        }
     };
 
     const handleSubmit = async () => {
@@ -128,29 +179,72 @@ export default function Modals({
         if (!total) return CommonToaster("Enter total amount", "error");
         if (mainCategory === "Select Main Category") return CommonToaster("Select main category", "error");
 
-        if (type === "expense" && subCategory === "Select Category")
+        const isExpenseOrApproval = activeModalTab === "expense" || activeModalTab === "approval" || activeModalTab === "edit-approval";
+
+        if (isExpenseOrApproval && subCategory === "Select Category")
             return CommonToaster("Select sub category", "error");
 
-        if (type === "expense" && spendMode === "Select Spend Mode")
+        if (activeModalTab === "expense" && spendMode === "Select Spend Mode")
             return CommonToaster("Select spend mode", "error");
 
-        const payloadBase = {
-            branch,
-            date,
-            total,
-            mainCategory,
-            subCategory: type === "expense" ? subCategory : "",
-            description: description || "",
-            vendor_name: vendorName || "",
-            vendor_number: vendorNumber || "",
-            end_date: endDate || "",
-            invoices: invoices.length > 0 ? invoices : [],
-            spend_mode: type === "expense" ? spendMode : ""
-        };
+        if (activeModalTab === "approval" || activeModalTab === "edit-approval" || activeModalTab === "expense") {
+            if (!transactionFrom) return CommonToaster("Select Transaction From", "error");
+            if (!transactionTo) return CommonToaster("Select Vendor", "error");
+            if (!description || !description.trim()) return CommonToaster("Enter Description", "error");
+            if (invoices.length === 0) return CommonToaster("Upload Invoice", "error");
+        }
+
+        if (activeModalTab === "approval" || activeModalTab === "edit-approval") {
+            if (!endDate) return CommonToaster("Select End Date", "error");
+        }
 
         try {
-            if (type === "expense" && isEdit && editData) {
-                // EDIT EXPENSE FLOW
+            const formData = new FormData();
+
+            // Append all form fields
+            formData.append("user_id", currentUser?.id);
+            formData.append("branch", branch);
+            formData.append("date", date);
+
+            console.log("=== FRONTEND DEBUG ===");
+            console.log("Total value before sending:", total);
+            console.log("Type:", typeof total);
+            console.log("======================");
+
+            formData.append("total", total);
+            formData.append("mainCategory", mainCategory);
+            formData.append("subCategory", isExpenseOrApproval ? subCategory : "");
+            formData.append("description", description || "");
+            formData.append("gst", gst === "Yes" ? "Yes" : "No");
+            formData.append("transaction_from", transactionFrom || "");
+            formData.append("transaction_to", transactionTo || "");
+
+            // Handle Vendor Details
+            let vName = transactionTo || "";
+            let vNumber = "";
+
+            if (vendorType === "Regular") {
+                const foundVendor = vendorList.find(v => v.name === transactionTo);
+                if (foundVendor) {
+                    vNumber = foundVendor.number || "";
+                }
+            }
+            formData.append("vendor_name", vName);
+            formData.append("vendor_number", vNumber);
+
+            formData.append("end_date", endDate ? endDate.format("YYYY-MM-DD") : "");
+
+            if (activeModalTab === "expense") {
+                formData.append("spend_mode", spendMode);
+            }
+
+            // Append file objects
+            invoiceFiles.forEach((file) => {
+                formData.append("invoices", file);
+            });
+
+            if ((activeModalTab === "expense" || activeModalTab === "edit-approval") && isEdit && editData) {
+                // EDIT EXPENSE / APPROVAL FLOW
                 const updates = {
                     total,
                     branch,
@@ -158,48 +252,55 @@ export default function Modals({
                     mainCategory,
                     subCategory,
                     description,
-                    invoices,
-                    vendor_name: vendorName,
-                    vendor_number: vendorNumber,
-                    end_date: endDate,
-                    spend_mode: spendMode
+                    spend_mode: spendMode,
+                    gst: gst === "Yes" ? "Yes" : "No",
+                    transaction_from: transactionFrom,
+                    transaction_to: transactionTo,
+                    vendor_name: vName,
+                    vendor_number: vNumber,
+                    end_date: endDate ? endDate.format("YYYY-MM-DD") : null,
+                    existingInvoices: JSON.stringify(invoices.filter(inv => typeof inv === 'string' || inv.preview?.startsWith('/uploads'))),
+                    source_type: (activeModalTab === "approval" || activeModalTab === "edit-approval") ? "approval" : "expense"
                 };
 
-                const res = await editExpenseApi({
-                    expense_id: editData.id,
-                    user_id: currentUser?.id,
-                    updates
+                const editFormData = new FormData();
+                editFormData.append("expense_id", editData.id);
+                editFormData.append("user_id", currentUser?.id);
+                editFormData.append("updates", JSON.stringify(updates));
+
+                // Append new files for edit
+                invoiceFiles.forEach((file) => {
+                    editFormData.append("invoices", file);
                 });
 
-                CommonToaster(res.data?.message || "Expense updated!", "success");
-            } else if (type === "expense") {
-                // ADD EXPENSE FLOW
-                await addExpenseApi({
-                    user_id: currentUser?.id,
-                    ...payloadBase
-                });
-
-                CommonToaster(
-                    currentUser?.role === "admin"
-                        ? "Expense added & auto-approved!"
-                        : "Expense submitted!",
-                    "success"
-                );
+                const res = await editExpenseApi(editFormData);
+                CommonToaster(res.data?.message || "Updated successfully!", "success");
+            } else if (isExpenseOrApproval) {
+                // ADD EXPENSE or APPROVAL FLOW
+                if (activeModalTab === "approval") {
+                    await addApprovalApi(formData);
+                    CommonToaster("Approval request sent!", "success");
+                } else {
+                    await addExpenseApi(formData);
+                    CommonToaster("Expense added!", "success");
+                }
             } else {
                 // ADD INCOME FLOW
-                await addIncomeApi({
-                    user_id: currentUser?.id,
-                    ...payloadBase
-                });
+                await addIncomeApi(formData);
                 CommonToaster("Income added successfully!", "success");
             }
 
             // Reset local-only state
             setInvoices([]);
+            setInvoiceFiles([]);
             setSpendMode("Select Spend Mode");
+            setGst("No");
+            setTransactionFrom(null);
+            setTransactionTo("");
 
             onClose();
 
+            // Trigger reloads
             setTimeout(() => {
                 window.dispatchEvent(new Event("summaryUpdated"));
             }, 50);
@@ -215,29 +316,72 @@ export default function Modals({
         <Menu
             onClick={(e) => setBranch(e.key)}
             items={[
-                { key: "Velachery", label: "Velachery" },
-                { key: "Anna Nagar", label: "Anna Nagar" },
-                { key: "Tambaram", label: "Tambaram" },
-                { key: "Porur", label: "Porur" },
-                { key: "Tnagar", label: "Tnagar" },
-                { key: "OMR", label: "OMR" },
-                { key: "Siruseri", label: "Siruseri" },
-                { key: "Thiruvanmiyur", label: "Thiruvanmiyur" },
-                { key: "Maraimalai Nagar", label: "Maraimalai Nagar" },
-                { key: "Electronic City", label: "Electronic City" },
-                { key: "BTM Layout", label: "BTM Layout" },
-                { key: "Marathahalli", label: "Marathahalli" },
-                { key: "Hebbal", label: "Hebbal" },
-                { key: "Rajaji Nagar", label: "Rajaji Nagar" },
-                { key: "Jayanagar", label: "Jayanagar" },
-                { key: "Kalyan Nagar", label: "Kalyan Nagar" },
-                { key: "Indira Nagar", label: "Indira Nagar" },
-                { key: "HSR Layout", label: "HSR Layout" },
+                { key: "Overall", label: "Overall" }, // Added Option
+                {
+                    type: 'group',
+                    label: 'CHENNAI',
+                    children: [
+                        { key: "Velachery", label: "Velachery" },
+                        { key: "Anna Nagar", label: "Anna Nagar" },
+                        { key: "Porur", label: "Porur" },
+                        { key: "OMR", label: "OMR" },
+                    ]
+                },
+                {
+                    type: 'group',
+                    label: 'BANGALORE',
+                    children: [
+                        { key: "Electronic City", label: "Electronic City" },
+                        { key: "BTM Layout", label: "BTM Layout" },
+                        { key: "Marathahalli", label: "Marathahalli" },
+                        { key: "Rajaji Nagar", label: "Rajaji Nagar" },
+                    ]
+                },
+                {
+                    type: 'group',
+                    label: 'HUB',
+                    children: [
+                        { key: "BDC", label: "BDC" },
+                        { key: "BDC 2", label: "BDC 2" },
+                    ]
+                }
             ]}
         />
     );
 
-    const isExpense = type === "expense";
+    const resetFormFields = () => {
+        setBranch("Select Branch");
+        setDate(dayjs().format("YYYY-MM-DD"));
+        setTotal("");
+        setMainCategory("Select Main Category");
+        setSubCategory("Select Category");
+        setDescription("");
+
+        setInvoices([]);
+        setInvoiceFiles([]);
+        setSpendMode("Select Spend Mode");
+        setGst("No");
+        setTransactionFrom(null);
+        setTransactionTo("");
+        setEndDate(null);
+        setVendorType("Regular");
+    };
+
+    const handleTabSwitch = (newTab) => {
+        setActiveModalTab(newTab);
+        resetFormFields();
+    };
+
+    const isExpense = activeModalTab === "expense";
+    const isApproval = activeModalTab === "approval" || activeModalTab === "edit-approval";
+    const isIncome = activeModalTab === "income";
+
+    const getTitle = () => {
+        if (isEdit) return (activeModalTab === "approval" || activeModalTab === "edit-approval") ? "Edit Approval" : "Edit Expense";
+        if (isApproval) return "New Approval";
+        if (isExpense) return "New Expense";
+        return "New Income";
+    };
 
     return (
         <motion.div
@@ -256,92 +400,179 @@ export default function Modals({
             >
                 {/* HEADER */}
                 <div className="modal-header">
-                    <h2>
-                        {isExpense
-                            ? isEdit
-                                ? "Edit Expense"
-                                : "New Expense"
-                            : "New Income"}
-                    </h2>
+                    <h2>{getTitle()}</h2>
                     <button className="close-btn" onClick={onClose}>
                         <X size={18} />
                     </button>
                 </div>
 
-                {/* HIDE TABS IN EDIT MODE */}
+                {/* TABS SWITCHER */}
                 {!isEdit && (
                     <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 15 }}>
                         {currentUser?.role === "admin" ? (
-                            <>
-                                <button
-                                    onClick={() => {
-                                        onClose();
-                                        setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent("openIncomeModal"));
-                                        }, 50);
-                                    }}
+                            // ADMIN TABS: Expense only
+                            ["expense"].map(t => (
+                                <motion.button
+                                    key={t}
+                                    onClick={() => handleTabSwitch(t)}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     style={{
                                         padding: "8px 14px",
                                         borderRadius: 8,
-                                        border: type === "income" ? "none" : "1px solid #ccc",
-                                        background: type === "income" ? "#d4af37" : "#f1f1f1",
-                                        color: type === "income" ? "white" : "black",
+                                        border: activeModalTab === t ? "none" : "1px solid #ccc",
+                                        background: activeModalTab === t ? "#d4af37" : "#f1f1f1",
+                                        color: activeModalTab === t ? "white" : "black",
                                         cursor: "pointer",
                                         fontWeight: 600,
+                                        textTransform: "capitalize"
                                     }}
                                 >
-                                    Income
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        onClose();
-                                        setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent("openExpenseModal"));
-                                        }, 50);
-                                    }}
-                                    style={{
-                                        padding: "8px 14px",
-                                        borderRadius: 8,
-                                        border: type === "expense" ? "none" : "1px solid #ccc",
-                                        background: type === "expense" ? "#d4af37" : "#f1f1f1",
-                                        color: type === "expense" ? "white" : "black",
-                                        cursor: "pointer",
-                                        fontWeight: 600,
-                                    }}
-                                >
-                                    Expense
-                                </button>
-                            </>
+                                    {t}
+                                </motion.button>
+                            ))
                         ) : (
-                            <>
-                                <button
-                                    onClick={() => {
-                                        onClose();
-                                        setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent("openExpenseModal"));
-                                        }, 50);
-                                    }}
+                            // USER TABS: Approval / Expense
+                            ["approval", "expense"].map(t => (
+                                <motion.button
+                                    key={t}
+                                    onClick={() => handleTabSwitch(t)}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     style={{
                                         padding: "8px 14px",
                                         borderRadius: 8,
-                                        border: type === "expense" ? "none" : "1px solid #ccc",
-                                        background: type === "expense" ? "#d4af37" : "#f1f1f1",
-                                        color: type === "expense" ? "white" : "black",
+                                        border: activeModalTab === t ? "none" : "1px solid #ccc",
+                                        background: activeModalTab === t ? "#d4af37" : "#f1f1f1",
+                                        color: activeModalTab === t ? "white" : "black",
                                         cursor: "pointer",
                                         fontWeight: 600,
+                                        textTransform: "capitalize"
                                     }}
                                 >
-                                    Expense
-                                </button>
-                            </>
+                                    {t}
+                                </motion.button>
+                            ))
                         )}
                     </div>
                 )}
+
                 <hr />
                 {/* BODY */}
                 <div className="modal-body">
                     <div className="form-section">
+
+                        {/* Date */}
+                        <div style={{ marginBottom: "10px" }}>
+                            <label>Date <span style={{ color: "red" }}>*</span></label>
+                            <DatePicker
+                                value={date ? dayjs(date) : null}
+                                onChange={handleDateChange}
+                                style={{ width: "100%", height: 40 }}
+                            />
+                        </div>
+
+
+                        {/* CATEGORIES */}
+                        {/* Expense & Approval use Expense Categories */}
+                        <AnimatePresence mode="wait">
+                            {(isExpense || isApproval) && (
+                                <motion.div
+                                    key="expense-categories"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <label>Main Category (Expense) <span style={{ color: "red" }}>*</span></label>
+                                    <div style={{ marginTop: "8px", marginBottom: "8px" }}>
+                                        <Dropdown
+                                            overlay={
+                                                <Menu
+                                                    onClick={(e) => {
+                                                        if (e.key === "ADD_NEW_MAIN") {
+                                                            setAddCategoryInitialMain("");
+                                                            setIsAddCategoryOpen(true);
+                                                        } else {
+                                                            setMainCategory(e.key);
+                                                            setSubCategory("Select Category");
+                                                        }
+                                                    }}
+                                                    items={[
+                                                        ...Object.keys(expenseCategories).map((cat) => ({
+                                                            key: cat,
+                                                            label: cat,
+                                                        })),
+                                                        {
+                                                            type: 'divider',
+                                                        },
+                                                        {
+                                                            key: "ADD_NEW_MAIN",
+                                                            label: (
+                                                                <span style={{ color: "#d4af37", fontWeight: 600 }}>
+                                                                    + Add New Main Category
+                                                                </span>
+                                                            ),
+                                                        }
+                                                    ]}
+                                                />
+                                            }
+                                            trigger={["click"]}
+                                        >
+                                            <Button style={{ width: "100%", height: 40 }}>
+                                                <Space>{mainCategory}<DownOutlined /></Space>
+                                            </Button>
+                                        </Dropdown>
+                                    </div>
+
+                                    {mainCategory !== "Select Main Category" && (
+                                        <>
+                                            <label>Sub Category <span style={{ color: "red" }}>*</span></label>
+                                            <div style={{ marginTop: "8px" }}>
+                                                <Dropdown
+                                                    overlay={
+                                                        <Menu
+                                                            onClick={(e) => {
+                                                                if (e.key === "ADD_NEW_SUB") {
+                                                                    setAddCategoryInitialMain(mainCategory);
+                                                                    setIsAddCategoryOpen(true);
+                                                                } else {
+                                                                    setSubCategory(e.key);
+                                                                }
+                                                            }}
+                                                            items={[
+                                                                ...(Array.isArray(expenseCategories[mainCategory])
+                                                                    ? expenseCategories[mainCategory].map((sub) => ({
+                                                                        key: sub,
+                                                                        label: sub,
+                                                                    }))
+                                                                    : []),
+                                                                {
+                                                                    type: 'divider',
+                                                                },
+                                                                {
+                                                                    key: "ADD_NEW_SUB",
+                                                                    label: (
+                                                                        <span style={{ color: "#d4af37", fontWeight: 600 }}>
+                                                                            + Add New Sub Category
+                                                                        </span>
+                                                                    ),
+                                                                }
+                                                            ]}
+                                                        />
+                                                    }
+                                                    trigger={["click"]}
+                                                >
+                                                    <Button style={{ width: "100%", height: 40 }}>
+                                                        <Space>{subCategory}<DownOutlined /></Space>
+                                                    </Button>
+                                                </Dropdown>
+                                            </div>
+                                        </>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         {/* Branch */}
                         <label>Branch <span style={{ color: "red" }}>*</span></label>
                         <Dropdown overlay={branchMenu} trigger={["click"]}>
@@ -353,164 +584,218 @@ export default function Modals({
                             </Button>
                         </Dropdown>
 
-                        {/* Date */}
-                        <label>Date <span style={{ color: "red" }}>*</span></label>
-                        <DatePicker
-                            value={date ? dayjs(date) : null}
-                            onChange={handleDateChange}
-                            style={{ width: "100%", height: 40 }}
+                        {/* Description */}
+                        <label style={{ marginTop: 10, display: "block" }}>Description <span style={{ color: "red" }}>*</span></label>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Add a description..."
+                            style={{ width: "100%", marginTop: 5 }}
                         />
 
-                        {isExpense && (
-                            <>
-                                <label>End Date <span style={{ color: "red" }}>*</span></label>
-                                <DatePicker
-                                    value={endDate ? dayjs(endDate) : null}
-                                    onChange={handleEndDateChange}
-                                    style={{ width: "100%", height: 40 }}
-                                />
-                            </>
-                        )}
+                        {/* EXPENSE ONLY FIELDS: SPEND MODE */}
+                        <AnimatePresence mode="wait">
+                            {isExpense && (
+                                <motion.div
+                                    key="expense-spend-mode"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <label>Spend Mode <span style={{ color: "red" }}>*</span></label><br></br>
+                                    <div style={{ marginTop: "8px", marginBottom: "10px" }}>
+                                        <Dropdown
+                                            overlay={
+                                                <Menu
+                                                    onClick={(e) => setSpendMode(e.key)}
+                                                    items={[
+                                                        { key: "Cash", label: "Cash" },
+                                                        { key: "Upi", label: "Upi" },
+                                                        { key: "NEFT", label: "NEFT" },
+                                                        { key: "IMPS", label: "IMPS" },
+                                                        { key: "Card", label: "Card" },
+                                                    ]}
+                                                />
+                                            }
+                                            trigger={["click"]}
+                                        >
+                                            <Button style={{ width: "100%", height: 40 }}>
+                                                <Space>{spendMode}<DownOutlined /></Space>
+                                            </Button>
+                                        </Dropdown>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* TRANSACTION FIELDS: EXPENSE & APPROVAL */}
+                        <AnimatePresence mode="wait">
+                            {(isExpense || isApproval) && (
+                                <motion.div
+                                    key="transaction-fields"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <div style={{ marginBottom: "20px" }}>
+                                        {/* Transaction From */}
+                                        <label style={{ display: "block" }}>Transaction From <span style={{ color: "red" }}>*</span></label>
+                                        <Select
+                                            showSearch
+                                            style={{ width: "100%", marginTop: 5 }}
+                                            placeholder="Select User"
+                                            optionFilterProp="children"
+                                            value={transactionFrom}
+                                            onChange={(val) => setTransactionFrom(val)}
+                                            filterOption={(input, option) =>
+                                                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                            }
+                                            options={[
+                                                "Prakash Kotak",
+                                                "Ajith Kotak",
+                                                "Sathish ICICI",
+                                                "Cheran",
+                                                "ACTE SBI",
+                                                "ACTE HDFC",
+                                                "ACTE RBL",
+                                                "ACTE AXIS"
+                                            ].map(opt => ({ value: opt, label: opt }))}
+                                        />
+                                    </div>
+
+                                    {/* Transaction To */}
+                                    {/* Transaction To */}
+                                    <label style={{ marginTop: 25, display: "block" }}>Transaction To / Vendor <span style={{ color: "red" }}>*</span></label>
+
+                                    <Radio.Group
+                                        value={vendorType}
+                                        onChange={(e) => {
+                                            setVendorType(e.target.value);
+                                            setTransactionTo("");
+                                        }}
+                                        style={{ marginTop: 5, marginBottom: 10 }}
+                                    >
+                                        <Radio value="Regular">Regular Vendor</Radio>
+                                        <Radio value="One Time">One Time Vendor</Radio>
+                                    </Radio.Group>
+
+                                    {vendorType === "Regular" ? (
+                                        <div style={{ marginBottom: 5 }}>
+                                            <Select
+                                                showSearch
+                                                style={{ width: "100%", height: 40 }}
+                                                placeholder="Select Vendor"
+                                                optionFilterProp="children"
+                                                value={transactionTo ? transactionTo : undefined}
+                                                onChange={(val) => setTransactionTo(val)}
+                                                filterOption={(input, option) =>
+                                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                                }
+                                                options={vendorList.map(v => ({ value: v.name, label: v.name }))}
+                                            />
+                                            <Button
+                                                style={{ color: "#d4af37", paddingTop: 4 }}
+                                                type="link"
+                                                size="small"
+                                                onClick={() => setIsAddVendorOpen(true)}
+                                            >
+                                                + Add New Vendor
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={transactionTo}
+                                            onChange={(e) => setTransactionTo(e.target.value)}
+                                            placeholder="Enter Vendor Name"
+                                            style={{ height: 40, width: "100%", marginTop: 5 }}
+                                        />
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+
 
                         {/* Total */}
                         <label>Total <span style={{ color: "red" }}>*</span></label>
                         <input
                             type="number"
                             value={total}
-                            onChange={(e) => setTotal(e.target.value)}
+                            onChange={(e) => {
+                                console.log("Input onChange - e.target.value:", e.target.value);
+                                setTotal(e.target.value);
+                            }}
                             placeholder="0.00"
                             style={{ height: 40 }}
                         />
 
-                        {/* EXPENSE CATEGORIES */}
-                        {isExpense && (
-                            <>
-                                <label>Main Category <span style={{ color: "red" }}>*</span></label>
-                                <Dropdown
-                                    overlay={
-                                        <Menu
-                                            onClick={(e) => {
-                                                setMainCategory(e.key);
-                                                setSubCategory("Select Category");
-                                            }}
-                                            items={Object.keys(expenseCategories).map((cat) => ({
-                                                key: cat,
-                                                label: cat,
-                                            }))}
-                                        />
-                                    }
-                                    trigger={["click"]}
+                        {/* INCOME CATEGORIES */}
+                        <AnimatePresence mode="wait">
+                            {isIncome && (
+                                <motion.div
+                                    key="income-categories"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
                                 >
-                                    <Button style={{ width: "100%", height: 40 }}>
-                                        <Space>{mainCategory}<DownOutlined /></Space>
-                                    </Button>
-                                </Dropdown>
-
-                                {mainCategory !== "Select Main Category" && (
-                                    <>
-                                        <label>Sub Category <span style={{ color: "red" }}>*</span></label>
+                                    <label>Income Category <span style={{ color: "red" }}>*</span></label>
+                                    <div style={{ marginTop: "8px" }}>
                                         <Dropdown
                                             overlay={
                                                 <Menu
-                                                    onClick={(e) => setSubCategory(e.key)}
-                                                    items={
-                                                        Array.isArray(expenseCategories[mainCategory])
-                                                            ? expenseCategories[mainCategory].map((sub) => ({
-                                                                key: sub,
-                                                                label: sub,
-                                                            }))
-                                                            : []
-                                                    }
+                                                    onClick={(e) => setMainCategory(e.key)}
+                                                    items={incomeCategories.map((cat) => ({
+                                                        key: cat,
+                                                        label: cat,
+                                                    }))}
                                                 />
                                             }
                                             trigger={["click"]}
                                         >
                                             <Button style={{ width: "100%", height: 40 }}>
-                                                <Space>{subCategory}<DownOutlined /></Space>
+                                                <Space>{mainCategory}<DownOutlined /></Space>
                                             </Button>
                                         </Dropdown>
-                                    </>
-                                )}
-                            </>
-                        )}
+                                    </div>
 
-                        {/* INCOME CATEGORIES */}
-                        {!isExpense && (
-                            <>
-                                <label>Income Category <span style={{ color: "red" }}>*</span></label>
-                                <Dropdown
-                                    overlay={
-                                        <Menu
-                                            onClick={(e) => setMainCategory(e.key)}
-                                            items={incomeCategories.map((cat) => ({
-                                                key: cat,
-                                                label: cat,
-                                            }))}
-                                        />
-                                    }
-                                    trigger={["click"]}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* APPROVAL ONLY FIELDS */}
+                        <AnimatePresence mode="wait">
+                            {isApproval && (
+                                <motion.div
+                                    key="approval-specific-fields"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    style={{ marginTop: 10 }}
                                 >
-                                    <Button style={{ width: "100%", height: 40 }}>
-                                        <Space>{mainCategory}<DownOutlined /></Space>
-                                    </Button>
-                                </Dropdown>
-                            </>
-                        )}
-
-                        {isExpense && (
-                            <>
-                                <label>Vendor Name</label>
-                                <input
-                                    type="text"
-                                    value={vendorName}
-                                    onChange={(e) => setVendorName(e.target.value)}
-                                    placeholder="Add Vendor name"
-                                    style={{ height: 40 }}
-                                />
-
-                                <label>Vendor Number</label>
-                                <input
-                                    type="text"
-                                    value={vendorNumber}
-                                    onChange={(e) => setVendorNumber(e.target.value)}
-                                    placeholder="Add Vendor number"
-                                    style={{ height: 40 }}
-                                />
-
-                                <label>Spend Mode <span style={{ color: "red" }}>*</span></label>
-                                <Dropdown
-                                    overlay={
-                                        <Menu
-                                            onClick={(e) => setSpendMode(e.key)}
-                                            items={[
-                                                { key: "Cash", label: "Cash" },
-                                                { key: "Online", label: "Online" },
-                                            ]}
+                                    <div style={{ marginBottom: 15 }}>
+                                        <label>End Date <span style={{ color: "red" }}>*</span></label>
+                                        <DatePicker
+                                            value={endDate}
+                                            onChange={(val) => setEndDate(val)}
+                                            style={{ width: "100%", height: 40, marginTop: 5 }}
                                         />
-                                    }
-                                    trigger={["click"]}
-                                >
-                                    <Button style={{ width: "100%", height: 40 }}>
-                                        <Space>{spendMode}<DownOutlined /></Space>
-                                    </Button>
-                                </Dropdown>
-                            </>
-                        )}
-
-                        {/* Description */}
-                        <label>Description</label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Add a description..."
-                        />
+                                    </div>
+                                    <label>GST <span style={{ color: "red" }}>*</span></label><br />
+                                    <Radio.Group onChange={(e) => setGst(e.target.value)} value={gst}>
+                                        <Radio value="Yes">Yes</Radio>
+                                        <Radio value="No">No</Radio>
+                                    </Radio.Group>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* UPLOAD */}
-                    <div className="upload-section">
+                    <div className="upload-section" style={{ marginTop: 20 }}>
                         <div className="upload-box">
                             <Upload size={40} strokeWidth={1.5} />
-                            <p>Upload invoices (Multiple files allowed)</p>
+                            <p>Upload invoices <span style={{ color: "red" }}>*</span></p>
 
                             <input
                                 type="file"
@@ -522,7 +807,10 @@ export default function Modals({
                                     position: "absolute",
                                     height: "100%",
                                     opacity: 0,
-                                    cursor: "pointer"
+                                    cursor: "pointer",
+                                    width: "100%",
+                                    top: 0,
+                                    left: 0
                                 }}
                             />
                         </div>
@@ -539,61 +827,67 @@ export default function Modals({
                                     maxHeight: 200,
                                     overflowY: "auto"
                                 }}>
-                                    {invoices.map((inv, idx) => (
-                                        <div
-                                            key={idx}
-                                            style={{
-                                                position: "relative",
-                                                width: 80,
-                                                height: 80,
-                                                borderRadius: 8,
-                                                overflow: "hidden",
-                                                border: "2px solid #e0e0e0"
-                                            }}
-                                        >
-                                            {typeof inv === "string" && inv.includes("application/pdf") ? (
-                                                <div style={{
-                                                    width: "100%",
-                                                    height: "100%",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    background: "#f5f5f5",
-                                                    fontSize: 10,
-                                                    fontWeight: 600,
-                                                    color: "#666"
-                                                }}>
-                                                    PDF
-                                                </div>
-                                            ) : (
-                                                <img
-                                                    src={inv}
-                                                    alt={`invoice-${idx}`}
-                                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                                />
-                                            )}
-                                            <button
-                                                onClick={() => removeInvoice(idx)}
+                                    {invoices.map((inv, idx) => {
+                                        const isPreview = inv.preview;
+                                        const isPdf = isPreview ? inv.type?.includes("pdf") : (typeof inv === "string" && inv.includes(".pdf"));
+                                        const displaySrc = isPreview ? inv.preview : (typeof inv === "string" ? `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${inv}` : inv);
+
+                                        return (
+                                            <div
+                                                key={idx}
                                                 style={{
-                                                    position: "absolute",
-                                                    top: 2,
-                                                    right: 2,
-                                                    background: "rgba(255, 0, 0, 0.8)",
-                                                    border: "none",
-                                                    borderRadius: "50%",
-                                                    width: 20,
-                                                    height: 20,
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    cursor: "pointer",
-                                                    padding: 0
+                                                    position: "relative",
+                                                    width: 80,
+                                                    height: 80,
+                                                    borderRadius: 8,
+                                                    overflow: "hidden",
+                                                    border: "2px solid #e0e0e0"
                                                 }}
                                             >
-                                                <X size={14} color="white" />
-                                            </button>
-                                        </div>
-                                    ))}
+                                                {isPdf ? (
+                                                    <div style={{
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        background: "#f5f5f5",
+                                                        fontSize: 10,
+                                                        fontWeight: 600,
+                                                        color: "#666"
+                                                    }}>
+                                                        PDF
+                                                    </div>
+                                                ) : (
+                                                    <img
+                                                        src={displaySrc}
+                                                        alt={`invoice-${idx}`}
+                                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                                    />
+                                                )}
+                                                <button
+                                                    onClick={() => removeInvoice(idx)}
+                                                    style={{
+                                                        position: "absolute",
+                                                        top: 2,
+                                                        right: 2,
+                                                        background: "rgba(255, 0, 0, 0.8)",
+                                                        border: "none",
+                                                        borderRadius: "50%",
+                                                        width: 20,
+                                                        height: 20,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        cursor: "pointer",
+                                                        padding: 0
+                                                    }}
+                                                >
+                                                    <X size={14} color="white" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -603,12 +897,62 @@ export default function Modals({
                 {/* FOOTER */}
                 <div className="modal-footer">
                     <button className="btn-draft" onClick={handleSubmit}>
-                        {isExpense && isEdit
-                            ? "Update Expense"
-                            : `Add ${isExpense ? "Expense" : "Income"}`}
+                        {isEdit ? "Update" : "Submit"}
                     </button>
                 </div>
+
+                {/* Add Vendor Modal */}
+                <Modal
+                    title="Add New Vendor"
+                    open={isAddVendorOpen}
+                    onCancel={() => setIsAddVendorOpen(false)}
+                    onOk={handleSaveNewVendor}
+                    centered
+                >
+                    <div style={{ marginBottom: 15 }}>
+                        <label style={{ display: "block", marginBottom: 5 }}>Vendor Name <span style={{ color: "red" }}>*</span></label>
+                        <input
+                            type="text"
+                            value={newVendorName}
+                            onChange={(e) => setNewVendorName(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "8px 10px",
+                                border: "1px solid #d9d9d9",
+                                borderRadius: 6
+                            }}
+                            placeholder="e.g. ABC Supplies"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: 5 }}>Vendor Number</label>
+                        <input
+                            type="text"
+                            value={newVendorNumber}
+                            onChange={(e) => setNewVendorNumber(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "8px 10px",
+                                border: "1px solid #d9d9d9",
+                                borderRadius: 6
+                            }}
+                            placeholder="e.g. +91 9876543210"
+                        />
+                    </div>
+                </Modal>
+
+                {/* ADD CATEGORY MODAL */}
+                <AddCategoryModal
+                    open={isAddCategoryOpen}
+                    onClose={() => setIsAddCategoryOpen(false)}
+                    initialMainCategory={addCategoryInitialMain}
+                    existingCategories={Object.keys(expenseCategories)}
+                    onSuccess={(main, sub) => {
+                        setMainCategory(main);
+                        setSubCategory(sub);
+                    }}
+                />
             </motion.div>
-        </motion.div>
+        </motion.div >
     );
 }

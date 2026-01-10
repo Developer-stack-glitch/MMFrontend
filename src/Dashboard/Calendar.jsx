@@ -13,7 +13,8 @@ import {
     moveEventToNextDayApi,
     moveEventToNextMonthApi,
     getPendingAlertsApi,
-    searchEventsApi
+    searchEventsApi,
+    markEventCompletedApi
 } from "../../Api/action";
 import "../css/Calendar.css";
 import { CommonToaster } from "../../Common/CommonToaster";
@@ -38,10 +39,9 @@ export default function CalendarPage() {
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
 
-    // Load events on component mount
     useEffect(() => {
         loadEvents();
-        loadAlerts();
+        loadAlerts(true);
     }, []);
 
     useEffect(() => {
@@ -56,24 +56,54 @@ export default function CalendarPage() {
         return () => window.removeEventListener("calendar-jump", jumpHandler);
     }, []);
 
+    // Listen for calendar events updates from other components (like Sidebar)
+    useEffect(() => {
+        const updateHandler = () => {
+            loadEvents();
+            loadAlerts(false); // Don't show modal on updates, just refresh data
+        };
+        window.addEventListener("calendarEventsUpdated", updateHandler);
+        return () => window.removeEventListener("calendarEventsUpdated", updateHandler);
+    }, []);
+
     // Load all events
     const loadEvents = async () => {
         try {
             setLoading(true);
             const response = await getEventsApi();
-            const calendarEvents = response.events.map(event => ({
-                id: event.id,
-                title: event.title,
-                start: new Date(event.event_date),
-                extendedProps: {
-                    description: event.description,
-                    notes: event.notes,
-                    category: event.category,
-                    alert_sent: event.alert_sent
-                },
-                backgroundColor: getCategoryColor(event.category),
-                borderColor: getCategoryColor(event.category)
-            }));
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const calendarEvents = response.events.map(event => {
+                const eventDate = new Date(event.event_date);
+                eventDate.setHours(0, 0, 0, 0);
+                let backgroundColor, borderColor;
+                if (event.status === 'completed') {
+                    backgroundColor = '#10b981';
+                    borderColor = '#10b981';
+                } else if (eventDate < today) {
+                    backgroundColor = '#ef4444';
+                    borderColor = '#ef4444';
+                } else {
+                    backgroundColor = getCategoryColor(event.category);
+                    borderColor = getCategoryColor(event.category);
+                }
+
+                return {
+                    id: event.id,
+                    title: event.title,
+                    start: eventDate,
+                    extendedProps: {
+                        description: event.description,
+                        notes: event.notes,
+                        category: event.category,
+                        alert_sent: event.alert_sent,
+                        status: event.status || 'pending'
+                    },
+                    backgroundColor,
+                    borderColor
+                };
+            });
             setEvents(calendarEvents);
         } catch (error) {
             console.error("Error loading events:", error);
@@ -84,13 +114,24 @@ export default function CalendarPage() {
     };
 
     // Load pending alerts
-    const loadAlerts = async () => {
+    const loadAlerts = async (showModal = false) => {
         try {
             const response = await getPendingAlertsApi();
-            setAlerts(response.alerts || []);
+            // Filter out completed events from alerts
+            const pendingAlerts = (response.alerts || []).filter(alert => alert.status !== 'completed');
+            setAlerts(pendingAlerts);
 
-            if (response.alerts && response.alerts.length > 0) {
-                setIsAlertModalVisible(true);
+            if (pendingAlerts.length > 0 && showModal) {
+                const alertShownKey = 'calendarAlertShown';
+                const hasShownAlert = sessionStorage.getItem(alertShownKey);
+
+                if (!hasShownAlert) {
+                    setIsAlertModalVisible(true);
+                    sessionStorage.setItem(alertShownKey, 'true');
+                }
+            } else if (pendingAlerts.length === 0) {
+                // Close modal if no pending alerts
+                setIsAlertModalVisible(false);
             }
         } catch (error) {
             console.error("Error loading alerts:", error);
@@ -131,7 +172,8 @@ export default function CalendarPage() {
             date: event.startStr,
             description: event.extendedProps.description,
             notes: event.extendedProps.notes,
-            category: event.extendedProps.category
+            category: event.extendedProps.category,
+            status: event.extendedProps.status || 'pending'
         });
         setFormData({
             title: event.title,
@@ -160,7 +202,9 @@ export default function CalendarPage() {
             CommonToaster("Event created successfully!", "success");
             setIsAddModalVisible(false);
             loadEvents();
-            loadAlerts();
+            loadAlerts(false); // Don't auto-show modal
+            // Notify other components (like Sidebar) to update alerts
+            window.dispatchEvent(new Event("calendarEventsUpdated"));
         } catch (error) {
             console.error("Error creating event:", error);
             CommonToaster(error.message || "Failed to create event", "error");
@@ -187,6 +231,9 @@ export default function CalendarPage() {
             CommonToaster("Event updated successfully!", "success");
             setIsEditModalVisible(false);
             loadEvents();
+            loadAlerts(false); // Don't auto-show modal
+            // Notify other components (like Sidebar) to update alerts
+            window.dispatchEvent(new Event("calendarEventsUpdated"));
         } catch (error) {
             console.error("Error updating event:", error);
             CommonToaster(error.message || "Failed to update event", "error");
@@ -208,10 +255,37 @@ export default function CalendarPage() {
             setIsEditModalVisible(false);
             setEvents([]);
             await loadEvents();
-            await loadAlerts();
+            await loadAlerts(false); // Don't auto-show modal
+            // Notify other components (like Sidebar) to update alerts
+            window.dispatchEvent(new Event("calendarEventsUpdated"));
         } catch (error) {
             console.error("❌ Delete error:", error);
             CommonToaster(error.response?.data?.message || "Failed to delete event", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Mark event as completed
+    const handleCompleteEvent = async () => {
+        const eventId = selectedEvent?.id;
+        if (!eventId) {
+            CommonToaster("Invalid event selected.", "error");
+            return;
+        }
+        try {
+            setLoading(true);
+            await markEventCompletedApi(eventId);
+            CommonToaster("Event marked as completed!", "success");
+            setIsEditModalVisible(false);
+            setIsAlertModalVisible(false); // Close alert modal too
+            await loadEvents();
+            await loadAlerts(false);
+            // Notify other components (like Sidebar) to update alerts
+            window.dispatchEvent(new Event("calendarEventsUpdated"));
+        } catch (error) {
+            console.error("❌ Complete error:", error);
+            CommonToaster(error.response?.data?.message || "Failed to mark event as completed", "error");
         } finally {
             setLoading(false);
         }
@@ -239,7 +313,8 @@ export default function CalendarPage() {
                     break;
             }
             loadEvents();
-            loadAlerts();
+            loadAlerts(false); // Don't auto-show modal
+            window.dispatchEvent(new Event("calendarEventsUpdated"));
         } catch (error) {
             console.error("Error handling alert action:", error);
             CommonToaster(error.message || "Failed to perform action", "error");
@@ -296,7 +371,6 @@ export default function CalendarPage() {
     return (
         <div className="calendar-wrapper">
             <Spin spinning={loading}>
-                {alerts.length > 0 && (<div className="alerts-banner" onClick={() => setIsAlertModalVisible(true)}> <span className="alert-icon">🔔</span> <span>You have {alerts.length} event(s) tomorrow!</span> <button className="view-alerts-btn">View Alerts</button> </div>)}
                 <div className="calendar-header">
                     <h1 className="page-title">📅 Calendar & Events</h1>
                     {/* Search Bar */}
@@ -353,6 +427,32 @@ export default function CalendarPage() {
                             if (highlightedIds.includes(Number(info.event.id))) {
                                 info.el.classList.add("highlighted-event");
                             }
+                        }}
+                        dayCellClassNames={(arg) => {
+                            // Get all events for this specific day
+                            const dayStr = arg.date.toISOString().split('T')[0];
+                            const dayEvents = events.filter(event => {
+                                const eventDateStr = new Date(event.start).toISOString().split('T')[0];
+                                return eventDateStr === dayStr;
+                            });
+
+                            // If there are events on this day
+                            if (dayEvents.length > 0) {
+                                const allCompleted = dayEvents.every(event => event.extendedProps.status === 'completed');
+
+                                if (allCompleted) {
+                                    return ['day-all-completed'];
+                                } else {
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    const eventDate = new Date(arg.date);
+                                    eventDate.setHours(0, 0, 0, 0);
+                                    if (eventDate < today) {
+                                        return ['day-has-pending'];
+                                    }
+                                }
+                            }
+                            return [];
                         }}
                         headerToolbar={{
                             left: "prev,next today",
@@ -432,20 +532,29 @@ export default function CalendarPage() {
                             </button>
                         </Popconfirm>,
                         <button
-                            key="cancel"
-                            onClick={() => setIsEditModalVisible(false)}
-                            className="cancel-event-btn"
+                            key="complete"
+                            onClick={handleCompleteEvent}
+                            className="complete-event-btn"
+                            disabled={selectedEvent?.status === 'completed'}
+                            style={{
+                                backgroundColor: selectedEvent?.status === 'completed' ? '#10b981' : '#d4af37',
+                                cursor: selectedEvent?.status === 'completed' ? 'not-allowed' : 'pointer',
+                                opacity: selectedEvent?.status === 'completed' ? 0.6 : 1
+                            }}
                         >
-                            Close
+                            {selectedEvent?.status === 'completed' ? '✓ Completed' : 'Complete'}
                         </button>,
-                        <button
-                            key="update"
-                            onClick={handleUpdateEvent}
-                            className="update-event-btn"
-                        >
-                            Update
-                        </button>
-                    ]}
+                        // Only show Update button if event is not completed
+                        selectedEvent?.status !== 'completed' && (
+                            <button
+                                key="update"
+                                onClick={handleUpdateEvent}
+                                className="update-event-btn"
+                            >
+                                Update
+                            </button>
+                        )
+                    ].filter(Boolean)}
                 >
                     {selectedEvent && (
                         <div className="event-form">
@@ -498,7 +607,7 @@ export default function CalendarPage() {
 
                 {/* Alerts Modal */}
                 <Modal
-                    title="🔔 Tomorrow's Events"
+                    title="🔔 Today & Tomorrow's Events"
                     open={isAlertModalVisible}
                     onCancel={() => setIsAlertModalVisible(false)}
                     footer={null}

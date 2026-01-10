@@ -1,46 +1,44 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Plus } from "lucide-react";
-import { Select, Button, Pagination } from "antd";
+import { Select, Button } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import Filters from "../Filters/Filters";
 import Modals from "./Modals";
 import {
     getExpenseCategoriesApi,
-    getExpensesApi,
-    getIncomeApi,
-    getIncomeCategoriesApi,
-    getWalletEntriesApi,
-    getUserAllExpensesApi
+    getUserAllExpensesApi,
+    getApprovalsApi,
+    safeGetLocalStorage
 } from "../../Api/action";
 
 import * as Icons from "lucide-react";
 import { FullPageLoader } from "../../Common/FullPageLoader";
-import { CommonToaster } from "../../Common/CommonToaster";
+import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 
 export default function IncomeExpense() {
-    const [activeTab, setActiveTab] = useState("expense");
+    const userDetails = safeGetLocalStorage("loginDetails", {});
+    const userId = userDetails?.id;
+    const userRole = userDetails?.role;
+
+    const [activeTab, setActiveTab] = useState("approval");
     const [openModal, setOpenModal] = useState(null);
     const [editData, setEditData] = useState(null);
 
-    // FORM
+    // FORM (Used for resetting, state passed to Modal)
     const [branch, setBranch] = useState("Select Branch");
     const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [total, setTotal] = useState("");
     const [mainCategory, setMainCategory] = useState("Select Main Category");
     const [subCategory, setSubCategory] = useState("Select Category");
     const [description, setDescription] = useState("");
-    const [endDate, setEndDate] = useState(null);
     const [vendorNumber, setVendorNumber] = useState("");
+
     const [vendorName, setVendorName] = useState("");
 
     // Invoice Modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [currentInvoices, setCurrentInvoices] = useState([]);
-    const [currentInvoiceIndex, setCurrentInvoiceIndex] = useState(0);
-
-    // Wallet
-    const [walletEntries, setWalletEntries] = useState([]);
 
     // Filters
     const [filterCategory, setFilterCategory] = useState("All");
@@ -62,35 +60,22 @@ export default function IncomeExpense() {
     const [expenseData, setExpenseData] = useState([]);
     const [incomeData, setIncomeData] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    const userDetails = JSON.parse(localStorage.getItem("loginDetails"));
-    const userId = userDetails?.id;
-    const userRole = userDetails?.role;
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // -------------------------------------
-    // Load Wallet
+    // Load Wallet (Only if needed, maybe keeping for legacy compatibility or if Admin checks wallet)
     // -------------------------------------
     useEffect(() => {
         const loadWallet = () => {
             if (userRole === "user" && userId) {
-                getWalletEntriesApi(userId).then((res) =>
-                    setWalletEntries(res.entries || [])
-                );
             }
         };
-
-        loadWallet();
-        window.addEventListener("incomeExpenseUpdated", loadWallet);
-        window.addEventListener("summaryUpdated", loadWallet);
-
-        return () => {
-            window.removeEventListener("incomeExpenseUpdated", loadWallet);
-            window.removeEventListener("summaryUpdated", loadWallet);
-        };
+        // loadWallet(); 
     }, [userId, userRole]);
 
     const fmtAmt = (n) =>
         `₹${Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0}`;
+
     // -------------------------------------
     // Invoice Slider
     // -------------------------------------
@@ -103,7 +88,11 @@ export default function IncomeExpense() {
         const normalize = (item) => {
             if (!item) return null;
             let str = String(item).trim().replace(/^"+|"+$/g, "");
+            // If it's base64, return as-is
             if (str.startsWith("data:")) return str;
+            // If it already has the full path, return as-is
+            if (str.startsWith("http") || str.startsWith("/uploads")) return str.startsWith("http") ? str : `${BASE}${str}`;
+            // Otherwise, assume it's just a filename
             return `${BASE}/uploads/invoices/${str}`;
         };
 
@@ -123,19 +112,10 @@ export default function IncomeExpense() {
         }
         if (!invoicesArray.length) return;
         setCurrentInvoices(invoicesArray);
-        setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
     };
 
-    const handleNextInvoice = () => {
-        setCurrentInvoiceIndex((prev) =>
-            prev < currentInvoices.length - 1 ? prev + 1 : prev
-        );
-    };
 
-    const handlePrevInvoice = () => {
-        setCurrentInvoiceIndex((prev) => prev > 0 ? prev - 1 : prev);
-    };
 
     // -------------------------------------
     // APPLY FILTERS
@@ -167,16 +147,12 @@ export default function IncomeExpense() {
         });
     };
 
-    const filteredWallet = applyFilters(walletEntries);
-
     // -------------------------------------
     // Load categories
     // -------------------------------------
     useEffect(() => {
         async function loadCategories() {
             const exp = await getExpenseCategoriesApi();
-            const inc = await getIncomeCategoriesApi();
-
             const grouped = exp.reduce((acc, item) => {
                 const main = item.main_category;
                 const sub = item.sub_category;
@@ -186,39 +162,45 @@ export default function IncomeExpense() {
             }, {});
 
             setExpenseCategories(grouped);
-            setIncomeCategories(inc.map((i) => i.name));
         }
         loadCategories();
+
+        window.addEventListener("refreshCategories", loadCategories);
+        return () => {
+            window.removeEventListener("refreshCategories", loadCategories);
+        };
     }, []);
 
     // -------------------------------------
-    // Load Income + Expense
-    // -------------------------------------
-    const [refreshKey, setRefreshKey] = useState(0);
-
-    // -------------------------------------
-    // Load Income + Expense
+    // Load Income + Expense + Approval
     // -------------------------------------
     useEffect(() => {
         async function loadData() {
             setLoading(true);
 
-            let expenses;
+            let expenses = { data: [], total: 0 };
+            let income = { data: [], total: 0 };
+
+            const res = await getUserAllExpensesApi();
+
+            let pendingApprovals = [];
+            pendingApprovals = await getApprovalsApi().catch(() => []);
+            expenses = { data: res.expenses || [], total: res.expenses?.length || 0 };
+            let combinedApprovals = [...(res.approvals || []), ...pendingApprovals];
 
             if (userRole === "admin") {
-                expenses = await getExpensesApi(page);
-            } else {
-                const res = await getUserAllExpensesApi();
-                expenses = { data: res.all || [], total: res.all?.length || 0 };
+                combinedApprovals = combinedApprovals.filter(item => item.status !== "pending");
             }
-            const income = await getIncomeApi(page);
+
+            income = { data: combinedApprovals, total: combinedApprovals.length };
+
             setExpenseData(expenses.data || []);
             setIncomeData(income.data || []);
-            setPageTotal(
-                activeTab === "expense"
-                    ? expenses.total
-                    : income.total
-            );
+            if (activeTab === "expense") {
+                setPageTotal(expenses.total);
+            } else {
+                setPageTotal(income.total);
+            }
 
             setLoading(false);
         }
@@ -226,31 +208,15 @@ export default function IncomeExpense() {
         loadData();
     }, [page, activeTab, userRole, refreshKey]);
 
-    // -------------------------------------
-    // Live reload listener
-    // -------------------------------------
     useEffect(() => {
         const reload = () => {
             setRefreshKey((prev) => prev + 1);
         };
-
         window.addEventListener("incomeExpenseUpdated", reload);
-        return () => window.removeEventListener("incomeExpenseUpdated", reload);
-    }, []);
-
-    // -------------------------------------
-    // Open modals via window event
-    // -------------------------------------
-    useEffect(() => {
-        const openIncome = () => setOpenModal("income");
-        const openExpense = () => setOpenModal("expense");
-
-        window.addEventListener("openIncomeModal", openIncome);
-        window.addEventListener("openExpenseModal", openExpense);
-
+        window.addEventListener("summaryUpdated", reload);
         return () => {
-            window.removeEventListener("openIncomeModal", openIncome);
-            window.removeEventListener("openExpenseModal", openExpense);
+            window.removeEventListener("incomeExpenseUpdated", reload);
+            window.removeEventListener("summaryUpdated", reload);
         };
     }, []);
 
@@ -261,7 +227,7 @@ export default function IncomeExpense() {
         setMainCategory("Select Main Category");
         setSubCategory("Select Category");
         setDescription("");
-        setEndDate(null);
+
         setVendorName("");
         setVendorNumber("");
     };
@@ -272,7 +238,7 @@ export default function IncomeExpense() {
     };
 
     const filteredExpenseData = applyFilters(expenseData);
-    const filteredIncomeData = applyFilters(incomeData);
+    const filteredApprovalsData = applyFilters(incomeData);
 
     const openEditModal = (item) => {
         const resolvedId = item.original_expense_id || item.id;
@@ -282,81 +248,78 @@ export default function IncomeExpense() {
         });
         setBranch(item.branch || "Select Branch");
         setDate(item.date ? dayjs(item.date).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
-        setTotal(item.total || "");
+        setTotal(item.total || item.amount || "");
         setMainCategory(item.main_category || "Select Main Category");
         setSubCategory(item.sub_category || "Select Category");
-        setDescription(item.description || "");
+        setDescription(item.description || item.role || "");
         setVendorName(item.vendor_name || "");
         setVendorNumber(item.vendor_number || "");
-        setEndDate(item.end_date || null);
-        setOpenModal("edit-expense");
+        setOpenModal(activeTab === "expense" ? "expense" : "edit-approval");
+
     };
 
-    // -------------------------------------
-    // BUILD TABLE ROWS
-    // -------------------------------------
-    let baseRows = [];
-
-    if (activeTab === "expense") {
-        baseRows = filteredExpenseData.map((item) => {
-            const DynamicIcon = Icons[item.icon] || Icons.Circle;
-            return {
-                date: dayjs(item.date).format("DD/MM/YYYY"),
-                title: item.sub_category,
-                merchant: item.user_name,
-                amount: `₹${item.total}`,
-                report: item.branch,
-                status: item.status === "pending" ? "Pending" : "Approved",
-                icon: <DynamicIcon size={20} />,
-                invoice: item.invoice,
-                color: item.color,
-                vendorName: item.vendor_name,
-                vendorNumber: item.vendor_number,
-                spendMode: item.spend_mode,
-                original_expense_id: item.original_expense_id,
-                originalItem: {
-                    ...item,
-                    id: item.id
-                },
-            };
-        });
-    } else {
-        if (userDetails.role === "admin") {
-            baseRows = filteredIncomeData.map((item) => {
+    // Helper to safely display
+    const getRowData = () => {
+        if (activeTab === "expense") {
+            return filteredExpenseData.map((item) => {
                 const DynamicIcon = Icons[item.icon] || Icons.Circle;
                 return {
                     date: dayjs(item.date).format("DD/MM/YYYY"),
-                    title: item.category,
-                    merchant: item.user_name || "Unknown",
+                    title: item.sub_category,
+                    description: item.description,
+                    merchant: item.user_name,
                     amount: `₹${item.total}`,
                     report: item.branch,
-                    status: "Received",
+                    status: item.status === "pending" ? "Pending" : item.status === "approved" ? "Approved" : item.status,
                     icon: <DynamicIcon size={20} />,
                     invoice: item.invoice,
                     color: item.color,
+                    vendorName: item.vendor_name,
+                    vendorNumber: item.vendor_number,
+                    spendMode: item.spend_mode,
+                    original_expense_id: item.original_expense_id,
+                    gst: item.gst,
+                    transaction_from: item.transaction_from,
+                    transaction_to: item.transaction_to,
+                    originalItem: { ...item, id: item.id },
                 };
             });
-        } else {
-            baseRows = filteredWallet.map((item) => ({
-                date: dayjs(item.date).format("DD/MM/YYYY"),
-                title: "Wallet Deposit",
-                note: item.note || "-",
-                merchant: userDetails.name || "You",
-                amount: `₹${item.amount}`,
-                report: item.branch || "-",
-                status: "Received",
-                icon: <Icons.Wallet size={20} />,
-                invoice: "",
-                color: "#00C49F",
-            }));
         }
-    }
+        {
+            return filteredApprovalsData.map((item) => {
+                const DynamicIcon = Icons[item.icon] || Icons.Circle;
+                return {
+                    date: dayjs(item.date).format("DD/MM/YYYY"),
+                    title: item.sub_category || item.category,
+                    note: item.role || item.description || "-",
+                    merchant: item.user_name || userDetails.name || "You",
+                    amount: `₹${item.total || item.amount}`,
+                    report: item.branch || "-",
+                    status: item.status,
+                    icon: <DynamicIcon size={20} />,
+                    invoice: item.invoice,
+                    color: item.color || item.categoryColor,
+                    invoice: item.invoice,
+                    color: item.color || item.categoryColor,
+                    gst: item.gst,
+                    vendorName: item.vendor_name,
+                    vendorNumber: item.vendor_number,
+                    transaction_to: item.transaction_to,
+                    end_date: item.end_date ? dayjs(item.end_date).format("DD/MM/YYYY") : "-",
+                    originalItem: { ...item, id: item.id },
+                    is_edit: item.is_edit
+                };
+            });
+        }
+    };
+
+    const baseRows = getRowData();
 
     // -------------------------------------
     // SEARCH / CATEGORY / SORT
     // -------------------------------------
-    const allNames = [...new Set(baseRows.map(r => r.merchant))];
-    const allBranches = [...new Set(baseRows.map(r => r.report))];
+    const allNames = [...new Set(baseRows.map(r => r.merchant))].filter(Boolean);
+    const allBranches = [...new Set(baseRows.map(r => r.report))].filter(Boolean);
     let filteredRows = [...baseRows];
 
     if (searchText.trim()) {
@@ -382,18 +345,19 @@ export default function IncomeExpense() {
     }
 
     if (filterAmount === "low") {
-        filteredRows.sort(
-            (a, b) =>
-                parseInt(a.amount.replace(/\D/g, "")) -
-                parseInt(b.amount.replace(/\D/g, ""))
-        );
+        filteredRows.sort((a, b) => parseInt(a.amount.replace(/\D/g, "")) - parseInt(b.amount.replace(/\D/g, "")));
     } else if (filterAmount === "high") {
-        filteredRows.sort(
-            (a, b) =>
-                parseInt(b.amount.replace(/\D/g, "")) -
-                parseInt(a.amount.replace(/\D/g, ""))
-        );
+        filteredRows.sort((a, b) => parseInt(b.amount.replace(/\D/g, "")) - parseInt(a.amount.replace(/\D/g, "")));
     }
+
+    // Calculate Total Approved Value
+    const totalApproved = filteredRows.reduce((acc, row) => {
+        if (String(row.status).toLowerCase() === "approved") {
+            const val = parseFloat(String(row.amount).replace(/[^0-9.-]+/g, "")) || 0;
+            return acc + val;
+        }
+        return acc;
+    }, 0);
 
     const clearAllFilters = () => {
         setFilterCategory("All");
@@ -403,14 +367,57 @@ export default function IncomeExpense() {
         setFilterBranch("All");
     };
 
-    const isPDF = (src) => {
-        if (!src || typeof src !== "string") return false;
-        const clean = src.replace(/^"+|"+$/g, "").trim();
-        return (
-            clean.startsWith("data:application/pdf") ||
-            clean.toLowerCase().endsWith(".pdf")
-        );
+    const handleExportCSV = () => {
+        if (!filteredRows.length) return;
+
+        let headers = [];
+        let rowMapper = (row) => [];
+
+        if (activeTab === "approval") {
+            headers = ["Date", "Category", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status"];
+            rowMapper = (row) => [
+                row.date,
+                row.title,
+                row.note || "-",
+                row.report || "-",
+                row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
+                row.amount,
+                row.gst || "No",
+                row.end_date || "-",
+                row.status
+            ];
+        } else {
+            headers = ["Date", "Category", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "Branch", "Status"];
+            rowMapper = (row) => [
+                row.date,
+                row.title,
+                row.description || "-",
+                row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
+                row.transaction_from || "-",
+                row.transaction_to || "-",
+                row.spendMode || "-",
+                row.amount,
+                row.report || "-",
+                row.status
+            ];
+        }
+
+        const csvContent = [
+            headers.join(","),
+            ...filteredRows.map(row => rowMapper(row).map(e => `"${String(e).replace(/"/g, '""')}"`).join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `${activeTab}_export_${dayjs().format("YYYY-MM-DD")}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
+
+
 
     const handleCloseModal = () => {
         setOpenModal(null);
@@ -418,8 +425,13 @@ export default function IncomeExpense() {
         resetForm();
     };
 
-    const isWalletTab = activeTab === "income" && userDetails?.role === "user";
-    const walletGridStyle = isWalletTab ? { gridTemplateColumns: "1.5fr 2fr 1fr 1fr 1fr" } : {};
+    const isApprovalTab = activeTab === "approval";
+    const gridStyle = { gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0fr" };
+    const approvalGridStyle = {
+        gridTemplateColumns: userRole === "admin"
+            ? "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr"
+            : "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.8fr"
+    };
 
     return (
         <>
@@ -433,10 +445,10 @@ export default function IncomeExpense() {
                         {/* TABS */}
                         <div className="tabs-wrapper">
                             <button
-                                className={`premium-tab ${activeTab === "income" ? "active" : ""}`}
-                                onClick={() => handleTabChange("income")}
+                                className={`premium-tab ${activeTab === "approval" ? "active" : ""}`}
+                                onClick={() => handleTabChange("approval")}
                             >
-                                {userDetails.role === "admin" ? "Income" : "Wallet"}
+                                {userRole === "admin" ? "Approve" : "Approve"}
                             </button>
 
                             <button
@@ -450,36 +462,38 @@ export default function IncomeExpense() {
                         <motion.div initial="hidden" animate="visible">
                             <div className="expense-header">
                                 <h1>
-                                    {activeTab === "expense"
-                                        ? "Expenses"
-                                        : userDetails.role === "admin"
-                                            ? "Income"
-                                            : "Wallet"}
+                                    {activeTab === "expense" ? "Expenses" : "Approvals"}
                                 </h1>
-
                                 <div className="expense-actions">
+                                    <button
+                                        onClick={handleExportCSV}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            padding: "8px 14px",
+                                            backgroundColor: "#fff",
+                                            border: "1px solid #e0e0e0",
+                                            borderRadius: "8px",
+                                            cursor: "pointer",
+                                            fontSize: "13px",
+                                            fontWeight: 500,
+                                            transition: "all 0.2s",
+                                            marginRight: "8px",
+                                            color: "#333"
+                                        }}
+                                    >
+                                        <Icons.Download size={16} /> Export CSV
+                                    </button>
                                     <button
                                         className="btn-primary"
                                         onClick={() => {
-                                            const currentUser =
-                                                JSON.parse(localStorage.getItem("loginDetails"));
-
-                                            if (
-                                                activeTab === "income" &&
-                                                currentUser?.role !== "admin"
-                                            ) {
-                                                return CommonToaster(
-                                                    "You do not have permission to add income",
-                                                    "error"
-                                                );
-                                            }
-
+                                            setOpenModal(activeTab);
                                             resetForm();
                                             setEditData(null);
-                                            setOpenModal(activeTab);
                                         }}
                                     >
-                                        <Plus size={16} /> New {activeTab}
+                                        <Plus size={16} /> New {activeTab === "approval" ? "Approval" : "Expense"}
                                     </button>
                                 </div>
                             </div>
@@ -500,7 +514,7 @@ export default function IncomeExpense() {
                                     />
                                 </div>
                                 <div className="filter-item">
-                                    <label>Employee Name</label>
+                                    <label>Name</label>
                                     <Select
                                         value={filterName}
                                         onChange={setFilterName}
@@ -529,7 +543,7 @@ export default function IncomeExpense() {
                                         type="text"
                                         value={searchText}
                                         onChange={(e) => setSearchText(e.target.value)}
-                                        placeholder="Search Category"
+                                        placeholder="Search..."
                                         style={{
                                             width: 240,
                                             padding: "8px 10px",
@@ -539,10 +553,17 @@ export default function IncomeExpense() {
                                         }}
                                     />
                                 </div>
-                                <div className="filter-item">
-                                    <Button className="clear-btn" onClick={clearAllFilters}>
+                                <div className="filter-item" style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ height: 24 }}></div> {/* Spacer to align with inputs having labels */}
+                                    <Button className="clear-btn" onClick={clearAllFilters} style={{ marginTop: 0 }}>
                                         Clear All
                                     </Button>
+                                </div>
+
+                                {/* TOTAL STAT PILL */}
+                                <div className={`simple-stat-pill ${activeTab === "expense" ? "expense" : "approved"}`}>
+                                    <span style={{ fontSize: 16, color: "#2a2a2a" }}>{activeTab === "expense" ? "Total Expense" : "Total Approved"}:</span>
+                                    <strong>{fmtAmt(totalApproved)}</strong>
                                 </div>
                             </div>
 
@@ -552,18 +573,32 @@ export default function IncomeExpense() {
                                     <div className="expense-table">
                                         <div
                                             className="expense-row expense-header-row"
-                                            style={walletGridStyle}
+                                            style={isApprovalTab ? approvalGridStyle : gridStyle}
                                         >
                                             <div>DETAILS</div>
-                                            {isWalletTab && <div>NOTE</div>}
-                                            {userDetails.role !== "user" && <div>EMPLOYEE NAME</div>}
-                                            <div>AMOUNT</div>
-                                            <div>BRANCH</div>
-                                            {!isWalletTab && <div>INVOICE</div>}
-                                            {!isWalletTab && <div>VENDOR DETAILS</div>}
-                                            {!isWalletTab && <div>SPEND MODE</div>}
-                                            <div>STATUS</div>
-                                            {userDetails.role !== "admin" && !isWalletTab && <div>ACTION</div>}
+                                            {isApprovalTab ? (
+                                                <>
+                                                    <div>DESCRIPTION</div>
+                                                    <div>BRANCH</div>
+                                                    <div>VENDOR</div>
+                                                    <div>AMOUNT</div>
+                                                    <div>GST</div>
+                                                    <div>END DATE</div>
+                                                    <div>STATUS</div>
+                                                    {userRole !== "admin" && <div>ACTION</div>}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div>DESCRIPTION</div>
+                                                    <div>VENDOR</div>
+                                                    <div>TRANSACTION</div>
+                                                    <div>MODE</div>
+                                                    <div>AMOUNT</div>
+                                                    <div>BRANCH</div>
+                                                    <div>STATUS</div>
+                                                    {/* <div>ACTION</div> */}
+                                                </>
+                                            )}
                                         </div>
                                         {filteredRows.length === 0 ? (
                                             <div className="no-data-box">
@@ -579,7 +614,7 @@ export default function IncomeExpense() {
                                                 <div
                                                     key={i}
                                                     className="expense-row"
-                                                    style={walletGridStyle}
+                                                    style={isApprovalTab ? approvalGridStyle : gridStyle}
                                                 >
                                                     {/* DETAILS */}
                                                     <div className="col details-col">
@@ -600,98 +635,86 @@ export default function IncomeExpense() {
                                                         <div className="details-text">
                                                             <span className="date">{row.date}</span>
                                                             <span className="title">{row.title}</span>
-                                                        </div>
-                                                    </div>
-                                                    {isWalletTab && <div>{row.note}</div>}
-                                                    {userDetails.role !== "user" && <div>{row.merchant}</div>}
-                                                    <div>
-                                                        {/* Amount */}
-                                                        <span>{fmtAmt(row.amount)}</span><br></br>
-                                                        {/* Editable / Locked Badge */}
-                                                        {userDetails.role === "user" && activeTab === "expense" ? (
-                                                            row.original_expense_id && (
-                                                                <span className="editable-pill">
-                                                                    Editable
-                                                                </span>
-                                                            )
-                                                        ) : null}
-                                                    </div>
-                                                    <div>{row.report}</div>
-                                                    {!isWalletTab && (
-                                                        <div>
-                                                            {row.invoice ? (
+                                                            {/* Invoice Button */}
+                                                            {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" && (
                                                                 <button
                                                                     className="view-invoice-btn"
                                                                     onClick={() => handleViewInvoice(row.invoice)}
+                                                                    style={{ marginTop: 5 }}
                                                                 >
-                                                                    View
+                                                                    View Invoice
                                                                 </button>
-                                                            ) : (
-                                                                <span className="no-invoice">No File</span>
                                                             )}
                                                         </div>
-                                                    )}
-                                                    {!isWalletTab && (
-                                                        <div className="vendor-col">
-                                                            {row.vendorName ? (
-                                                                <span className="title">{row.vendorName}</span>
-                                                            ) : (
-                                                                <span className="title">No Vendor</span>
-                                                            )}
-                                                            {row.vendorNumber ? (
-                                                                <span className="date">{row.vendorNumber}</span>
-                                                            ) : (
-                                                                <span className="date">No Number</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {!isWalletTab && (
-                                                        <div>
-                                                            {row.spendMode ? (
-                                                                <span
-                                                                    className="spend-mode-badge"
-                                                                    style={{
-                                                                        padding: "4px 12px",
-                                                                        borderRadius: "12px",
-                                                                        fontSize: "12px",
-                                                                        fontWeight: 600,
-                                                                        backgroundColor:
-                                                                            row.spendMode === "Cash" ? "#c0b4ff" : "#D4E7FF",
-                                                                        color:
-                                                                            row.spendMode === "Cash" ? "#3c138b" : "#1E3A8A",
-                                                                    }}
-                                                                >
-                                                                    {row.spendMode}
-                                                                </span>
-                                                            ) : (
-                                                                <span style={{ color: "#999" }}>-</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <span
-                                                            className={
-                                                                row.status === "Approved" || row.status === "Received"
-                                                                    ? "status-approved"
-                                                                    : row.status === "Pending"
-                                                                        ? "status-pending"
-                                                                        : "status-rejected"
-                                                            }
-                                                        >
-                                                            {row.status}
-                                                        </span>
                                                     </div>
-                                                    {userDetails.role !== "admin" && !isWalletTab && (
-                                                        <div>
-                                                            {activeTab === "expense" && (
-                                                                <button
-                                                                    className="edit-btn"
-                                                                    onClick={() => openEditModal(row.originalItem)}
-                                                                >
-                                                                    <Icons.Edit size={16} /> Edit
-                                                                </button>
+
+                                                    {isApprovalTab ? (
+                                                        <>
+                                                            <div>{row.note}</div>
+                                                            <div>{row.report}</div>
+                                                            <div className="vendor-col">
+                                                                {row.vendorName ? (
+                                                                    <>
+                                                                        <span className="title">{row.vendorName}</span>
+                                                                        {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
+                                                                    </>
+                                                                ) : row.transaction_to || "-"}
+                                                            </div>
+                                                            <div>{row.amount}<br></br>
+                                                                {Boolean(row.is_edit) && <span className="editable-pill">Editable</span>}
+                                                            </div>
+                                                            <div>{row.gst === 'Yes' ? <span className="status-badge" style={{ background: '#d4377f', color: 'white' }}>GST</span> : '-'}</div>
+                                                            <div>{row.end_date}</div>
+                                                            <div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                    <span className={row.status === "approved" ? "status-approved" : row.status === "pending" ? "status-pending" : "status-rejected"}>
+                                                                        {row.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {userRole !== "admin" && (
+                                                                <div>
+                                                                    {/* Action for Approval */}
+                                                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                                        <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
+                                                                            <Icons.Edit size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
                                                             )}
-                                                        </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="vendor-col">
+                                                                {row.description || "-"}
+                                                            </div>
+                                                            <div className="vendor-col">
+                                                                {row.vendorName ? (
+                                                                    <>
+                                                                        <span className="title">{row.vendorName}</span>
+                                                                        {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
+                                                                    </>
+                                                                ) : row.transaction_to || "-"}
+                                                            </div>
+                                                            <div className="vendor-col">
+                                                                {row.transaction_from ? (
+                                                                    <>
+                                                                        <span className="title">From: {row.transaction_from}</span>
+                                                                        <span className="date">To: {row.transaction_to}</span>
+                                                                    </>
+                                                                ) : "-"}
+                                                            </div>
+                                                            <div>{row.spendMode}</div>
+                                                            <div>{row.amount}</div>
+                                                            <div>{row.report}</div>
+                                                            <div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                    <span className={row.status === "approved" ? "status-approved" : row.status === "pending" ? "status-pending" : "status-rejected"}>
+                                                                        {row.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </>
                                                     )}
                                                 </div>
                                             ))
@@ -700,26 +723,13 @@ export default function IncomeExpense() {
                                 </div>
                             </div>
 
-                            {/* PAGINATION */}
-                            {!(userDetails.role === "user" && activeTab === "income") && (
-                                <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
-                                    <Pagination
-                                        current={page}
-                                        total={PageTotal}
-                                        pageSize={10}
-                                        showSizeChanger={false}
-                                        onChange={(p) => setPage(p)}
-                                    />
-                                </div>
-                            )}
-
                             {/* MODAL */}
                             <AnimatePresence>
                                 {openModal && (
                                     <Modals
                                         open={!!openModal}
-                                        type={openModal === "income" ? "income" : "expense"}
-                                        isEdit={openModal === "edit-expense"}
+                                        type={openModal}
+                                        isEdit={openModal === "edit-approval" || (openModal === "expense" && editData)}
                                         onClose={handleCloseModal}
                                         branch={branch}
                                         setBranch={setBranch}
@@ -735,8 +745,7 @@ export default function IncomeExpense() {
                                         setDescription={setDescription}
                                         expenseCategories={expenseCategories}
                                         incomeCategories={incomeCategories}
-                                        endDate={endDate}
-                                        setEndDate={setEndDate}
+
                                         vendorNumber={vendorNumber}
                                         setVendorNumber={setVendorNumber}
                                         vendorName={vendorName}
@@ -751,121 +760,11 @@ export default function IncomeExpense() {
             )}
 
             {showInvoiceModal && currentInvoices.length > 0 && (
-                <div
-                    className="invoice-modal-backdrop"
-                    onClick={() => setShowInvoiceModal(false)}
-                >
-                    <div
-                        className="invoice-modal"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 15
-                            }}
-                        >
-                            <h3>Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})</h3>
-                            <div style={{ display: "flex", gap: 10 }}>
-                                <button
-                                    className="close-modal-btn"
-                                    onClick={() => setShowInvoiceModal(false)}
-                                >
-                                    <Icons.X size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ position: "relative", textAlign: "center" }}>
-                            {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
-                                <button
-                                    className="invoice-nav-btn-left"
-                                    onClick={handlePrevInvoice}
-                                >
-                                    <Icons.ChevronLeft size={24} color="white" />
-                                </button>
-                            )}
-
-                            {isPDF(currentInvoices[currentInvoiceIndex]) ? (
-                                <div style={{
-                                    width: "auto",
-                                    height: "500px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    background: "#f5f5f5",
-                                    borderRadius: 10
-                                }}>
-                                    <Icons.FileText size={80} color="#666" />
-                                    <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
-                                        PDF Document
-                                    </p>
-                                    <a
-                                        href={currentInvoices[currentInvoiceIndex]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            marginTop: 10,
-                                            fontSize: 14,
-                                            color: "#d4af37",
-                                            textDecoration: "underline",
-                                            cursor: "pointer",
-                                            display: "inline-block"
-                                        }}
-                                    >
-                                        Open in New Tab
-                                    </a>
-                                </div>
-                            ) : (
-                                <img
-                                    src={currentInvoices[currentInvoiceIndex]}
-                                    alt={`Invoice ${currentInvoiceIndex + 1}`}
-                                    style={{
-                                        borderRadius: 10,
-                                        objectFit: "contain",
-                                        width: "500px",
-                                        height: "420px"
-                                    }}
-                                />
-                            )}
-                            {currentInvoices.length > 1 && currentInvoiceIndex < currentInvoices.length - 1 && (
-                                <button
-                                    onClick={handleNextInvoice}
-                                    className="invoice-nav-btn-right"
-                                >
-                                    <Icons.ChevronRight size={24} color="white" />
-                                </button>
-                            )}
-                        </div>
-
-                        {currentInvoices.length > 1 && (
-                            <div style={{
-                                display: "flex",
-                                justifyContent: "center",
-                                gap: 8,
-                                marginTop: 20
-                            }}>
-                                {currentInvoices.map((_, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setCurrentInvoiceIndex(idx)}
-                                        style={{
-                                            width: idx === currentInvoiceIndex ? 24 : 8,
-                                            height: 8,
-                                            borderRadius: 4,
-                                            background: idx === currentInvoiceIndex ? "#d4af37" : "#ccc",
-                                            cursor: "pointer",
-                                            transition: "all 0.3s ease"
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <InvoicePreviewModal
+                    open={showInvoiceModal}
+                    onClose={() => setShowInvoiceModal(false)}
+                    invoices={currentInvoices}
+                />
             )}
         </>
     );

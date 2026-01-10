@@ -22,26 +22,24 @@ import {
     CreditCard,
     Wallet,
     Receipt,
-    X,
-    ChevronRight,
-    ChevronLeft,
-    FileText
 } from "lucide-react";
 import "../css/Dashboard.css";
+import "../css/Calendar.css";
 import AmountDetails from "./AmountDetails";
 import Filters from "../Filters/Filters";
 import {
-    getIncomeApi,
-    getExpensesApi,
     getExpenseCategoriesApi,
-    getIncomeCategoriesApi,
     getWalletEntriesApi,
+    getUserAllExpensesApi,
+    getAllWalletTransactionsApi,
+    safeGetLocalStorage
 } from "../../Api/action";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { FullPageLoader } from "../../Common/FullPageLoader";
 import Modals from "./Modals";
 import { CommonToaster } from "../../Common/CommonToaster";
+import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 dayjs.extend(isBetween);
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
@@ -60,7 +58,6 @@ export default function Dashboard() {
     const [activeTab, setActiveTab] = useState("expense");
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [currentInvoices, setCurrentInvoices] = useState([]);
-    const [currentInvoiceIndex, setCurrentInvoiceIndex] = useState(0);
     const [branch, setBranch] = useState("Select Branch");
     const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [total, setTotal] = useState("");
@@ -75,18 +72,7 @@ export default function Dashboard() {
         compareMode: false,
         value: dayjs(),
     });
-    const user = JSON.parse(localStorage.getItem("loginDetails")) || {};
-
-    const isPDF = (src) => {
-        if (!src || typeof src !== "string") return false;
-
-        let clean = src.replace(/^"+|"+$/g, "").trim();
-
-        return (
-            clean.startsWith("data:application/pdf") ||
-            clean.toLowerCase().endsWith(".pdf")
-        );
-    };
+    const user = safeGetLocalStorage("loginDetails", {});
 
     // -------------------------
     // Single loader for all APIs
@@ -94,9 +80,8 @@ export default function Dashboard() {
     const fetchOriginalData = async () => {
         try {
             setLoading(true);
-            const [expCat, incCat] = await Promise.all([
+            const [expCat] = await Promise.all([
                 getExpenseCategoriesApi(),
-                getIncomeCategoriesApi(),
             ]).catch(() => [[], []]);
             const grouped = (expCat || []).reduce((acc, item) => {
                 const main = item.main_category;
@@ -106,16 +91,21 @@ export default function Dashboard() {
                 return acc;
             }, {});
             setExpenseCategories(grouped);
-            setIncomeCategories((incCat || []).map((i) => i.name));
-            const [incomes, expenses] = await Promise.all([
-                getIncomeApi().catch(() => []),
-                getExpensesApi().catch(() => []),
-            ]);
-            setOriginalIncome((incomes?.data) || []);
-            setOriginalExpenses((expenses?.data) || []);
+
+            const res = await getUserAllExpensesApi();
+
+            // For Dashboard charts:
+            const expensesData = res.expenses || [];
+            const incomeData = res.approvals || [];
+
+            setOriginalIncome(incomeData);
+            setOriginalExpenses(expensesData);
             if (user?.role === "user") {
                 const wallets = await getWalletEntriesApi(user.id).catch(() => ({ entries: [] }));
                 setWalletEntries(wallets.entries || []);
+            } else if (user?.role === "admin") {
+                const allWallets = await getAllWalletTransactionsApi().catch(() => ({ entries: [] }));
+                setWalletEntries(allWallets.entries || []);
             } else {
                 setWalletEntries([]);
             }
@@ -154,6 +144,7 @@ export default function Dashboard() {
         };
     }, []);
 
+
     const handleViewInvoice = (invoiceData) => {
         if (!invoiceData) return;
         const BASE = import.meta.env.VITE_API_URL;
@@ -163,7 +154,11 @@ export default function Dashboard() {
 
             let str = String(item).trim().replace(/^"+|"+$/g, "");
 
+            // If it's base64, return as-is
             if (str.startsWith("data:")) return str;
+            // If it already has the full path, return as-is
+            if (str.startsWith("http") || str.startsWith("/uploads")) return str.startsWith("http") ? str : `${BASE}${str}`;
+            // Otherwise, assume it's just a filename
             return `${BASE}/uploads/invoices/${str}`;
         };
         if (Array.isArray(invoiceData)) {
@@ -182,18 +177,7 @@ export default function Dashboard() {
         }
         if (!invoicesArray.length) return;
         setCurrentInvoices(invoicesArray);
-        setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
-    };
-
-    const handleNextInvoice = () => {
-        setCurrentInvoiceIndex((prev) =>
-            prev < currentInvoices.length - 1 ? prev + 1 : prev
-        );
-    };
-
-    const handlePrevInvoice = () => {
-        setCurrentInvoiceIndex((prev) => (prev > 0 ? prev - 1 : prev));
     };
 
     const applyFilters = useCallback(
@@ -225,28 +209,39 @@ export default function Dashboard() {
     );
     const filteredIncome = useMemo(() => applyFilters(originalIncome), [originalIncome, applyFilters]);
     const filteredExpenses = useMemo(() => applyFilters(originalExpenses), [originalExpenses, applyFilters]);
-    const filteredWalletEntries = useMemo(() => (user?.role === "user" ? applyFilters(walletEntries) : []), [walletEntries, applyFilters, user?.role]);
+    const filteredWalletEntries = useMemo(() => applyFilters(walletEntries), [walletEntries, applyFilters]);
 
     useEffect(() => {
         setIncomeData(filteredIncome);
         setExpenseDataDb(filteredExpenses);
         let latestIncomeOrWallet = [];
+
+        // Filter only approved approvals for the Wallet/Income tab
+        const approvedApprovals = filteredIncome.filter(item => item.status === 'approved');
+
+        let latestExpense = [];
+
         if (user.role === "admin") {
-            latestIncomeOrWallet = [...filteredIncome]
+            // Admin: Use all wallet entries (Income types)
+            latestIncomeOrWallet = [...filteredWalletEntries]
+                .filter(w => (w.type || "").toLowerCase() === 'income')
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5)
                 .map((i) => ({
-                    type: "Income",
+                    type: "Wallet",
                     date: i.date,
-                    amount: Number(i.total),
+                    amount: Number(i.amount),
                     branch: i.branch,
-                    category: i.category,
+                    category: i.sub_category || i.category || "-",
                     method: i.invoice,
-                    description: i.description || "-",
+                    description: i.note || i.description || i.role || "-",
+                    user_name: i.user_name || i.name || "-",
                     color: "#B6F3C0",
                 }));
         } else {
+            // Use wallet entries for the "Wallet" tab for users (Only Income)
             latestIncomeOrWallet = [...filteredWalletEntries]
+                .filter(w => (w.type || "").toLowerCase() === 'income')
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5)
                 .map((w) => ({
@@ -254,56 +249,63 @@ export default function Dashboard() {
                     date: w.date,
                     amount: Number(w.amount),
                     branch: w.branch || "-",
-                    category: w.note || "Wallet",
-                    method: "",
-                    description: w.note || "-",
+                    category: w.sub_category || w.category || "Wallet",
+                    method: w.invoice || "",
+                    description: w.note || w.description || "-",
+                    user_name: w.user_name || w.name || "-",
                     color: "#00C49F",
+                }));
+
+            // Revert to showing only Expenses table data for "Expense" tab
+            latestExpense = [...filteredExpenses]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 5)
+                .map((e) => ({
+                    type: "Expense",
+                    date: e.date,
+                    amount: -Math.abs(Number(e.total)),
+                    category: e.sub_category,
+                    branch: e.branch,
+                    method: e.invoice,
+                    description: e.description || "-",
+                    user_name: e.user_name || "-",
+                    color: "#FFB0B0",
                 }));
         }
 
-        const latestExpense = [...filteredExpenses]
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 5)
-            .map((e) => ({
-                type: "Expense",
-                date: e.date,
-                amount: -Math.abs(Number(e.total)),
-                category: e.sub_category,
-                branch: e.branch,
-                method: e.invoice,
-                description: e.description || "-",
-                color: "#FFB0B0",
-            }));
-
         setRecentTransactions({
             income: latestIncomeOrWallet,
-            expense: latestExpense,
+            expense: user.role === "admin" ? [...filteredExpenses]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 5)
+                .map((e) => ({
+                    type: "Expense",
+                    date: e.date,
+                    amount: -Math.abs(Number(e.total)),
+                    category: e.sub_category,
+                    branch: e.branch,
+                    method: e.invoice,
+                    description: e.description || "-",
+                    user_name: e.user_name || "-",
+                    color: "#FFB0B0",
+                })) : latestExpense,
         });
     }, [filteredIncome, filteredExpenses, filteredWalletEntries]);
 
     // -------------------------
     // Charts (memoized)
     // -------------------------
-    const incomeChartData = useMemo(() => {
-        const map = {};
-        (filteredIncome || []).forEach((item) => {
-            const month = dayjs(item.date).format("MMM");
-            map[month] = (map[month] || 0) + Number(item.total);
-        });
-
-        return Object.keys(map).map((m) => ({ month: m, value: map[m] }));
-    }, [filteredIncome]);
-
     const walletChartData = useMemo(() => {
-        if (!user || user.role !== "user") return [];
         const map = {};
-        (filteredWalletEntries || []).forEach((item) => {
-            const month = dayjs(item.date).format("MMM");
-            map[month] = (map[month] || 0) + Number(item.amount);
-        });
+        (filteredWalletEntries || [])
+            .filter(item => (item.type || "").toLowerCase() === 'income')
+            .forEach((item) => {
+                const month = dayjs(item.date).format("MMM");
+                map[month] = (map[month] || 0) + Number(item.amount);
+            });
 
         return Object.keys(map).map((m) => ({ month: m, value: map[m] }));
-    }, [filteredWalletEntries, user]);
+    }, [filteredWalletEntries]);
 
     const expensePieData = useMemo(() => {
         const latestFive = [...expenseDataDb]
@@ -379,6 +381,22 @@ export default function Dashboard() {
                             <div className="quick-access-grid">
                                 {[
                                     {
+                                        icon: <Receipt size={18} />,
+                                        label: user?.role === "admin" ? "+ New Income" : "+ New Approve",
+                                        bg: "#006b29ff",
+                                        action: () => {
+                                            const currentUser = safeGetLocalStorage("loginDetails", {});
+                                            if (currentUser?.role === "admin") {
+                                                setOpenModal("income");
+                                                setMainCategory("Select Main Category");
+                                            } else {
+                                                setOpenModal("approval");
+                                                setMainCategory("Select Main Category");
+                                                setSubCategory("Select Category");
+                                            }
+                                        },
+                                    },
+                                    {
                                         icon: <Wallet size={18} />,
                                         label: "+ New Expense",
                                         bg: "#ff1b1bff",
@@ -386,19 +404,6 @@ export default function Dashboard() {
                                             setOpenModal("expense");
                                             setMainCategory("Select Main Category");
                                             setSubCategory("Select Category");
-                                        },
-                                    },
-                                    {
-                                        icon: <Receipt size={18} />,
-                                        label: "+ New Income",
-                                        bg: "#006b29ff",
-                                        action: () => {
-                                            const currentUser = JSON.parse(localStorage.getItem("loginDetails"));
-                                            if (currentUser?.role !== "admin") {
-                                                return CommonToaster("You do not have permission to add income", "error");
-                                            }
-                                            setOpenModal("income");
-                                            setMainCategory("Select Main Category");
                                         },
                                     },
                                 ].map((item, i) => (
@@ -418,65 +423,35 @@ export default function Dashboard() {
                                 <div className="chart-header">
                                     <h3>
                                         <TrendingUp size={18} style={{ marginRight: 8, color: "#d4af37" }} />
-                                        {user.role === "admin" ? "Income Cash Flow" : "Wallet Cash Flow"}
+                                        Wallet Cash Flow
                                     </h3>
                                 </div>
-                                {user.role === "admin" ? (
-                                    incomeChartData.length === 0 ? (
-                                        <NoDataBox title="No Data Found" subtitle="No Income Data available." />
-                                    ) : (
-                                        <ResponsiveContainer width="100%" height={260}>
-                                            <AreaChart data={incomeChartData}>
-                                                <defs>
-                                                    <linearGradient id="incomeCashFlow" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#d4af37" stopOpacity={0.8} />
-                                                        <stop offset="95%" stopColor="#d4af37" stopOpacity={0.1} />
-                                                    </linearGradient>
-                                                </defs>
-
-                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                                                <XAxis dataKey="month" stroke="#1c2431" fontSize={12} tickLine={false} />
-                                                <YAxis stroke="#1c2431" fontSize={12} tickLine={false} />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor: "#1c2431",
-                                                        borderRadius: "10px",
-                                                        border: "1px solid #d4af37",
-                                                        color: "#fff",
-                                                    }}
-                                                />
-                                                <Area type="monotone" dataKey="value" stroke="#d4af37" strokeWidth={3} fill="url(#incomeCashFlow)" />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    )
+                                {walletChartData.length === 0 ? (
+                                    <NoDataBox title="No Data Found" subtitle="No Wallet Data available." />
                                 ) : (
-                                    walletChartData.length === 0 ? (
-                                        <NoDataBox title="No Data Found" subtitle="No Wallet Data available." />
-                                    ) : (
-                                        <ResponsiveContainer width="100%" height={260}>
-                                            <AreaChart data={walletChartData}>
-                                                <defs>
-                                                    <linearGradient id="walletCashFlow" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#009688" stopOpacity={0.8} />
-                                                        <stop offset="95%" stopColor="#009688" stopOpacity={0.1} />
-                                                    </linearGradient>
-                                                </defs>
+                                    <ResponsiveContainer width="100%" height={260}>
+                                        <AreaChart data={walletChartData}>
+                                            <defs>
+                                                <linearGradient id="walletCashFlow" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#009688" stopOpacity={0.8} />
+                                                    <stop offset="95%" stopColor="#009688" stopOpacity={0.1} />
+                                                </linearGradient>
+                                            </defs>
 
-                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                                                <XAxis dataKey="month" stroke="#1c2431" fontSize={12} tickLine={false} />
-                                                <YAxis stroke="#1c2431" fontSize={12} tickLine={false} />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor: "#1c2431",
-                                                        borderRadius: "10px",
-                                                        border: "1px solid #009688",
-                                                        color: "#fff",
-                                                    }}
-                                                />
-                                                <Area type="monotone" dataKey="value" stroke="#009688" strokeWidth={3} fill="url(#walletCashFlow)" />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    )
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                                            <XAxis dataKey="month" stroke="#1c2431" fontSize={12} tickLine={false} />
+                                            <YAxis stroke="#1c2431" fontSize={12} tickLine={false} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: "#1c2431",
+                                                    borderRadius: "10px",
+                                                    border: "1px solid #009688",
+                                                    color: "#fff",
+                                                }}
+                                            />
+                                            <Area type="monotone" dataKey="value" stroke="#009688" strokeWidth={3} fill="url(#walletCashFlow)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
                                 )}
                             </motion.div>
 
@@ -564,7 +539,7 @@ export default function Dashboard() {
                                     className={`rt-tab ${activeTab === "income" ? "active" : ""}`}
                                     onClick={() => setActiveTab("income")}
                                 >
-                                    {user.role === "admin" ? "Income" : "Wallet"}
+                                    {user.role === "admin" ? "Wallet" : "Wallet"}
                                 </button>
                                 <button
                                     className={`rt-tab ${activeTab === "expense" ? "active" : ""}`}
@@ -581,6 +556,7 @@ export default function Dashboard() {
                                                 <th>Date</th>
                                                 <th>Category</th>
                                                 <th>Branch</th>
+                                                <th>Name</th>
                                                 <th>Amount</th>
                                                 <th>Invoice</th>
                                             </tr>
@@ -588,8 +564,8 @@ export default function Dashboard() {
                                         <tbody>
                                             {recentTransactions.income.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="5" className="no-data">
-                                                        <NoDataBox title="No Income Data Found" />
+                                                    <td colSpan="6" className="no-data">
+                                                        <NoDataBox title="No Wallet Data Found" />
                                                     </td>
                                                 </tr>
                                             ) : (
@@ -598,14 +574,15 @@ export default function Dashboard() {
                                                         <td>{dayjs(t.date).format("DD MMM YYYY")}</td>
                                                         <td>{t.category}</td>
                                                         <td>{t.branch}</td>
+                                                        <td>{t.user_name}</td>
                                                         <td className="positive">₹{Number(t.amount).toLocaleString()}</td>
                                                         <td>
-                                                            {t.method ? (
+                                                            {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
                                                                 <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>
                                                                     View
                                                                 </button>
                                                             ) : (
-                                                                <span className="no-invoice">No File</span>
+                                                                <span className="no-invoice">No Invoice</span>
                                                             )}
                                                         </td>
                                                     </motion.tr>
@@ -620,6 +597,7 @@ export default function Dashboard() {
                                                 <th>Date</th>
                                                 <th>Category</th>
                                                 <th>Branch</th>
+                                                <th>Spender Name</th>
                                                 <th>Amount</th>
                                                 <th>Invoice</th>
                                             </tr>
@@ -627,7 +605,7 @@ export default function Dashboard() {
                                         <tbody>
                                             {recentTransactions.expense.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="5" className="no-data">
+                                                    <td colSpan="6" className="no-data">
                                                         <NoDataBox title="No Expense Data Found" />
                                                     </td>
                                                 </tr>
@@ -637,14 +615,15 @@ export default function Dashboard() {
                                                         <td>{dayjs(t.date).format("DD MMM YYYY")}</td>
                                                         <td>{t.category}</td>
                                                         <td>{t.branch}</td>
+                                                        <td>{t.user_name}</td>
                                                         <td className="negative">-₹{Math.abs(t.amount)}</td>
                                                         <td>
-                                                            {t.method ? (
+                                                            {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
                                                                 <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>
                                                                     View
                                                                 </button>
                                                             ) : (
-                                                                <span className="no-invoice">No File</span>
+                                                                <span className="no-invoice">No Invoice</span>
                                                             )}
                                                         </td>
                                                     </motion.tr>
@@ -659,126 +638,11 @@ export default function Dashboard() {
                 </>
             )}
             {showInvoiceModal && currentInvoices.length > 0 && (
-                <div
-                    className="invoice-modal-backdrop"
-                    onClick={() => setShowInvoiceModal(false)}
-                >
-                    <div
-                        className="invoice-modal"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 15
-                            }}
-                        >
-                            <h3>
-                                Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})
-                            </h3>
-                            <button
-                                className="close-modal-btn"
-                                onClick={() => setShowInvoiceModal(false)}
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div style={{ position: "relative", textAlign: "center" }}>
-                            {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
-                                <button
-                                    className="invoice-nav-btn-left"
-                                    onClick={handlePrevInvoice}
-                                >
-                                    <ChevronLeft size={24} color="white" />
-                                </button>
-                            )}
-                            {isPDF(currentInvoices[currentInvoiceIndex]) ? (
-                                <div
-                                    style={{
-                                        width: "auto",
-                                        height: "500px",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        background: "#f5f5f5",
-                                        borderRadius: 10
-                                    }}
-                                >
-                                    <FileText size={80} color="#666" />
-                                    <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
-                                        PDF Document
-                                    </p>
-                                    <a
-                                        href={currentInvoices[currentInvoiceIndex]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            marginTop: 10,
-                                            fontSize: 14,
-                                            color: "#d4af37",
-                                            textDecoration: "underline",
-                                            cursor: "pointer"
-                                        }}
-                                    >
-                                        Open in New Tab
-                                    </a>
-                                </div>
-                            ) : (
-                                <img
-                                    src={currentInvoices[currentInvoiceIndex]}
-                                    alt="Invoice"
-                                    style={{
-                                        borderRadius: 10,
-                                        objectFit: "contain",
-                                        width: "500px",
-                                        height: "450px"
-                                    }}
-                                />
-                            )}
-                            {currentInvoices.length > 1 &&
-                                currentInvoiceIndex < currentInvoices.length - 1 && (
-                                    <button
-                                        className="invoice-nav-btn-right"
-                                        onClick={handleNextInvoice}
-                                    >
-                                        <ChevronRight size={24} color="white" />
-                                    </button>
-                                )}
-                        </div>
-
-                        {/* Dots Indicator */}
-                        {currentInvoices.length > 1 && (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "center",
-                                    gap: 8,
-                                    marginTop: 20
-                                }}
-                            >
-                                {currentInvoices.map((_, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setCurrentInvoiceIndex(idx)}
-                                        style={{
-                                            width: idx === currentInvoiceIndex ? 24 : 8,
-                                            height: 8,
-                                            borderRadius: 4,
-                                            background:
-                                                idx === currentInvoiceIndex ? "#d4af37" : "#ccc",
-                                            cursor: "pointer",
-                                            transition: "0.3s"
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <InvoicePreviewModal
+                    open={showInvoiceModal}
+                    onClose={() => setShowInvoiceModal(false)}
+                    invoices={currentInvoices}
+                />
             )}
         </>
     );

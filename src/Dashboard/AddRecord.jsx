@@ -33,7 +33,6 @@ import Filters from "../Filters/Filters";
 import Modals from "./Modals";
 import {
     getExpenseCategoriesApi,
-    getIncomeCategoriesApi,
     getExpensesApi,
     getIncomeApi,
 } from "../../Api/action";
@@ -95,7 +94,6 @@ export default function AddRecord() {
         async function loadInitial() {
             setLoading(true);
             const expCat = await getExpenseCategoriesApi();
-            const incCat = await getIncomeCategoriesApi();
             const grouped = expCat.reduce((acc, item) => {
                 const main = item.main_category;
                 const sub = item.sub_category;
@@ -104,7 +102,6 @@ export default function AddRecord() {
                 return acc;
             }, {});
             setExpenseCategories(grouped);
-            setIncomeCategories(incCat.map((item) => item.name));
             const incomeRes = await getIncomeApi();
             const expenseRes = await getExpensesApi();
             setOriginalIncome(incomeRes);

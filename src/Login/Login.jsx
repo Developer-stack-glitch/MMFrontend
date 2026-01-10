@@ -39,20 +39,10 @@ export default function Login() {
         <div className="login-bg">
             <div className="card-welcome">
 
-                <h3 className="welcome-title">Welcome back, Mika</h3>
+                <h3 className="welcome-title">ACTE's</h3>
+                <img className="login_logo" src="/images/login_logo.png" alt="" />
 
-                <img
-                    src="https://i.pravatar.cc/160?img=67"
-                    className="welcome-avatar"
-                    alt="user"
-                />
-
-                <button className="google-btn">
-                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="" />
-                    Continue with Google
-                </button>
-
-                <div className="divider">or</div>
+                <div className="divider">Login</div>
 
                 <form className="login-form"
                     onSubmit={onSubmit}

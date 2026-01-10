@@ -21,16 +21,31 @@ import {
     Plus,
     Wallet,
     Calendar,
+    StickyNote,
+    ArrowRight,
+    CalendarCheck,
+    Calendar as CalendarIcon,
+    ClockFading,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
 import "../css/Response.css";
+import "../css/Calendar.css";
 import Dashboard from "../Dashboard/Dashboard";
 import AddRecord from "../Dashboard/AddRecord";
 import AddCategories from "../Dashboard/AddCategeories";
 import IncomeExpense from "../Dashboard/IncomeExpense";
 import Approvals from "../Dashboard/Approvals";
-import { apiLogout, getExpenseCategoriesApi, getIncomeCategoriesApi, getUser } from "../../Api/action";
+import {
+    apiLogout,
+    getExpenseCategoriesApi,
+    getUser,
+    getPendingAlertsApi,
+    deleteEventApi,
+    moveEventToNextDayApi,
+    moveEventToNextMonthApi,
+    clearAuthData
+} from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
 import { getApprovalsApi } from "../../Api/action";
 import SettingPage from "../Dashboard/Settings";
@@ -59,6 +74,8 @@ export default function SideBarLayout() {
     const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [expenseCategories, setExpenseCategories] = useState({});
     const [incomeCategories, setIncomeCategories] = useState([]);
+    const [alerts, setAlerts] = useState([]);
+    const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
 
     const [isMobile, setIsMobile] = useState(false);
     const isAdmin = user?.role === "admin";
@@ -106,10 +123,20 @@ export default function SideBarLayout() {
     }, []);
 
     useEffect(() => {
+        loadAlerts();
+    }, []);
+
+    // Listen for calendar events updates
+    useEffect(() => {
+        const update = () => loadAlerts();
+        window.addEventListener("calendarEventsUpdated", update);
+
+        return () => window.removeEventListener("calendarEventsUpdated", update);
+    }, []);
+
+    useEffect(() => {
         async function loadCategories() {
             const exp = await getExpenseCategoriesApi();
-            const inc = await getIncomeCategoriesApi();
-
             const grouped = exp.reduce((acc, item) => {
                 const main = item.main_category;
                 const sub = item.sub_category;
@@ -121,7 +148,6 @@ export default function SideBarLayout() {
             }, {});
 
             setExpenseCategories(grouped);
-            setIncomeCategories(inc.map(item => item.name));
         }
 
         loadCategories();
@@ -147,6 +173,67 @@ export default function SideBarLayout() {
         }
     }
 
+    const loadAlerts = async () => {
+        try {
+            const response = await getPendingAlertsApi();
+            // Filter out completed events from alerts
+            const pendingAlerts = (response.alerts || []).filter(alert => alert.status !== 'completed');
+            setAlerts(pendingAlerts);
+
+            if (pendingAlerts.length > 0) {
+                setIsAlertModalVisible(true);
+            } else {
+                // Close modal if no pending alerts
+                setIsAlertModalVisible(false);
+            }
+        } catch (error) {
+            console.error("Error loading alerts:", error);
+        }
+    };
+
+    // Get color based on category
+    const getCategoryColor = (category) => {
+        const colors = {
+            work: "#3b82f6",
+            personal: "#8b5cf6",
+            health: "#10b981",
+            finance: "#f59e0b",
+            social: "#ec4899",
+            general: "#6b7280"
+        };
+        return colors[category] || colors.general;
+    };
+
+    // Handle alert actions
+    const handleAlertAction = async (eventId, action) => {
+        try {
+            switch (action) {
+                case "cancel":
+                    await deleteEventApi(eventId);
+                    CommonToaster("Event cancelled", "success");
+                    setIsAlertModalVisible(false);
+                    break;
+                case "nextDay":
+                    await moveEventToNextDayApi(eventId);
+                    CommonToaster("Event moved to next day", "success");
+                    setIsAlertModalVisible(false);
+                    break;
+                case "nextMonth":
+                    await moveEventToNextMonthApi(eventId);
+                    CommonToaster("Event moved to next month", "success");
+                    setIsAlertModalVisible(false);
+                    break;
+            }
+            await loadAlerts();
+            // Notify other components (like Calendar page) to update
+            window.dispatchEvent(new Event("calendarEventsUpdated"));
+        } catch (error) {
+            console.error("Error handling alert action:", error);
+            CommonToaster(error.message || "Failed to perform action", "error");
+        } finally {
+            setIsAlertModalVisible(false);
+        }
+    };
 
     const getInitials = (fullName) => {
         if (!fullName) return "";
@@ -158,7 +245,6 @@ export default function SideBarLayout() {
         }
         return (words[0][0] + words[1][0]).toUpperCase();
     };
-
 
     const menuKeyMap = {
         "/dashboard": "1",
@@ -214,10 +300,11 @@ export default function SideBarLayout() {
                     try {
                         await apiLogout();
                         navigate("/login");
-                        CommonToaster("Your'e logged out!", 'error')
-                        localStorage.removeItem("authToken");
+                        CommonToaster("Your'e logged out!", 'error');
                     } catch (e) {
                         console.error(e);
+                        clearAuthData();
+                        navigate("/login");
                     }
                 }
             }
@@ -234,7 +321,6 @@ export default function SideBarLayout() {
             </Button>
 
             {/* Add Category Modal */}
-
             <Modals
                 open={isCategoryModalOpen}
                 type="expense"
@@ -272,7 +358,7 @@ export default function SideBarLayout() {
                 <div onClick={() => {
                     navigate("/dashboard")
                 }} className="sider-header">
-                    <div className="logo-circle"><img src="/images/cashmaster_logo_main.png" alt="" /></div>
+                    {collapsed && <div className="logo-circle"><img src="/images/cashmaster_logo_main.png" alt="" /></div>}
                     {!collapsed && <img src="/images/cashmaster_logo.png" alt="" />}
                 </div>
 
@@ -344,8 +430,7 @@ export default function SideBarLayout() {
                         {isAdmin ? (
                             <Tooltip title="Approvals pending">
                                 <Button onClick={() => navigate("/approvals")} type="text" className="icon-btn notification-btn">
-                                    <Bell size={18} />
-
+                                    <ClockFading size={18} />
                                     {pendingCount > 0 && (
                                         <span className="pending-badge">{pendingCount}</span>
                                     )}
@@ -363,6 +448,17 @@ export default function SideBarLayout() {
                     </div>
                 </Header>
 
+                {/* Alert Banner */}
+                <div style={{ backgroundColor: "#261d011a" }}>
+                    {alerts.length > 0 && (
+                        <div className="alerts-banner" onClick={() => setIsAlertModalVisible(true)}>
+                            <span className="alert-icon">🔔</span>
+                            <span>You have {alerts.length} upcoming event(s)!</span>
+                            <button className="view-alerts-btn">View Alerts</button>
+                        </div>
+                    )}
+                </div>
+
                 {/* Main Content */}
                 <Content className="main-content">
                     <Routes>
@@ -377,6 +473,67 @@ export default function SideBarLayout() {
                     </Routes>
                 </Content>
             </Layout>
+
+            {/* Calendar Alerts Modal */}
+            <Modal
+                title="🔔 Today & Tomorrow's Events"
+                open={isAlertModalVisible}
+                onCancel={() => setIsAlertModalVisible(false)}
+                footer={null}
+                width={700}
+            >
+                <div className="alerts-container">
+                    {alerts.map((alert) => (
+                        <div key={alert.id} className="alert-card">
+                            <div className="alert-header">
+                                <h3>{alert.title}</h3>
+                                <span className="alert-category" style={{
+                                    backgroundColor: getCategoryColor(alert.category)
+                                }}>
+                                    {alert.category}
+                                </span>
+                            </div>
+                            {alert.description && (
+                                <p className="alert-description">{alert.description}</p>
+                            )}
+                            {alert.notes && (
+                                <div className="alert-notes">
+                                    <strong style={{ display: "flex", alignItems: "center", gap: "5px" }}><StickyNote color="#d4af37" size={14} />Notes:</strong>
+                                    <p>{alert.notes}</p>
+                                </div>
+                            )}
+                            <div className="alert-date">
+                                <CalendarIcon size={18} className="next-month-icon" /> {new Date(alert.event_date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                })}
+                            </div>
+                            <div className="alert-actions">
+                                <button
+                                    onClick={() => handleAlertAction(alert.id, "cancel")}
+                                    className="alert-btn cancel-alert-btn"
+                                >
+                                    <X size={20} className="cancel-icon" /> Cancel Event
+                                </button>
+                                <button
+                                    onClick={() => handleAlertAction(alert.id, "nextDay")}
+                                    className="alert-btn next-day-btn"
+                                >
+                                    <ArrowRight size={20} className="next-day-icon" /> Next Day
+                                </button>
+                                <button
+                                    onClick={() => handleAlertAction(alert.id, "nextMonth")}
+                                    className="alert-btn next-month-btn"
+                                >
+                                    <CalendarCheck size={20} className="next-month-icon" /> Next Month
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Modal>
         </Layout>
     );
 }

@@ -563,6 +563,19 @@ body {
   resize: vertical;
 }
 
+/* Smooth transitions for animated sections */
+.form-section>div {
+  overflow: hidden;
+}
+
+.form-section label,
+.form-section input,
+.form-section select,
+.form-section textarea,
+.form-section button {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
 .row {
   display: flex;
   gap: 10px;
@@ -745,6 +758,31 @@ body {
 }
 
 .ant-picker-header-view button:hover {
+  color: #d4af37 !important;
+}
+
+/* Branch Menu Group Styling */
+.ant-dropdown-menu-item-group-title {
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  color: #1c2431 !important;
+  padding: 8px 12px !important;
+  background: #f8f9fa !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+  letter-spacing: 0.5px !important;
+}
+
+.ant-dropdown-menu-item-group-list {
+  padding: 4px 0 !important;
+}
+
+.ant-dropdown-menu-item-group-list .ant-dropdown-menu-item {
+  padding: 8px 20px !important;
+  font-size: 14px !important;
+}
+
+.ant-dropdown-menu-item-group-list .ant-dropdown-menu-item:hover {
+  background: #fffbe6 !important;
   color: #d4af37 !important;
 }
 
@@ -1156,6 +1194,7 @@ body {
   padding: 22px;
   align-items: center;
   border-bottom: 1px solid #f0f0f0;
+  justify-items: start;
   transition: 0.25s ease;
 }
 
@@ -1595,6 +1634,16 @@ body {
 /* Body */
 .details-modal .ant-modal-body {
   padding: 24px 26px !important;
+}
+
+:where(.css-dev-only-do-not-override-ac2jek).ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #d4af37 !important;
+  border-color: #d4af37 !important;
+}
+
+:where(.css-dev-only-do-not-override-ac2jek).ant-checkbox-wrapper:not(.ant-checkbox-wrapper-disabled):hover .ant-checkbox-inner,
+:where(.css-dev-only-do-not-override-ac2jek).ant-checkbox:not(.ant-checkbox-disabled):hover .ant-checkbox-inner {
+  border-color: #d4af37 !important;
 }
 
 /* Info grid */
@@ -2103,12 +2152,20 @@ body {
   position: relative;
   padding: 20px;
   width: 40%;
-  height: 600px;
+  height: 90%;
   place-content: center;
   max-width: 900px;
   border-radius: 12px;
   animation: fadeIn 0.3s ease;
   overflow-y: auto;
+}
+
+:where(.css-dev-only-do-not-override-ac2jek).ant-table-wrapper .ant-table-row-expand-icon:hover {
+  color: #d4af37 !important;
+}
+
+:where(.css-dev-only-do-not-override-ac2jek).ant-table-wrapper .ant-table-row-expand-icon:focus {
+  color: #d4af37 !important;
 }
 
 .invoice-nav-btn-left {
@@ -2335,4 +2392,30 @@ body {
   .wallet-table-title {
     font-size: 18px;
   }
+}
+
+
+/* Simple Stat Pill */
+.simple-stat-pill {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+}
+
+.simple-stat-pill strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.simple-stat-pill.expense strong {
+  color: #ef4444;
+}
+
+.simple-stat-pill.approved strong {
+  color: #10b948;
 }

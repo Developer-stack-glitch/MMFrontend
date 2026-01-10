@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Input, DatePicker, Select, message } from "antd";
+import { Button, Input, DatePicker, Select, message, Modal } from "antd";
 import dayjs from "dayjs";
 import { addWalletApi, getUsersApi } from "../../Api/action";
 import {
@@ -13,12 +13,13 @@ import WalletBalanceTable from "./WalletBalance";
 export default function WalletPage() {
     const [amount, setAmount] = useState("");
     const [date, setDate] = useState(dayjs());
-    const [userId, setUserId] = useState("Select User");
+    const [userId, setUserId] = useState(null);
     const [branch, setBranch] = useState(null);
     const [note, setNote] = useState("");
-    const [users, setUsers] = useState(["Select User"]);
-    const formRef = React.useRef(null);
+    const [users, setUsers] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [reloadTable, setReloadTable] = useState(0);
+
     const branches = [
         "Velachery", "Anna Nagar", "Tambaram", "Porur", "Tnagar", "OMR", "Siruseri",
         "Thiruvanmiyur", "Maraimalai Nagar", "Electronic City", "BTM Layout",
@@ -54,9 +55,10 @@ export default function WalletPage() {
             CommonToaster("Wallet added successfully!", "success");
             setAmount("");
             setDate(dayjs());
-            setUserId("");
+            setUserId(null);
             setBranch(null);
             setNote("");
+            setIsModalOpen(false);
             setReloadTable(prev => prev + 1);
         } catch (err) {
             CommonToaster(err.message || "Error adding wallet", "error");
@@ -76,225 +78,145 @@ export default function WalletPage() {
             <WalletBalanceTable
                 onAddWallet={(user) => {
                     setUserId(user.id);
-                    formRef.current?.scrollIntoView({ behavior: "smooth" });
+                    setIsModalOpen(true);
                 }}
                 reloadTrigger={reloadTable}
             />
-            <div
-                style={{
-                    position: "absolute",
-                    top: "-80px",
-                    left: "-80px",
-                    width: "280px",
-                    height: "280px",
-                    background: "rgba(212,175,55,0.25)",
-                    filter: "blur(90px)",
-                    borderRadius: "50%",
-                    zIndex: 0,
-                }}
-            />
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: "-100px",
-                    right: "-100px",
-                    width: "320px",
-                    height: "320px",
-                    background: "rgba(100,120,255,0.25)",
-                    filter: "blur(110px)",
-                    borderRadius: "50%",
-                    zIndex: 0,
-                }}
-            />
-            <div
-                style={{
-                    position: "absolute",
-                    top: "50px",
-                    right: "20%",
-                    width: "180px",
-                    height: "180px",
-                    background: "rgba(255,200,120,0.25)",
-                    filter: "blur(90px)",
-                    borderRadius: "50%",
-                    zIndex: 0,
-                }}
-            />
-            <div
-                ref={formRef}
-                style={{
-                    position: "relative",
-                    zIndex: 2,
-                    display: "flex",
-                    justifyContent: "center",
-                }}
-            >
-                <div
-                    style={{
-                        width: "100%",
-                        maxWidth: "580px",
-                        background: "white",
-                        padding: "32px",
-                        borderRadius: "18px",
-                        boxShadow: "0 10px 35px rgba(0,0,0,0.08)",
-                        border: "1px solid #f1f1f1",
-                    }}
-                >
-                    <div style={{ textAlign: "center", marginBottom: 25 }}>
+
+            <Modal
+                title={
+                    <div style={{ textAlign: "center" }}>
                         <div
                             style={{
-                                width: 68,
-                                height: 68,
+                                width: 50,
+                                height: 50,
                                 borderRadius: "50%",
                                 background: "#d4af371a",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 margin: "auto",
+                                marginBottom: 10
                             }}
                         >
-                            <Wallet2 size={34} color="#d4af37" />
+                            <Wallet2 size={24} color="#d4af37" />
                         </div>
-                        <h2
-                            style={{
-                                marginTop: 14,
-                                fontWeight: 700,
-                                fontSize: 24,
-                                marginBottom: 5,
-                            }}
-                        >
-                            Add Wallet Amount
-                        </h2>
-                        <p style={{ color: "#777", marginTop: 4 }}>
+                        <h3 style={{ margin: 0, fontSize: 20 }}>Add Wallet Amount</h3>
+                        <p style={{ color: "#777", fontSize: 13, fontWeight: 400, marginTop: 4 }}>
                             Add funds to user wallet for tracking
                         </p>
                     </div>
-
-                    <div style={{ display: "grid", gap: 20 }}>
-                        {/* Wallet Amount */}
-                        <div className="wallet-input" style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
-                                Wallet Amount
-                            </label>
-                            <Input
-                                size="large"
-                                type="number"
-                                placeholder="Enter amount"
-                                prefix={<Wallet2 size={18} style={{ marginRight: 5 }} />}
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                style={{
-                                    borderRadius: 10,
-                                    height: 40,
-                                    fontSize: 15,
-                                }}
-                            />
-                        </div>
-                        {/* Added Date */}
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
-                                Add Date
-                            </label>
-                            <DatePicker
-                                size="large"
-                                value={date}
-                                onChange={setDate}
-                                style={{
-                                    width: "100%",
-                                    borderRadius: 10,
-                                    height: 40,
-                                    fontSize: 15,
-                                }}
-                                suffixIcon={<CalendarDays size={18} />}
-                            />
-                        </div>
-                        {/* Alloting For */}
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={{ fontWeight: 500, marginBottom: 0, fontSize: 16 }}>
-                                Alloting For
-                            </label>
-                            <Select
-                                size="large"
-                                placeholder="Select user"
-                                value={userId}
-                                onChange={setUserId}
-                                style={{
-                                    width: "100%",
-                                    borderRadius: 10,
-                                    height: 55,
-                                    fontSize: 15,
-                                    alignItems: "center"
-                                }}
-                                suffixIcon={<UsersRound size={18} />}
-                            >
-                                {users.map((u) => (
-                                    <Select.Option key={u.id} value={u.id}>
-                                        {u.name}
-                                    </Select.Option>
-                                ))}
-                            </Select>
-                        </div>
-                        {/* Branch */}
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={{ fontWeight: 500, marginBottom: 0, fontSize: 16 }}>
-                                Branch
-                            </label>
-                            <Select
-                                size="large"
-                                placeholder="Select Branch"
-                                value={branch}
-                                onChange={setBranch}
-                                style={{
-                                    width: "100%",
-                                    borderRadius: 10,
-                                    height: 55,
-                                    fontSize: 15,
-                                    alignItems: "center"
-                                }}
-                            >
-                                {branches.map((b) => (
-                                    <Select.Option key={b} value={b}>
-                                        {b}
-                                    </Select.Option>
-                                ))}
-                            </Select>
-                        </div>
-                        {/* Note */}
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={{ fontWeight: 500, marginBottom: 6, fontSize: 16 }}>
-                                Note
-                            </label>
-                            <Input.TextArea
-                                placeholder="Add a note (optional)"
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                style={{
-                                    borderRadius: 10,
-                                    fontSize: 15,
-                                }}
-                                rows={3}
-                            />
-                        </div>
-                        {/* Button */}
-                        <Button
-                            type="primary"
+                }
+                open={isModalOpen}
+                onCancel={() => setIsModalOpen(false)}
+                footer={null}
+                centered
+            >
+                <div style={{ display: "grid", gap: 15, marginTop: 20 }}>
+                    {/* Alloting For */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <label style={{ fontWeight: 500, marginBottom: 5, fontSize: 14 }}>
+                            Alloting For <span style={{ color: "red" }}>*</span>
+                        </label>
+                        <Select
                             size="large"
-                            onClick={handleSubmit}
-                            style={{
-                                height: 50,
-                                borderRadius: 12,
-                                background: "#d4af37",
-                                borderColor: "#d4af37",
-                                fontSize: 16,
-                                fontWeight: 600,
-                            }}
-                            block
+                            placeholder="Select user"
+                            value={userId}
+                            onChange={setUserId}
+                            style={{ width: "100%", borderRadius: 8 }}
                         >
-                            Add to Wallet
-                        </Button>
+                            {users.map((u) => (
+                                <Select.Option key={u.id} value={u.id}>
+                                    {u.name}
+                                </Select.Option>
+                            ))}
+                        </Select>
                     </div>
+
+                    {/* Wallet Amount */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <label style={{ fontWeight: 500, marginBottom: 5, fontSize: 14 }}>
+                            Wallet Amount <span style={{ color: "red" }}>*</span>
+                        </label>
+                        <Input
+                            size="large"
+                            type="number"
+                            placeholder="Enter amount"
+                            prefix={<span style={{ marginRight: 5, fontWeight: 600 }}>₹</span>}
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            style={{ borderRadius: 8 }}
+                        />
+                    </div>
+
+                    {/* Added Date */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <label style={{ fontWeight: 500, marginBottom: 5, fontSize: 14 }}>
+                            Add Date <span style={{ color: "red" }}>*</span>
+                        </label>
+                        <DatePicker
+                            size="large"
+                            value={date}
+                            onChange={setDate}
+                            style={{ width: "100%", borderRadius: 8 }}
+                            format="DD MMM YYYY"
+                        />
+                    </div>
+
+                    {/* Branch */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <label style={{ fontWeight: 500, marginBottom: 5, fontSize: 14 }}>
+                            Branch <span style={{ color: "red" }}>*</span>
+                        </label>
+                        <Select
+                            size="large"
+                            placeholder="Select Branch"
+                            value={branch}
+                            onChange={setBranch}
+                            style={{ width: "100%", borderRadius: 8 }}
+                        >
+                            {branches.map((b) => (
+                                <Select.Option key={b} value={b}>
+                                    {b}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </div>
+
+                    {/* Note */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <label style={{ fontWeight: 500, marginBottom: 5, fontSize: 14 }}>
+                            Note
+                        </label>
+                        <Input.TextArea
+                            placeholder="Add a note (optional)"
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            style={{ borderRadius: 8 }}
+                            rows={3}
+                        />
+                    </div>
+
+                    {/* Button */}
+                    <Button
+                        type="primary"
+                        size="large"
+                        onClick={handleSubmit}
+                        style={{
+                            height: 45,
+                            borderRadius: 10,
+                            background: "#d4af37",
+                            borderColor: "#d4af37",
+                            fontSize: 16,
+                            fontWeight: 600,
+                            marginTop: 10
+                        }}
+                        block
+                    >
+                        Add to Wallet
+                    </Button>
                 </div>
-            </div>
+            </Modal>
         </div>
     );
-
 }

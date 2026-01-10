@@ -4,12 +4,55 @@ import dayjs from "dayjs";
 
 const { RangePicker } = DatePicker;
 
-export default function Filters({ onFilterChange }) {
-    const [filterType, setFilterType] = useState("year");
-    const [compareMode, setCompareMode] = useState(false);
-    const [selectedValue, setSelectedValue] = useState(dayjs()); // ✅ default = current year
+export default function Filters({ onFilterChange, style }) {
+    // ✅ Load from sessionStorage or use defaults
+    const getInitialState = () => {
+        try {
+            const saved = sessionStorage.getItem("filterState");
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return {
+                    filterType: parsed.filterType || "year",
+                    compareMode: parsed.compareMode || false,
+                    selectedValue: parsed.selectedValue
+                        ? (Array.isArray(parsed.selectedValue)
+                            ? parsed.selectedValue.map(d => dayjs(d))
+                            : dayjs(parsed.selectedValue))
+                        : dayjs()
+                };
+            }
+        } catch (e) {
+            console.error("Error loading filter state:", e);
+        }
+        return {
+            filterType: "year",
+            compareMode: false,
+            selectedValue: dayjs()
+        };
+    };
 
-    // Notify Dashboard
+    const initialState = getInitialState();
+    const [filterType, setFilterType] = useState(initialState.filterType);
+    const [compareMode, setCompareMode] = useState(initialState.compareMode);
+    const [selectedValue, setSelectedValue] = useState(initialState.selectedValue);
+
+    // ✅ Save to sessionStorage whenever filters change
+    useEffect(() => {
+        try {
+            const stateToSave = {
+                filterType,
+                compareMode,
+                selectedValue: Array.isArray(selectedValue)
+                    ? selectedValue.map(d => d?.format?.("YYYY-MM-DD"))
+                    : selectedValue?.format?.("YYYY-MM-DD")
+            };
+            sessionStorage.setItem("filterState", JSON.stringify(stateToSave));
+        } catch (e) {
+            console.error("Error saving filter state:", e);
+        }
+    }, [filterType, compareMode, selectedValue]);
+
+    // Notify parent component
     useEffect(() => {
         if (onFilterChange) {
             onFilterChange({
@@ -21,7 +64,7 @@ export default function Filters({ onFilterChange }) {
     }, [filterType, compareMode, selectedValue]);
 
     return (
-        <div className="filters-premium-container">
+        <div className="filters-premium-container" style={style}>
 
             {/* FILTER TABS */}
             <div className="filter-type-tabs">
@@ -90,6 +133,7 @@ export default function Filters({ onFilterChange }) {
                 <input
                     type="checkbox"
                     id="compare_toggle"
+                    checked={compareMode}
                     onChange={(e) => {
                         setCompareMode(e.target.checked);
                         setSelectedValue(null);

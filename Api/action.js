@@ -49,6 +49,40 @@ const handleModalClose = () => {
     window.dispatchEvent(new Event("tokenExpireUpdated"));
 };
 
+// ====================== SAFE LOCALSTORAGE HELPERS ======================
+// ✅ Safely parse localStorage with validation
+export const safeGetLocalStorage = (key, defaultValue = null) => {
+    try {
+        const item = localStorage.getItem(key);
+        if (!item) return defaultValue;
+
+        const parsed = JSON.parse(item);
+
+        // Validate the parsed data structure
+        if (key === "loginDetails" && parsed) {
+            // Ensure required fields exist
+            if (!parsed.id || !parsed.role) {
+                console.warn("Invalid loginDetails structure, clearing...");
+                localStorage.removeItem(key);
+                return defaultValue;
+            }
+        }
+
+        return parsed;
+    } catch (error) {
+        console.error(`Error parsing localStorage key "${key}":`, error);
+        localStorage.removeItem(key); // Clear corrupted data
+        return defaultValue;
+    }
+};
+
+// ✅ Clear all auth-related data
+export const clearAuthData = () => {
+    localStorage.removeItem("AccessToken");
+    localStorage.removeItem("loginDetails");
+    sessionStorage.clear();
+};
+
 // ====================== REQUEST INTERCEPTOR ======================
 api.interceptors.request.use(
     (config) => {
@@ -57,6 +91,7 @@ api.interceptors.request.use(
         if (token) {
             if (isTokenExpired(token)) {
                 showExpiredModal();
+                clearAuthData();
                 return Promise.reject(new Error("Token expired"));
             }
 
@@ -66,6 +101,23 @@ api.interceptors.request.use(
         return config;
     },
     (error) => Promise.reject(error)
+);
+
+// ====================== RESPONSE INTERCEPTOR ======================
+// ✅ Handle 401 errors and clear stale data
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            console.warn("401 Unauthorized - Clearing auth data");
+            clearAuthData();
+
+            if (!isModalVisible) {
+                showExpiredModal();
+            }
+        }
+        return Promise.reject(error);
+    }
 );
 
 // ================================================================
@@ -92,12 +144,11 @@ export const apiLogin = async (payload) => {
 export const apiLogout = async () => {
     try {
         const res = await api.post("/api/auth/logout");
-
-        localStorage.removeItem("AccessToken");
-        localStorage.removeItem("loginDetails");
-
+        clearAuthData();
         return res.data;
     } catch (err) {
+        // Even if the API call fails, clear local data
+        clearAuthData();
         throw err?.response?.data || err;
     }
 };
@@ -140,7 +191,11 @@ export const addIncomeCategoryApi = async (payload) => {
 // ✅ ADD EXPENSE
 export const addExpenseApi = async (payload) => {
     try {
-        const res = await api.post("/api/transactions/add-expense", payload);
+        const config = {};
+        if (payload instanceof FormData) {
+            config.headers = { 'Content-Type': 'multipart/form-data' };
+        }
+        const res = await api.post("/api/transactions/add-expense", payload, config);
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
@@ -150,7 +205,25 @@ export const addExpenseApi = async (payload) => {
 // ✅ ADD INCOME
 export const addIncomeApi = async (payload) => {
     try {
-        const res = await api.post("/api/transactions/add-income", payload);
+        const config = {};
+        if (payload instanceof FormData) {
+            config.headers = { 'Content-Type': 'multipart/form-data' };
+        }
+        const res = await api.post("/api/transactions/add-income", payload, config);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ ADD APPROVAL
+export const addApprovalApi = async (payload) => {
+    try {
+        const config = {};
+        if (payload instanceof FormData) {
+            config.headers = { 'Content-Type': 'multipart/form-data' };
+        }
+        const res = await api.post("/api/transactions/add-approval", payload, config);
         return res.data;
     } catch (err) {
         throw err?.response?.data || err;
@@ -225,9 +298,38 @@ export const addWalletApi = async (payload) => {
     }
 };
 
+// ====================== VENDORS ======================
+export const getVendorsApi = async () => {
+    const res = await api.get("/api/wallet/vendors");
+    return res.data;
+};
+
+export const addVendorApi = async (payload) => {
+    const res = await api.post("/api/wallet/add-vendor", payload);
+    return res.data;
+};
 
 export const getWalletEntriesApi = async (userId) => {
     const res = await api.get(`/api/wallet/wallet/${userId}`);
+    return res.data;
+};
+
+// GET ALL WALLET DETAILS
+export const getAllWalletDetailsApi = async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/wallet/wallet-details?${queryString}` : '/api/wallet/wallet-details';
+
+    const res = await api.get(endpoint);
+    return res.data;
+};
+
+// GET ALL TRANSACTION FOR ADMIN
+export const getAllWalletTransactionsApi = async () => {
+    const res = await api.get("/api/wallet/all-wallet-transactions");
     return res.data;
 };
 
@@ -242,7 +344,11 @@ export const getIncomePaginatedApi = async (page, limit = 10) => {
 };
 
 export const editExpenseApi = async (payload) => {
-    return await api.post("/api/transactions/edit-expense", payload);
+    const config = {};
+    if (payload instanceof FormData) {
+        config.headers = { 'Content-Type': 'multipart/form-data' };
+    }
+    return await api.post("/api/transactions/edit-expense", payload, config);
 };
 
 export const getUserAllExpensesApi = async () => {
@@ -376,3 +482,12 @@ export const searchEventsApi = async (query) => {
     }
 };
 
+// ✅ MARK EVENT AS COMPLETED
+export const markEventCompletedApi = async (eventId) => {
+    try {
+        const res = await api.post(`/api/calendar/event/${eventId}/complete`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};

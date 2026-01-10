@@ -14,6 +14,7 @@ import {
 import { CommonToaster } from "../../Common/CommonToaster";
 import Filters from "../Filters/Filters";
 import { FullPageLoader } from "../../Common/FullPageLoader";
+import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 
 export default function Approvals() {
     const [filters, setFilters] = useState({
@@ -29,7 +30,6 @@ export default function Approvals() {
     // Invoice Modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [currentInvoices, setCurrentInvoices] = useState([]);
-    const [currentInvoiceIndex, setCurrentInvoiceIndex] = useState(0);
     // ✅ Details Modal
     const [showDetails, setShowDetails] = useState(false);
     const [selected, setSelected] = useState(null);
@@ -70,7 +70,7 @@ export default function Approvals() {
             setRequests((prev) => prev.filter((r) => r.id !== row.id));
             window.dispatchEvent(new Event("incomeExpenseUpdated"));
 
-            CommonToaster("Approved and added to expenses!", "success");
+            CommonToaster("Approved and added to wallet!", "success");
             setShowDetails(false);
         } catch (err) {
             CommonToaster("Error approving!", "error");
@@ -141,9 +141,17 @@ export default function Approvals() {
             if (!entry) return null;
             let str = String(entry).trim();
             str = str.replace(/^"+|"+$/g, "");
+            // If it's a base64 data URL, return as-is
             if (str.startsWith("data:")) {
                 return str;
             }
+
+            // If it already starts with /uploads/invoices/, just prepend API_BASE
+            if (str.startsWith("/uploads/invoices/")) {
+                return `${API_BASE}${str}`;
+            }
+
+            // Otherwise, construct the full path
             return `${API_BASE}/uploads/invoices/${str}`;
         };
         if (Array.isArray(invoiceData)) {
@@ -167,17 +175,7 @@ export default function Approvals() {
         }
         if (!invoicesArray.length) return;
         setCurrentInvoices(invoicesArray);
-        setCurrentInvoiceIndex(0);
         setShowInvoiceModal(true);
-    };
-
-    const handleNextInvoice = () => {
-        setCurrentInvoiceIndex((prev) =>
-            prev < currentInvoices.length - 1 ? prev + 1 : prev
-        );
-    };
-    const handlePrevInvoice = () => {
-        setCurrentInvoiceIndex((prev) => (prev > 0 ? prev - 1 : prev));
     };
 
     let filteredRows = applyFilters(requests);
@@ -287,6 +285,8 @@ export default function Approvals() {
                                     <tr className="table-header">
                                         <th>SPENDER NAME</th>
                                         <th>CATEGORY</th>
+                                        <th>VENDOR</th>
+                                        <th>DESCRIPTION</th>
                                         <th>AMOUNT</th>
                                         <th>INVOICE</th>
                                         <th>REQUEST DATE</th>
@@ -299,16 +299,16 @@ export default function Approvals() {
                                 <tbody>
                                     {filteredRows.length === 0 ? (
                                         <tr>
-                                            <td></td>
-                                            <td></td>
-                                            <td colSpan="6" className="no-data-box">
-                                                <img
-                                                    src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
-                                                    alt="no data"
-                                                    className="no-data-img"
-                                                />
-                                                <h3>No Data Found</h3>
-                                                <p>No approval requests available.</p>
+                                            <td colSpan="9">
+                                                <div className="no-data-box" style={{ textAlign: "center", padding: "40px 0" }}>
+                                                    <img
+                                                        src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
+                                                        alt="no data"
+                                                        className="no-data-img"
+                                                    />
+                                                    <h3>No Data Found</h3>
+                                                    <p>No approval requests available.</p>
+                                                </div>
                                             </td>
                                         </tr>
                                     ) : (
@@ -337,18 +337,37 @@ export default function Approvals() {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                {/* 3️⃣ AMOUNT */}
+                                                {/* VENDOR */}
+                                                <td>
+                                                    <div className="description-cell">
+                                                        {row.vendor_name ? (
+                                                            <>
+                                                                <b>{row.vendor_name}</b>
+                                                                {row.vendor_number && <div style={{ fontSize: 11, color: '#666' }}>{row.vendor_number}</div>}
+                                                            </>
+                                                        ) : (
+                                                            row.transaction_to || "-"
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                {/* 3️⃣ DESCRIPTION */}
+                                                <td>
+                                                    <div className="description-cell">
+                                                        {row.description || row.role || "-"}
+                                                    </div>
+                                                </td>
+                                                {/* 4️⃣ AMOUNT */}
                                                 <td>
                                                     {fmtAmt(row.amount)}<br></br>
-                                                    {row.original_expense_id && (
+                                                    {Boolean(row.original_expense_id || row.is_edit) && (
                                                         <span className="editable-pill">
                                                             Editable
                                                         </span>
                                                     )}
                                                 </td>
-                                                {/* 4️⃣ INVOICE */}
+                                                {/* 5️⃣ INVOICE */}
                                                 <td>
-                                                    {row.invoice ? (
+                                                    {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" ? (
                                                         <button
                                                             className="view-invoice-btn"
                                                             onClick={() =>
@@ -358,7 +377,7 @@ export default function Approvals() {
                                                             View
                                                         </button>
                                                     ) : (
-                                                        <span className="no-invoice">No File</span>
+                                                        <span className="no-invoice">No Invoice</span>
                                                     )}
                                                 </td>
                                                 {/* 5️⃣ Request DATE */}
@@ -424,9 +443,12 @@ export default function Approvals() {
                                     <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
                                     <div><b>Request Date:</b> {fmtDate(selected.date)}</div>
                                     <div><b>End Date:</b> {fmtDate(selected.end_date)}</div>
-                                    <div><b>Vendor Name:</b> {selected.vendor_name}</div>
-                                    <div><b>Vendor Number:</b> {selected.vendor_number}</div>
-                                    <div><b>Spend Mode:</b> {selected.spend_mode}</div>
+                                    <div><b>GST:</b> {selected.gst}</div>
+                                    <div><b>Transaction From:</b> {selected.transaction_from}</div>
+                                    <div><b>Vendor:</b> {selected.vendor_name || selected.transaction_to || "-"}</div>
+                                    <div><b>Vendor Number:</b> {selected.vendor_number || "-"}</div>
+                                    <div><b>Transaction From:</b> {selected.transaction_from}</div>
+                                    <div><b>Transaction To:</b> {selected.transaction_to}</div>
                                     <div
                                         style={{
                                             display: "flex",
@@ -454,126 +476,11 @@ export default function Approvals() {
                 </>
             )}
             {showInvoiceModal && currentInvoices.length > 0 && (
-                <div
-                    className="invoice-modal-backdrop"
-                    onClick={() => setShowInvoiceModal(false)}
-                >
-                    <div
-                        className="invoice-modal"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 15
-                            }}
-                        >
-                            <h3>
-                                Invoice Preview ({currentInvoiceIndex + 1} of {currentInvoices.length})
-                            </h3>
-                            <button
-                                className="close-modal-btn"
-                                onClick={() => setShowInvoiceModal(false)}
-                            >
-                                <Icons.X size={20} />
-                            </button>
-                        </div>
-
-                        <div style={{ position: "relative", textAlign: "center" }}>
-                            {currentInvoices.length > 1 && currentInvoiceIndex > 0 && (
-                                <button
-                                    className="invoice-nav-btn-left"
-                                    onClick={handlePrevInvoice}
-                                >
-                                    <Icons.ChevronLeft size={24} color="white" />
-                                </button>
-                            )}
-                            {currentInvoices[currentInvoiceIndex]?.includes("application/pdf") ? (
-                                <div
-                                    style={{
-                                        width: "auto",
-                                        height: "500px",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        background: "#f5f5f5",
-                                        borderRadius: 10
-                                    }}
-                                >
-                                    <Icons.FileText size={80} color="#666" />
-                                    <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
-                                        PDF Document
-                                    </p>
-                                    <a
-                                        href={currentInvoices[currentInvoiceIndex]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            marginTop: 10,
-                                            fontSize: 14,
-                                            color: "#d4af37",
-                                            textDecoration: "underline",
-                                            cursor: "pointer"
-                                        }}
-                                    >
-                                        Open in new tab
-                                    </a>
-                                </div>
-                            ) : (
-                                <img
-                                    src={currentInvoices[currentInvoiceIndex]}
-                                    alt="Invoice"
-                                    style={{
-                                        borderRadius: 10,
-                                        objectFit: "contain",
-                                        width: "500px",
-                                        height: "450px"
-                                    }}
-                                />
-                            )}
-                            {currentInvoices.length > 1 &&
-                                currentInvoiceIndex < currentInvoices.length - 1 && (
-                                    <button
-                                        className="invoice-nav-btn-right"
-                                        onClick={handleNextInvoice}
-                                    >
-                                        <Icons.ChevronRight size={24} color="white" />
-                                    </button>
-                                )}
-                        </div>
-
-                        {/* Dots Indicator */}
-                        {currentInvoices.length > 1 && (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "center",
-                                    gap: 8,
-                                    marginTop: 20
-                                }}
-                            >
-                                {currentInvoices.map((_, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setCurrentInvoiceIndex(idx)}
-                                        style={{
-                                            width: idx === currentInvoiceIndex ? 24 : 8,
-                                            height: 8,
-                                            borderRadius: 4,
-                                            background:
-                                                idx === currentInvoiceIndex ? "#d4af37" : "#ccc",
-                                            cursor: "pointer",
-                                            transition: "0.3s"
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <InvoicePreviewModal
+                    open={showInvoiceModal}
+                    onClose={() => setShowInvoiceModal(false)}
+                    invoices={currentInvoices}
+                />
             )}
         </>
     );

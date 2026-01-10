@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { createUserApi, getUsersApi, deleteUserApi } from "../../Api/action";
+import { createUserApi, getUsersApi, deleteUserApi, safeGetLocalStorage } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
 import { Input, Select, Button, Card, Popconfirm } from "antd";
 import { FullPageLoader } from "../../Common/FullPageLoader";
@@ -18,7 +18,7 @@ export default function SettingPage() {
     const [submitting, setSubmitting] = useState(false);
 
     // ✅ logged-in user
-    const currentUser = JSON.parse(localStorage.getItem("loginDetails"));
+    const currentUser = safeGetLocalStorage("loginDetails", {});
 
     // ✅ Load all users
     const loadUsers = async () => {

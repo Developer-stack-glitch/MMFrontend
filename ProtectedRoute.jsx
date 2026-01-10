@@ -1,12 +1,15 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { safeGetLocalStorage } from "./Api/action";
 
 export default function ProtectedRoute({ children }) {
     const token = localStorage.getItem("AccessToken");
-    const user = JSON.parse(localStorage.getItem("loginDetails") || "{}");
+    const user = safeGetLocalStorage("loginDetails", {});
     const location = useLocation();
-    if (!token) {
+
+    if (!token || !user || !user.id) {
         return <Navigate to="/login" replace />;
     }
+
     if (user?.role === "user") {
         const blockedRoutes = ["/approvals", "/wallet"];
 
