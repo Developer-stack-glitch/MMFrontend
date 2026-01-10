@@ -299,8 +299,6 @@ export default function IncomeExpense() {
                     icon: <DynamicIcon size={20} />,
                     invoice: item.invoice,
                     color: item.color || item.categoryColor,
-                    invoice: item.invoice,
-                    color: item.color || item.categoryColor,
                     gst: item.gst,
                     vendorName: item.vendor_name,
                     vendorNumber: item.vendor_number,
