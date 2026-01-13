@@ -40,6 +40,33 @@ export default function IncomeExpense() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [currentInvoices, setCurrentInvoices] = useState([]);
 
+    // Vendor Details Modal
+    const [showVendorModal, setShowVendorModal] = useState(false);
+    const [selectedVendorStats, setSelectedVendorStats] = useState(null);
+
+    const handleViewVendor = (row) => {
+        const vName = row.vendorName || row.transaction_to;
+        if (!vName) return;
+
+        // Calculate total for this vendor
+        const relevantExpenses = expenseData.filter(e =>
+            (e.vendor_name === vName) || (e.transaction_to === vName)
+        );
+        const totalPaid = relevantExpenses.reduce((sum, e) => {
+            const val = parseFloat(String(e.total || e.amount || 0).replace(/[^0-9.-]+/g, "")) || 0;
+            return sum + val;
+        }, 0);
+
+        setSelectedVendorStats({
+            name: vName,
+            number: row.vendorNumber || "-",
+            gst: row.vendorGst || "-",
+            totalPaid: fmtAmt(totalPaid),
+            count: relevantExpenses.length
+        });
+        setShowVendorModal(true);
+    };
+
     // Filters
     const [filterCategory, setFilterCategory] = useState("All");
     const [filterName, setFilterName] = useState("All");
@@ -276,6 +303,7 @@ export default function IncomeExpense() {
                     color: item.color,
                     vendorName: item.vendor_name,
                     vendorNumber: item.vendor_number,
+                    vendorGst: item.vendor_gst,
                     spendMode: item.spend_mode,
                     original_expense_id: item.original_expense_id,
                     gst: item.gst,
@@ -423,12 +451,28 @@ export default function IncomeExpense() {
         resetForm();
     };
 
+    const handleQuickAddExpense = (item) => {
+        setEditData(null); // Ensure it's treated as a new entry, not an edit
+        setBranch(item.branch || "Select Branch");
+        setDate(item.date ? dayjs(item.date).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
+        // Check for total/amount key
+        setTotal(item.amount || item.total || "");
+        setMainCategory(item.main_category || "Select Main Category");
+        setSubCategory(item.sub_category || item.category || "Select Category");
+        // Approval description is often in 'role' or 'description'
+        setDescription(item.description || item.role || "");
+        setVendorName(item.vendor_name || "");
+        setVendorNumber(item.vendor_number || "");
+
+        // Open Expense Modal
+        setOpenModal("expense");
+    };
+
     const isApprovalTab = activeTab === "approval";
-    const gridStyle = { gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0fr" };
+    const gridStyle = { gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0fr" };
+    // Always show action column now
     const approvalGridStyle = {
-        gridTemplateColumns: userRole === "admin"
-            ? "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr"
-            : "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.8fr"
+        gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 0.5fr"
     };
 
     return (
@@ -578,12 +622,11 @@ export default function IncomeExpense() {
                                                 <>
                                                     <div>DESCRIPTION</div>
                                                     <div>BRANCH</div>
-                                                    <div>VENDOR</div>
                                                     <div>AMOUNT</div>
                                                     <div>GST</div>
                                                     <div>END DATE</div>
                                                     <div>STATUS</div>
-                                                    {userRole !== "admin" && <div>ACTION</div>}
+                                                    <div>ACTION</div>
                                                 </>
                                             ) : (
                                                 <>
@@ -650,14 +693,6 @@ export default function IncomeExpense() {
                                                         <>
                                                             <div>{row.note}</div>
                                                             <div>{row.report}</div>
-                                                            <div className="vendor-col">
-                                                                {row.vendorName ? (
-                                                                    <>
-                                                                        <span className="title">{row.vendorName}</span>
-                                                                        {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
-                                                                    </>
-                                                                ) : row.transaction_to || "-"}
-                                                            </div>
                                                             <div>{row.amount}<br></br>
                                                                 {Boolean(row.is_edit) && <span className="editable-pill">Editable</span>}
                                                             </div>
@@ -670,16 +705,30 @@ export default function IncomeExpense() {
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            {userRole !== "admin" && (
-                                                                <div>
-                                                                    {/* Action for Approval */}
+                                                            <div>
+                                                                {userRole === "admin" ? (
                                                                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                                                                         <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
                                                                             <Icons.Edit size={16} />
                                                                         </button>
                                                                     </div>
-                                                                </div>
-                                                            )}
+                                                                ) : (
+                                                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                                        <button
+                                                                            className="edit-btn"
+                                                                            onClick={() => handleQuickAddExpense(row.originalItem || row)}
+                                                                            title="Add to Expense"
+                                                                            style={{
+                                                                                backgroundColor: '#edf7ed',
+                                                                                color: '#2e7d32',
+                                                                                border: '1px solid #c8e6c9'
+                                                                            }}
+                                                                        >
+                                                                            Expense <Plus size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </>
                                                     ) : (
                                                         <>
@@ -687,18 +736,34 @@ export default function IncomeExpense() {
                                                                 {row.description || "-"}
                                                             </div>
                                                             <div className="vendor-col">
-                                                                {row.vendorName ? (
-                                                                    <>
-                                                                        <span className="title">{row.vendorName}</span>
-                                                                        {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
-                                                                    </>
-                                                                ) : row.transaction_to || "-"}
+                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                                    {row.vendorName ? (
+                                                                        <>
+                                                                            <span className="title">{row.vendorName}</span>
+                                                                            {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
+                                                                        </>
+                                                                    ) : (
+                                                                        <span className="title">{row.transaction_to || "-"}</span>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => handleViewVendor(row)}
+                                                                        className="view-invoice-btn"
+                                                                        style={{
+                                                                            fontSize: '10px',
+                                                                            padding: '2px 6px',
+                                                                            marginTop: '4px',
+                                                                            height: 'auto',
+                                                                            lineHeight: 'normal'
+                                                                        }}
+                                                                    >
+                                                                        View Info
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                             <div className="vendor-col">
                                                                 {row.transaction_from ? (
                                                                     <>
-                                                                        <span className="title">From: {row.transaction_from}</span>
-                                                                        <span className="date">To: {row.transaction_to}</span>
+                                                                        <span className="title">{row.transaction_from}</span>
                                                                     </>
                                                                 ) : "-"}
                                                             </div>
@@ -764,6 +829,46 @@ export default function IncomeExpense() {
                     invoices={currentInvoices}
                 />
             )}
+
+            {/* Vendor Stats Modal */}
+            <AnimatePresence>
+                {showVendorModal && selectedVendorStats && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }} onClick={() => setShowVendorModal(false)}>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            style={{
+                                background: '#fff', padding: '24px', borderRadius: '12px',
+                                width: '350px', maxWidth: '90%'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <h3 style={{ marginTop: 0, marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                                Vendor Details
+                            </h3>
+                            <div style={{ display: 'grid', gap: '12px', fontSize: '14px' }}>
+                                <div><strong>Name:</strong> {selectedVendorStats.name}</div>
+                                <div><strong>Number:</strong> {selectedVendorStats.number}</div>
+                                <div><strong>GST Number:</strong> {selectedVendorStats.gst}</div>
+                                <div style={{ marginTop: '10px', fontSize: '16px', color: '#d4af37' }}>
+                                    <strong>Total Paid:</strong> {selectedVendorStats.totalPaid}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#888' }}>
+                                    (Across {selectedVendorStats.count} transactions)
+                                </div>
+                            </div>
+                            <div style={{ marginTop: '24px', textAlign: 'right' }}>
+                                <Button onClick={() => setShowVendorModal(false)}>Close</Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </>
     );
 }

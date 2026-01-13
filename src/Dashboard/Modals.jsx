@@ -35,6 +35,7 @@ export default function Modals({
     const [invoiceFiles, setInvoiceFiles] = useState([]); // Actual File objects for upload
     const [spendMode, setSpendMode] = useState("Select Spend Mode");
     const [gst, setGst] = useState("No");
+    const [vendorGst, setVendorGst] = useState(""); // Vendor's GST Number
     const [activeModalTab, setActiveModalTab] = useState(type);
     const [transactionFrom, setTransactionFrom] = useState(null);
     const [transactionTo, setTransactionTo] = useState("");
@@ -47,6 +48,10 @@ export default function Modals({
     const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
     const [newVendorName, setNewVendorName] = useState("");
     const [newVendorNumber, setNewVendorNumber] = useState("");
+    const [newVendorCompany, setNewVendorCompany] = useState("");
+    const [newVendorGst, setNewVendorGst] = useState("");
+    const [newVendorEmail, setNewVendorEmail] = useState("");
+    const [newVendorAddress, setNewVendorAddress] = useState("");
 
     // Add Category Modal State
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -102,6 +107,7 @@ export default function Modals({
 
             // Vendor & End Date
             setGst(editData.gst === "Yes" || editData.gst === true ? "Yes" : "No");
+            setVendorGst(editData.vendor_gst || "");
             setTransactionFrom(editData.transaction_from || null);
             setTransactionTo(editData.transaction_to || "");
             setEndDate(editData.end_date ? dayjs(editData.end_date) : null);
@@ -113,6 +119,7 @@ export default function Modals({
             setSpendMode("Select Spend Mode");
 
             setGst("No");
+            setVendorGst("");
             setTransactionFrom(null);
             setTransactionTo("");
             setEndDate(null);
@@ -159,8 +166,18 @@ export default function Modals({
 
     const handleSaveNewVendor = async () => {
         if (!newVendorName) return CommonToaster("Vendor name is required", "error");
+        if (!newVendorCompany) return CommonToaster("Company name is required", "error");
+        if (!newVendorGst) return CommonToaster("GST number is required", "error");
+        if (!newVendorNumber) return CommonToaster("Vendor number is required", "error");
         try {
-            await addVendorApi({ name: newVendorName, number: newVendorNumber });
+            await addVendorApi({
+                name: newVendorName,
+                number: newVendorNumber,
+                company_name: newVendorCompany,
+                gst: newVendorGst,
+                email: newVendorEmail,
+                address: newVendorAddress
+            });
             CommonToaster("Vendor added!", "success");
             const updatedVendors = await getVendorsApi();
             setVendorList(updatedVendors);
@@ -168,6 +185,10 @@ export default function Modals({
             setIsAddVendorOpen(false);
             setNewVendorName("");
             setNewVendorNumber("");
+            setNewVendorCompany("");
+            setNewVendorGst("");
+            setNewVendorEmail("");
+            setNewVendorAddress("");
         } catch (err) {
             CommonToaster("Failed to add vendor", "error");
         }
@@ -189,7 +210,12 @@ export default function Modals({
 
         if (activeModalTab === "approval" || activeModalTab === "edit-approval" || activeModalTab === "expense") {
             if (!transactionFrom) return CommonToaster("Select Transaction From", "error");
-            if (!transactionTo) return CommonToaster("Select Vendor", "error");
+
+            // Vendor is only required for Expenses now
+            if (activeModalTab === "expense" && !transactionTo) {
+                return CommonToaster("Select Vendor", "error");
+            }
+
             if (!description || !description.trim()) return CommonToaster("Enter Description", "error");
             if (invoices.length === 0) return CommonToaster("Upload Invoice", "error");
         }
@@ -222,15 +248,18 @@ export default function Modals({
             // Handle Vendor Details
             let vName = transactionTo || "";
             let vNumber = "";
+            let vGst = vendorGst || "";
 
             if (vendorType === "Regular") {
                 const foundVendor = vendorList.find(v => v.name === transactionTo);
                 if (foundVendor) {
                     vNumber = foundVendor.number || "";
+                    vGst = foundVendor.gst || ""; // Auto-fetch GST for regular vendor
                 }
             }
             formData.append("vendor_name", vName);
             formData.append("vendor_number", vNumber);
+            formData.append("vendor_gst", vGst);
 
             formData.append("end_date", endDate ? endDate.format("YYYY-MM-DD") : "");
 
@@ -258,6 +287,7 @@ export default function Modals({
                     transaction_to: transactionTo,
                     vendor_name: vName,
                     vendor_number: vNumber,
+                    vendor_gst: vGst,
                     end_date: endDate ? endDate.format("YYYY-MM-DD") : null,
                     existingInvoices: JSON.stringify(invoices.filter(inv => typeof inv === 'string' || inv.preview?.startsWith('/uploads'))),
                     source_type: (activeModalTab === "approval" || activeModalTab === "edit-approval") ? "approval" : "expense"
@@ -361,6 +391,7 @@ export default function Modals({
         setInvoiceFiles([]);
         setSpendMode("Select Spend Mode");
         setGst("No");
+        setVendorGst("");
         setTransactionFrom(null);
         setTransactionTo("");
         setEndDate(null);
@@ -628,11 +659,11 @@ export default function Modals({
                             )}
                         </AnimatePresence>
 
-                        {/* TRANSACTION FIELDS: EXPENSE & APPROVAL */}
+                        {/* TRANSACTION FIELDS: FROM (Expense & Approval) */}
                         <AnimatePresence mode="wait">
                             {(isExpense || isApproval) && (
                                 <motion.div
-                                    key="transaction-fields"
+                                    key="transaction-from-field"
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
@@ -662,11 +693,20 @@ export default function Modals({
                                             ].map(opt => ({ value: opt, label: opt }))}
                                         />
                                     </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
-                                    {/* Transaction To */}
-                                    {/* Transaction To */}
-                                    <label style={{ marginTop: 25, display: "block" }}>Transaction To / Vendor <span style={{ color: "red" }}>*</span></label>
-
+                        {/* TRANSACTION FIELDS: TO / VENDOR (Expense ONLY) */}
+                        <AnimatePresence mode="wait">
+                            {isExpense && (
+                                <motion.div
+                                    key="transaction-to-field"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <label style={{ marginTop: 10, display: "block" }}>Transaction To / Vendor <span style={{ color: "red" }}>*</span></label>
                                     <Radio.Group
                                         value={vendorType}
                                         onChange={(e) => {
@@ -703,22 +743,29 @@ export default function Modals({
                                             </Button>
                                         </div>
                                     ) : (
-                                        <input
-                                            type="text"
-                                            value={transactionTo}
-                                            onChange={(e) => setTransactionTo(e.target.value)}
-                                            placeholder="Enter Vendor Name"
-                                            style={{ height: 40, width: "100%", marginTop: 5 }}
-                                        />
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={transactionTo}
+                                                onChange={(e) => setTransactionTo(e.target.value)}
+                                                placeholder="Enter Vendor Name"
+                                                style={{ height: 40, width: "100%", marginTop: 5 }}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={vendorGst}
+                                                onChange={(e) => setVendorGst(e.target.value)}
+                                                placeholder="Enter GST Number"
+                                                style={{ height: 40, width: "100%", marginTop: 5 }}
+                                            />
+                                        </>
                                     )}
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-
-
-                        {/* Total */}
-                        <label>Total <span style={{ color: "red" }}>*</span></label>
+                        {/* Amount */}
+                        <label>Amount <span style={{ color: "red" }}>*</span></label>
                         <input
                             type="number"
                             value={total}
@@ -729,6 +776,21 @@ export default function Modals({
                             placeholder="0.00"
                             style={{ height: 40 }}
                         />
+
+                        {/* GST Selection */}
+                        {isExpense && (
+                            <div style={{ marginTop: 20 }}>
+                                <label style={{ display: "block" }}>GST? <span style={{ color: "red" }}>*</span></label>
+                                <Radio.Group
+                                    value={gst}
+                                    onChange={(e) => setGst(e.target.value)}
+                                    style={{ marginTop: 5 }}
+                                >
+                                    <Radio value="Yes">Yes</Radio>
+                                    <Radio value="No">No</Radio>
+                                </Radio.Group>
+                            </div>
+                        )}
 
                         {/* INCOME CATEGORIES */}
                         <AnimatePresence mode="wait">
@@ -924,8 +986,68 @@ export default function Modals({
                             placeholder="e.g. ABC Supplies"
                         />
                     </div>
+                    <div style={{ marginBottom: 15 }}>
+                        <label style={{ display: "block", marginBottom: 5 }}>Company Name <span style={{ color: "red" }}>*</span></label>
+                        <input
+                            type="text"
+                            value={newVendorCompany}
+                            onChange={(e) => setNewVendorCompany(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "8px 10px",
+                                border: "1px solid #d9d9d9",
+                                borderRadius: 6
+                            }}
+                            placeholder="e.g. ABC Pvt Ltd"
+                        />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                        <label style={{ display: "block", marginBottom: 5 }}>GST Number <span style={{ color: "red" }}>*</span></label>
+                        <input
+                            type="text"
+                            value={newVendorGst}
+                            onChange={(e) => setNewVendorGst(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "8px 10px",
+                                border: "1px solid #d9d9d9",
+                                borderRadius: 6
+                            }}
+                            placeholder="GST Number"
+                        />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                        <label style={{ display: "block", marginBottom: 5 }}>Mail ID</label>
+                        <input
+                            type="email"
+                            value={newVendorEmail}
+                            onChange={(e) => setNewVendorEmail(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "8px 10px",
+                                border: "1px solid #d9d9d9",
+                                borderRadius: 6
+                            }}
+                            placeholder="example@mail.com"
+                        />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                        <label style={{ display: "block", marginBottom: 5 }}>Address</label>
+                        <textarea
+                            value={newVendorAddress}
+                            onChange={(e) => setNewVendorAddress(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "8px 10px",
+                                border: "1px solid #d9d9d9",
+                                borderRadius: 6
+                            }}
+                            placeholder="Vendor Address"
+                            rows={3}
+                        />
+                    </div>
                     <div>
-                        <label style={{ display: "block", marginBottom: 5 }}>Vendor Number</label>
+                        <label style={{ display: "block", marginBottom: 5 }}>Vendor Number <span style={{ color: "red" }}>*</span></label>
                         <input
                             type="text"
                             value={newVendorNumber}

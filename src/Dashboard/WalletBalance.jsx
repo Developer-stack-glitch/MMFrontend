@@ -115,14 +115,19 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             }
         }
 
-        // Recalculate totals based on filtered entries
+        // Filter out expenses as per user request
+        entries = entries.filter(e => e.type.toLowerCase() !== 'expense');
+
+        // Recalculate totals based on filtered entries (Expense will be 0 now effectively if we used filtered list, but we can compute before if we wanted to show it. But user said don't show expense)
+        // actually if we don't show rows, we probably shouldn't show the total spent either.
+
         const filteredIncome = entries
             .filter(e => e.type.toLowerCase() === 'income')
             .reduce((sum, e) => sum + Number(e.amount), 0);
 
-        const filteredExpense = entries
-            .filter(e => e.type.toLowerCase() === 'expense')
-            .reduce((sum, e) => sum + Number(e.amount), 0);
+        // const filteredExpense = entries
+        //    .filter(e => e.type.toLowerCase() === 'expense')
+        //    .reduce((sum, e) => sum + Number(e.amount), 0);
 
         if (!entries || entries.length === 0) {
             return <Empty description="No transaction history for selected period" />;
@@ -156,18 +161,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                 render: (val, item) => item.main_category || item.category || "-",
             },
             {
-                title: "Vendor",
-                dataIndex: "vendor_name",
-                key: "vendor_name",
-                render: (val, item) => (
-                    <div>
-                        <div style={{ fontWeight: 500 }}>{val || item.transaction_to || "-"}</div>
-                        {item.vendor_number && <div style={{ fontSize: '11px', color: '#888' }}>{item.vendor_number}</div>}
-                    </div>
-                )
-            },
-            {
-                title: "Note",
+                title: "Description",
                 dataIndex: "note",
                 key: "note",
             },
@@ -194,10 +188,11 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                         <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Total Income</span>
                         <span style={{ color: 'green', fontWeight: 'bold', fontSize: '16px' }}>₹{filteredIncome.toLocaleString()}</span>
                     </div>
-                    <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
+                    {/* <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
                         <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Total Spent</span>
                         <span style={{ color: 'red', fontWeight: 'bold', fontSize: '16px' }}>₹{filteredExpense.toLocaleString()}</span>
-                    </div>
+                    </div> */}
+
                     <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
                         <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Wallet Balance</span>
                         <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>₹{Number(fullData.wallet).toLocaleString()}</span>
@@ -211,7 +206,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                     size="small"
                     bordered
                 />
-            </div>
+            </div >
         );
     };
 

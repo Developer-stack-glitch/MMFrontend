@@ -285,7 +285,6 @@ export default function Approvals() {
                                     <tr className="table-header">
                                         <th>SPENDER NAME</th>
                                         <th>CATEGORY</th>
-                                        <th>VENDOR</th>
                                         <th>DESCRIPTION</th>
                                         <th>AMOUNT</th>
                                         <th>INVOICE</th>
@@ -337,19 +336,7 @@ export default function Approvals() {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                {/* VENDOR */}
-                                                <td>
-                                                    <div className="description-cell">
-                                                        {row.vendor_name ? (
-                                                            <>
-                                                                <b>{row.vendor_name}</b>
-                                                                {row.vendor_number && <div style={{ fontSize: 11, color: '#666' }}>{row.vendor_number}</div>}
-                                                            </>
-                                                        ) : (
-                                                            row.transaction_to || "-"
-                                                        )}
-                                                    </div>
-                                                </td>
+
                                                 {/* 3️⃣ DESCRIPTION */}
                                                 <td>
                                                     <div className="description-cell">
@@ -445,10 +432,6 @@ export default function Approvals() {
                                     <div><b>End Date:</b> {fmtDate(selected.end_date)}</div>
                                     <div><b>GST:</b> {selected.gst}</div>
                                     <div><b>Transaction From:</b> {selected.transaction_from}</div>
-                                    <div><b>Vendor:</b> {selected.vendor_name || selected.transaction_to || "-"}</div>
-                                    <div><b>Vendor Number:</b> {selected.vendor_number || "-"}</div>
-                                    <div><b>Transaction From:</b> {selected.transaction_from}</div>
-                                    <div><b>Transaction To:</b> {selected.transaction_to}</div>
                                     <div
                                         style={{
                                             display: "flex",

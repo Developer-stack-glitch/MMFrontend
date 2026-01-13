@@ -29,7 +29,7 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                 setZoomLevel((prev) => {
                     const step = 0.1;
                     const direction = delta > 0 ? -1 : 1;
-                    return Math.min(Math.max(0.5, prev + (direction * step)), 3);
+                    return Math.min(Math.max(0.5, prev + (direction * step)), 5);
                 });
             };
             container.addEventListener("wheel", onWheel, { passive: false });
@@ -71,6 +71,15 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
             className="invoice-modal-backdrop"
             onClick={onClose}
         >
+            <style>{`
+                .invoice-scroll-container {
+                    -ms-overflow-style: none;  /* IE and Edge */
+                    scrollbar-width: none;  /* Firefox */
+                }
+                .invoice-scroll-container::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
             <div
                 className="invoice-modal"
                 onClick={(e) => e.stopPropagation()}
@@ -103,7 +112,7 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                                     {Math.round(zoomLevel * 100)}%
                                 </span>
                                 <button
-                                    onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.25))}
+                                    onClick={() => setZoomLevel(prev => Math.min(5, prev + 0.25))}
                                     style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", padding: "0 5px" }}
                                     title="Zoom In"
                                 >
@@ -131,6 +140,7 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
 
                 {/* BODY (Image / PDF) */}
                 <div
+                    className="invoice-scroll-container"
                     ref={imageContainerRef}
                     onMouseDown={(e) => {
                         if (zoomLevel > 1 && !isPDF(currentSrc)) {
@@ -157,12 +167,10 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                     onMouseLeave={() => setIsDragging(false)}
                     style={{
                         position: "relative",
-                        textAlign: "center",
                         overflow: "auto",
                         height: "70vh", // Fixed height to allow scrolling
                         display: "flex",
-                        justifyContent: "center",
-                        alignItems: zoomLevel === 1 ? "center" : "flex-start",
+                        // justifyContent / alignItems removed to allow scrolling to all edges
                         background: "#fafafa",
                         borderRadius: "8px",
                         padding: "10px",
@@ -175,7 +183,7 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                             className="invoice-nav-btn-left"
                             onClick={handlePrev}
                             onMouseDown={(e) => e.stopPropagation()}
-                            style={{ position: 'sticky', left: 10, zIndex: 10 }}
+                            style={{ position: 'sticky', left: 10, zIndex: 10, margin: 'auto 0' }}
                         >
                             <Icons.ChevronLeft size={24} color="white" />
                         </button>
@@ -190,7 +198,8 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                             alignItems: "center",
                             justifyContent: "center",
                             background: "#f5f5f5",
-                            borderRadius: 10
+                            borderRadius: 10,
+                            margin: 'auto'
                         }}>
                             <Icons.FileText size={80} color="#666" />
                             <p style={{ marginTop: 20, fontSize: 16, color: "#666" }}>
@@ -213,19 +222,11 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                             </a>
                         </div>
                     ) : (
-                        <img
+                        <InvoiceImage
                             src={currentSrc}
+                            zoomLevel={zoomLevel}
+                            isDragging={isDragging}
                             alt={`Invoice ${currentIndex + 1}`}
-                            onDragStart={(e) => e.preventDefault()}
-                            style={{
-                                borderRadius: 10,
-                                width: zoomLevel === 1 ? "100%" : `${zoomLevel * 100}%`,
-                                height: zoomLevel === 1 ? "100%" : "auto",
-                                objectFit: "contain",
-                                maxWidth: "none",
-                                transition: isDragging ? "none" : "width 0.2s ease",
-                                pointerEvents: isDragging ? "none" : "auto"
-                            }}
                         />
                     )}
 
@@ -268,5 +269,76 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                 )}
             </div>
         </div>
+    );
+}
+
+function InvoiceImage({ src, zoomLevel, isDragging, alt }) {
+    const imgRef = React.useRef(null);
+    const [constraint, setConstraint] = React.useState("width");
+
+    const checkConstraint = React.useCallback(() => {
+        if (!imgRef.current || !imgRef.current.parentElement) return;
+        const parent = imgRef.current.parentElement;
+        if (parent.clientHeight === 0) return;
+
+        const parentRatio = parent.clientWidth / parent.clientHeight;
+        const { naturalWidth, naturalHeight } = imgRef.current;
+        if (!naturalWidth || !naturalHeight) return;
+
+        const imgRatio = naturalWidth / naturalHeight;
+
+        // If image is "taller" relative to container's aspect ratio -> Height constrained
+        if (imgRatio < parentRatio) {
+            setConstraint("height");
+        } else {
+            setConstraint("width");
+        }
+    }, []);
+
+    React.useEffect(() => {
+        checkConstraint();
+        window.addEventListener("resize", checkConstraint);
+        return () => window.removeEventListener("resize", checkConstraint);
+    }, [checkConstraint, src]);
+
+    // Re-check when zoom returns to 1 to reset correct constraint for next zoom
+    React.useEffect(() => {
+        if (zoomLevel === 1) checkConstraint();
+    }, [zoomLevel, checkConstraint]);
+
+    const style = {
+        borderRadius: 10,
+        objectFit: "contain",
+        maxWidth: "none",
+        transition: isDragging ? "none" : "all 0.2s ease",
+        pointerEvents: isDragging ? "none" : "auto",
+        margin: "auto",
+        display: "block"
+    };
+
+    if (zoomLevel === 1) {
+        style.width = "auto";
+        style.height = "auto";
+        style.maxWidth = "100%";
+        style.maxHeight = "100%";
+    } else {
+        if (constraint === "width") {
+            style.width = `${zoomLevel * 100}%`;
+            style.height = "auto";
+        } else {
+            style.height = `${zoomLevel * 100}%`;
+            style.width = "auto";
+        }
+    }
+
+    return (
+        <img
+            ref={imgRef}
+            src={src}
+            alt={alt}
+            onDragStart={(e) => e.preventDefault()}
+            onLoad={checkConstraint}
+            style={style}
+        />
     );
 }

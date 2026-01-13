@@ -380,22 +380,16 @@ export default function Dashboard() {
                             <h3 className="quick-access-title">Add New Records</h3>
                             <div className="quick-access-grid">
                                 {[
-                                    {
+                                    ...(user?.role !== "admin" ? [{
                                         icon: <Receipt size={18} />,
-                                        label: user?.role === "admin" ? "+ New Income" : "+ New Approve",
+                                        label: "+ New Approve",
                                         bg: "#006b29ff",
                                         action: () => {
-                                            const currentUser = safeGetLocalStorage("loginDetails", {});
-                                            if (currentUser?.role === "admin") {
-                                                setOpenModal("income");
-                                                setMainCategory("Select Main Category");
-                                            } else {
-                                                setOpenModal("approval");
-                                                setMainCategory("Select Main Category");
-                                                setSubCategory("Select Category");
-                                            }
+                                            setOpenModal("approval");
+                                            setMainCategory("Select Main Category");
+                                            setSubCategory("Select Category");
                                         },
-                                    },
+                                    }] : []),
                                     {
                                         icon: <Wallet size={18} />,
                                         label: "+ New Expense",
