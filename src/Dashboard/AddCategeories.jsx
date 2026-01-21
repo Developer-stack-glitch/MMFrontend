@@ -1,12 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
-import { getExpenseCategoriesApi, getIncomeCategoriesApi } from "../../Api/action";
-import { Modal, Tabs, Button, Input, Select, Radio } from "antd";
-import { motion } from "framer-motion";
+import {
+    getExpenseCategoriesApi,
+    getIncomeCategoriesApi,
+    safeGetLocalStorage,
+    addExpenseCategoryApi,
+    addIncomeCategoryApi,
+    deleteExpenseCategoryApi,
+    deleteIncomeCategoryApi,
+    updateExpenseCategoryApi,
+    updateIncomeCategoryApi,
+    deleteExpenseMainCategoryApi
+} from "../../Api/action";
+import { Modal, Tabs, Button, Input, Select, Radio, Popconfirm } from "antd";
+import { motion, AnimatePresence } from "framer-motion";
 import * as Icons from "lucide-react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Trash2, Edit, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { FullPageLoader } from "../../Common/FullPageLoader";
-import { addExpenseCategoryApi, addIncomeCategoryApi } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
+
 const { TabPane } = Tabs;
 
 export default function AddCategories() {
@@ -16,6 +27,7 @@ export default function AddCategories() {
     const [categoryName, setCategoryName] = useState("");
     const [selectedIcon, setSelectedIcon] = useState("ShoppingBag");
     const [subCategory, setSubCategory] = useState("");
+
     const [expenseData, setExpenseData] = useState([]);
     const [incomeData, setIncomeData] = useState([]);
     const [iconSearch, setIconSearch] = useState("");
@@ -23,6 +35,16 @@ export default function AddCategories() {
     const colorInputRef = useRef(null);
     const [loading, setLoading] = useState(true);
     const [categoryType, setCategoryType] = useState("new"); // "new" | "existing"
+
+    // Edit Mode State
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+
+    // Expand State for Expense Groups
+    const [expandedGroups, setExpandedGroups] = useState({});
+
+    const isAdmin = safeGetLocalStorage("loginDetails", {})?.role === "admin";
+
     const loadCategories = React.useCallback(async () => {
         try {
             setLoading(true);
@@ -48,11 +70,24 @@ export default function AddCategories() {
         };
     }, [loadCategories]);
 
+    // Grouping Logic
+    const groupedExpenses = React.useMemo(() => {
+        return expenseData.reduce((acc, curr) => {
+            const main = curr.main_category;
+            if (!acc[main]) acc[main] = [];
+            acc[main].push(curr);
+            return acc;
+        }, {});
+    }, [expenseData]);
 
-    // ✅ All colors
+    const toggleGroup = (mainCat) => {
+        setExpandedGroups(prev => ({ ...prev, [mainCat]: !prev[mainCat] }));
+    };
+
+    // Colors
     const colors = ["#ef4444", "#f97316", "#facc15", "#4ade80", "#22d3ee", "#6366f1", "#a855f7"];
 
-    // ✅ Generate ALL available icon names
+    // Icons
     const allIcons = Object.keys(Icons)
         .filter((n) => /^[A-Z]/.test(n))
         .slice(0, 800);
@@ -66,34 +101,109 @@ export default function AddCategories() {
         return IconComponent ? <IconComponent size={size} color={color} /> : null;
     };
 
-    const handleCreateCategory = async () => {
+    const handleOpenCreate = () => {
+        setIsEditMode(false);
+        setEditingId(null);
+        setCategoryName("");
+        setSubCategory("");
+        setSelectedColor("#f87171");
+        setSelectedIcon("ShoppingBag");
+        setCategoryType("new");
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEdit = (item, type) => {
+        setIsEditMode(true);
+        setEditingId(item.id);
+        setSelectedColor(item.color || "#f87171");
+        setSelectedIcon(item.icon || "ShoppingBag");
+
+        if (type === "expense") {
+            setCategoryName(item.main_category);
+            setSubCategory(item.sub_category);
+            setCategoryType("existing");
+        } else {
+            setCategoryName(item.name);
+        }
+        setIsModalOpen(true);
+    };
+
+    const handleSubmit = async () => {
         if (!categoryName.trim()) return CommonToaster("Enter category name", "error");
+
         try {
             if (activeTab === "expenses") {
                 if (!subCategory.trim()) return CommonToaster("Enter sub category", "error");
-                await addExpenseCategoryApi({
+
+                const payload = {
                     mainCategory: categoryName,
                     subCategory,
                     color: selectedColor,
                     icon: selectedIcon,
-                });
+                };
+
+                if (isEditMode) {
+                    await updateExpenseCategoryApi(editingId, payload);
+                    CommonToaster("Category updated successfully", "success");
+                } else {
+                    await addExpenseCategoryApi(payload);
+                    CommonToaster("Category created successfully", "success");
+                }
             } else {
-                await addIncomeCategoryApi({
+                const payload = {
                     name: categoryName,
                     color: selectedColor,
                     icon: selectedIcon,
-                });
+                };
+
+                if (isEditMode) {
+                    await updateIncomeCategoryApi(editingId, payload);
+                    CommonToaster("Category updated successfully", "success");
+                } else {
+                    await addIncomeCategoryApi(payload);
+                    CommonToaster("Category created successfully", "success");
+                }
             }
-            CommonToaster("Category created", "success");
+
             setIsModalOpen(false);
-            setCategoryName("");
-            setSubCategory("");
-            setSelectedIcon("ShoppingBag");
-            setCategoryType("new");
             window.dispatchEvent(new Event("refreshCategories"));
         } catch (err) {
             console.error(err);
-            CommonToaster("Failed to add category", "error");
+            CommonToaster(isEditMode ? "Failed to update category" : "Failed to add category", "error");
+        }
+    };
+
+    // DELETE HANDLERS
+    const handleDeleteSub = async (id, type) => {
+        try {
+            if (type === "expense") {
+                await deleteExpenseCategoryApi(id, false);
+            } else {
+                await deleteIncomeCategoryApi(id);
+            }
+            CommonToaster("Category deleted", "success");
+            loadCategories();
+        } catch (e) {
+            CommonToaster("Failed to delete", "error");
+        }
+    };
+
+    // DELETE MAIN CATEGORY STATE
+    const [deleteModal, setDeleteModal] = useState({ open: false, category: null });
+
+    const handleDeleteMain = (mainCat) => {
+        setDeleteModal({ open: true, category: mainCat });
+    };
+
+    const confirmDeleteMain = async () => {
+        try {
+            if (!deleteModal.category) return;
+            await deleteExpenseMainCategoryApi(deleteModal.category);
+            CommonToaster("Main category and all sub-categories deleted!", "success");
+            loadCategories();
+            setDeleteModal({ open: false, category: null });
+        } catch (e) {
+            CommonToaster("Failed to delete", "error");
         }
     };
 
@@ -110,33 +220,123 @@ export default function AddCategories() {
                         initial="hidden"
                         animate="visible" className="categories-tabs">
                         <Tabs activeKey={activeTab} onChange={setActiveTab} centered className="custom-tabs">
-                            {/* ✅ EXPENSES */}
+
+                            {/* ✅ EXPENSES TAB */}
                             <TabPane tab="Expenses" key="expenses">
-                                <div className="category-list">
-                                    {expenseData.map((cat, index) => (
-                                        <div key={index} className="category-item premium">
-                                            <div className="category-left">
+                                <div className="category-list-grouped" style={{ paddingBottom: 20 }}>
+                                    {Object.entries(groupedExpenses).length === 0 && (
+                                        <div style={{ textAlign: "center", marginTop: 20, color: "#888" }}>
+                                            No expense categories found.
+                                        </div>
+                                    )}
+
+                                    {Object.entries(groupedExpenses).map(([mainCat, items]) => (
+                                        <div key={mainCat} className="category-group-card" style={{
+                                            marginBottom: 15,
+                                            background: "#fff",
+                                            borderRadius: 12,
+                                            padding: "10px 15px",
+                                            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                                            border: "1px solid #f0f0f0"
+                                        }}>
+                                            {/* GROUP HEADER */}
+                                            <div className="group-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                 <div
-                                                    className="category-icon"
-                                                    style={{ background: cat.color }}
+                                                    onClick={() => toggleGroup(mainCat)}
+                                                    style={{ display: "flex", alignItems: "center", cursor: "pointer", gap: 10, flex: 1 }}
                                                 >
-                                                    {renderIcon(cat.icon, 18)}
+                                                    {expandedGroups[mainCat] ? <ChevronDown size={18} color="#666" /> : <ChevronRight size={18} color="#666" />}
+                                                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#333" }}>{mainCat}</h3>
+                                                    <span style={{ fontSize: 12, color: "#999", marginLeft: 5 }}>({items.length})</span>
                                                 </div>
-                                                <div>
-                                                    <h4>{cat.sub_category}</h4>
-                                                    <p>0 transactions</p>
-                                                </div>
+
+                                                {isAdmin && (
+                                                    <Button
+                                                        type="text"
+                                                        danger
+                                                        size="small"
+                                                        icon={<Trash2 size={16} />}
+                                                        onClick={() => handleDeleteMain(mainCat)}
+                                                        title="Delete Main Category"
+                                                    />
+                                                )}
                                             </div>
+
+                                            {/* GROUP ITEMS (Sub Categories) */}
+                                            <AnimatePresence>
+                                                {expandedGroups[mainCat] && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: "auto" }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        style={{ marginTop: 10, paddingLeft: 28 }}
+                                                    >
+                                                        {items.map((cat, index) => (
+                                                            <div key={cat.id || index} className="sub-category-item" style={{
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "space-between",
+                                                                padding: "8px 0",
+                                                                borderBottom: index === items.length - 1 ? "none" : "1px solid #f9f9f9"
+                                                            }}>
+                                                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                                    <div
+                                                                        className="category-icon"
+                                                                        style={{
+                                                                            background: cat.color,
+                                                                            width: 30,
+                                                                            height: 30,
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            justifyContent: "center",
+                                                                            borderRadius: 8,
+                                                                            color: "white"
+                                                                        }}
+                                                                    >
+                                                                        {renderIcon(cat.icon, 16)}
+                                                                    </div>
+                                                                    <span style={{ fontSize: 14, fontWeight: 500, color: "#444" }}>{cat.sub_category}</span>
+                                                                </div>
+
+                                                                {isAdmin && (
+                                                                    <div style={{ display: "flex", gap: 5 }}>
+                                                                        <Button
+                                                                            type="text"
+                                                                            size="small"
+                                                                            icon={<Edit size={14} color="#d4af37" />}
+                                                                            onClick={() => handleOpenEdit(cat, "expense")}
+                                                                        />
+                                                                        <Popconfirm
+                                                                            title="Delete Sub Category?"
+                                                                            description="Are you sure?"
+                                                                            onConfirm={() => handleDeleteSub(cat.id, "expense")}
+                                                                            okText="Yes"
+                                                                            cancelText="No"
+                                                                        >
+                                                                            <Button
+                                                                                type="text"
+                                                                                size="small"
+                                                                                danger
+                                                                                icon={<Trash2 size={14} />}
+                                                                            />
+                                                                        </Popconfirm>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
                                     ))}
                                 </div>
                             </TabPane>
 
-                            {/* ✅ INCOME */}
+                            {/* ✅ INCOME TAB */}
                             <TabPane tab="Income" key="income">
                                 <div className="category-list">
                                     {incomeData.map((cat, index) => (
-                                        <div key={index} className="category-item premium">
+                                        <div key={index} className="category-item premium" style={{ justifyContent: 'space-between' }}>
                                             <div className="category-left">
                                                 <div
                                                     className="category-icon"
@@ -146,9 +346,33 @@ export default function AddCategories() {
                                                 </div>
                                                 <div>
                                                     <h4>{cat.name}</h4>
-                                                    <p>0 transactions</p>
+                                                    <p>Income Source</p>
                                                 </div>
                                             </div>
+                                            {isAdmin && (
+                                                <div style={{ display: "flex", gap: 5 }}>
+                                                    <Button
+                                                        type="text"
+                                                        size="small"
+                                                        icon={<Edit size={16} color="#d4af37" />}
+                                                        onClick={() => handleOpenEdit(cat, "income")}
+                                                    />
+                                                    <Popconfirm
+                                                        title="Delete Category?"
+                                                        description="Are you sure?"
+                                                        onConfirm={() => handleDeleteSub(cat.id, "income")}
+                                                        okText="Yes"
+                                                        cancelText="No"
+                                                    >
+                                                        <Button
+                                                            type="text"
+                                                            size="small"
+                                                            danger
+                                                            icon={<Trash2 size={16} />}
+                                                        />
+                                                    </Popconfirm>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -157,17 +381,19 @@ export default function AddCategories() {
                     </motion.div>
 
                     {/* ✅ Add button */}
-                    <div className="categories-footer">
-                        <Button
-                            icon={<Plus size={16} />}
-                            onClick={() => setIsModalOpen(true)}
-                            className="add-btn-premium"
-                        >
-                            Add New Category
-                        </Button>
-                    </div>
+                    {isAdmin && (
+                        <div className="categories-footer">
+                            <Button
+                                icon={<Plus size={16} />}
+                                onClick={handleOpenCreate}
+                                className="add-btn-premium"
+                            >
+                                Add New Category
+                            </Button>
+                        </div>
+                    )}
 
-                    {/* ✅ CREATE CATEGORY MODAL */}
+                    {/* ✅ CREATE / EDIT CATEGORY MODAL */}
                     <Modal
                         open={isModalOpen}
                         onCancel={() => setIsModalOpen(false)}
@@ -177,8 +403,11 @@ export default function AddCategories() {
                         className="create-category-modal"
                         closeIcon={<X size={20} />}
                     >
-                        <h3 className="modal-title">Create a New Category</h3>
-                        <p className="modal-subtitle">Choose color and icon to make it stand out.</p>
+                        <h3 className="modal-title">{isEditMode ? "Edit Category" : "Create New Category"}</h3>
+                        <p className="modal-subtitle">
+                            {isEditMode ? "Update category details." : "Choose color and icon to make it stand out."}
+                        </p>
+
                         {activeTab === "expenses" ? (
                             <div style={{ marginBottom: 5 }}>
                                 <Radio.Group
@@ -186,18 +415,23 @@ export default function AddCategories() {
                                     value={categoryType}
                                     onChange={(e) => {
                                         setCategoryType(e.target.value);
-                                        setCategoryName("");
+                                        // clear main category name if switching to new, unless editing
+                                        if (!isEditMode) setCategoryName("");
                                     }}
+                                    style={{ marginBottom: 10 }}
+                                    disabled={isEditMode} // Lock type in edit mode? OR allow change? Let's just lock for simplicity or allow input updates.
                                 >
-                                    <Radio value="new">New Main Category</Radio>
-                                    <Radio value="existing">Existing Main Category</Radio>
+                                    <Radio value="new" disabled={isEditMode}>Main Category Name</Radio>
+                                    {!isEditMode && <Radio value="existing">Existing Main Category</Radio>}
                                 </Radio.Group>
-                                {categoryType === "existing" ? (
+
+                                {categoryType === "existing" && !isEditMode ? (
                                     <Select
                                         placeholder="Select Main Category"
                                         style={{ width: "100%", height: 40 }}
                                         onChange={(value) => setCategoryName(value)}
                                         value={categoryName || undefined}
+                                        showSearch
                                     >
                                         {[...new Set(expenseData.map((item) => item.main_category).filter(Boolean))].map(
                                             (cat) => (
@@ -305,9 +539,37 @@ export default function AddCategories() {
                                 ))}
                             </div>
                         </div>
-                        <Button type="primary" className="create-btn" onClick={handleCreateCategory}>
-                            Create Category
+                        <Button type="primary" className="create-btn" onClick={handleSubmit}>
+                            {isEditMode ? "Update Category" : "Create Category"}
                         </Button>
+                    </Modal>
+
+                    {/* ✅ DELETE CONFIRMATION MODAL */}
+                    <Modal
+                        open={deleteModal.open}
+                        title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#cf1322' }}>
+                                <AlertTriangle size={20} />
+                                <span>Delete Main Category?</span>
+                            </div>
+                        }
+                        onCancel={() => setDeleteModal({ open: false, category: null })}
+                        footer={[
+                            <Button key="cancel" onClick={() => setDeleteModal({ open: false, category: null })}>
+                                Cancel
+                            </Button>,
+                            <Button key="delete" type="primary" className="delete-all-btn" danger onClick={confirmDeleteMain}>
+                                Yes, Delete All
+                            </Button>
+                        ]}
+                        centered
+                    >
+                        <p style={{ fontSize: 16 }}>
+                            You are about to delete <strong>{deleteModal.category}</strong>.
+                        </p>
+                        <p style={{ color: '#666' }}>
+                            This will also delete the main category and <strong>all its sub-categories</strong>. This action cannot be undone.
+                        </p>
                     </Modal>
                 </div>
             )}

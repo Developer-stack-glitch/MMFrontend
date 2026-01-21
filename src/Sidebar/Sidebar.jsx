@@ -26,6 +26,7 @@ import {
     CalendarCheck,
     Calendar as CalendarIcon,
     ClockFading,
+    TrendingUp,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
@@ -36,6 +37,7 @@ import AddRecord from "../Dashboard/AddRecord";
 import AddCategories from "../Dashboard/AddCategeories";
 import IncomeExpense from "../Dashboard/IncomeExpense";
 import Approvals from "../Dashboard/Approvals";
+import Income from "../Dashboard/Income";
 import {
     apiLogout,
     getExpenseCategoriesApi,
@@ -44,10 +46,10 @@ import {
     deleteEventApi,
     moveEventToNextDayApi,
     moveEventToNextMonthApi,
-    clearAuthData
+    clearAuthData,
+    getApprovalsApi
 } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
-import { getApprovalsApi } from "../../Api/action";
 import SettingPage from "../Dashboard/Settings";
 import Modals from "../Dashboard/Modals";
 import dayjs from "dayjs";
@@ -246,16 +248,19 @@ export default function SideBarLayout() {
         return (words[0][0] + words[1][0]).toUpperCase();
     };
 
+
+
     const menuKeyMap = {
         "/dashboard": "1",
         "/categories": "2",
-        "/income-expense": "3",
+        "/approved-expense": "3",
         "/approvals": "4",
         "/wallet": "5",
         "/bills": "6",
         "/savings": "7",
         "/settings": "8",
         "/calendar": "9",
+        "/income": "10",
     };
 
     const selectedKey = menuKeyMap[location.pathname] || "1";
@@ -264,13 +269,14 @@ export default function SideBarLayout() {
         const routeMap = {
             1: "/dashboard",
             2: "/categories",
-            3: "/income-expense",
+            3: "/approved-expense",
             4: "/approvals",
             5: "/wallet",
             6: "/bills",
             7: "/savings",
             8: "/settings",
             9: "/calendar",
+            10: "/income",
         };
 
         navigate(routeMap[e.key]);
@@ -373,11 +379,12 @@ export default function SideBarLayout() {
                         className="premium-menu"
                         items={[
                             { key: "1", icon: <LayoutDashboard size={16} />, label: "Dashboard" },
-                            { key: "3", icon: <DollarSign size={16} />, label: "Income / Expense" },
+                            { key: "3", icon: <DollarSign size={16} />, label: "Approved / Expense" },
 
                             ...(isAdmin ? [
                                 { key: "4", icon: <FileCheck2 size={16} />, label: "Approvals" },
                                 { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
+                                { key: "10", icon: <TrendingUp size={16} />, label: "Income" },
                             ] : []),
                         ]}
                     />
@@ -395,7 +402,7 @@ export default function SideBarLayout() {
                         items={[
                             { key: "8", icon: <Settings size={16} />, label: "Settings" },
                             { key: "9", icon: <Calendar size={16} />, label: "Schedule Calendar" },
-                            { key: "2", icon: <PlusIcon size={16} />, label: "Add Category" },
+                            { key: "2", icon: <PlusIcon size={16} />, label: isAdmin ? "Add Category" : "Categories" },
                         ]}
                     />
                 </div>
@@ -465,11 +472,12 @@ export default function SideBarLayout() {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/add-record" element={<AddRecord />} />
                         <Route path="/categories" element={<AddCategories />} />
-                        <Route path="/income-expense" element={<IncomeExpense />} />
+                        <Route path="/approved-expense" element={<IncomeExpense />} />
                         <Route path="/approvals" element={<Approvals />} />
                         <Route path="/wallet" element={<WalletPage />} />
                         <Route path="/settings" element={<SettingPage />} />
                         <Route path="/calendar" element={<CalendarPage />} />
+                        <Route path="/income" element={<Income />} />
                     </Routes>
                 </Content>
             </Layout>

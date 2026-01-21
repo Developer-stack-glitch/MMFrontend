@@ -135,7 +135,7 @@ export default function Approvals() {
     // -------------------------------------
     const handleViewInvoice = (invoiceData) => {
         if (!invoiceData) return;
-        const API_BASE = import.meta.env.VITE_API_URL;
+        const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
         let invoicesArray = [];
         const normalizeEntry = (entry) => {
             if (!entry) return null;
@@ -210,6 +210,8 @@ export default function Approvals() {
         return <img src={iconVal} className="avatar" alt="" />;
     };
 
+    const totalFilteredAmount = filteredRows.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+
     return (
         <>
             {loading ? (<FullPageLoader />) : (
@@ -219,59 +221,62 @@ export default function Approvals() {
                         <div className="approvals-header-top">
                             <h1 className="approvals-title">Approvals</h1>
                         </div>
-                        <motion.div
-                            initial="hidden"
-                            animate="visible" className="filter-dropdown">
-                            <div className="filter-item">
-                                <label>Search (Name / Branch)</label>
-                                <input
-                                    type="text"
-                                    value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
-                                    placeholder="Search owner or category"
-                                    style={{
-                                        width: 240,
-                                        padding: "8px 10px",
-                                        border: "1px solid #ccc",
-                                        borderRadius: 6,
-                                        height: 40,
-                                    }}
-                                />
+
+                        {/* FILTER UI */}
+                        <div className="filter-card">
+                            <div className="filter-left">
+                                <div className="search-wrapper">
+                                    <Icons.Search size={16} className="search-icon" />
+                                    <input
+                                        type="text"
+                                        value={searchText}
+                                        onChange={(e) => setSearchText(e.target.value)}
+                                        placeholder="Search owner, category..."
+                                    />
+                                </div>
+
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterCategory}
+                                        onChange={setFilterCategory}
+                                        style={{ width: 160 }}
+                                        placeholder="Category"
+                                        suffixIcon={<Icons.LayoutGrid size={14} />}
+                                        options={categoryOptions.map((c) => ({
+                                            value: c,
+                                            label: c === "All" ? "Category: All" : c,
+                                        }))}
+                                    />
+                                </div>
+
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterAmount}
+                                        onChange={setFilterAmount}
+                                        style={{ width: 150 }}
+                                        placeholder="Amount"
+                                        suffixIcon={<Icons.ArrowUpDown size={14} />}
+                                        options={[
+                                            { value: "", label: "Amount: All" },
+                                            { value: "low", label: "Low → High" },
+                                            { value: "high", label: "High → Low" },
+                                        ]}
+                                    />
+                                </div>
+
+                                {(filterCategory !== "All" || filterAmount !== "" || searchText) && (
+                                    <button className="clear-filter-btn" onClick={clearAllFilters}>
+                                        <Icons.X size={14} /> Clear
+                                    </button>
+                                )}
                             </div>
 
-                            {/* Category */}
-                            <div className="filter-item">
-                                <label>Category</label>
-                                <Select
-                                    value={filterCategory}
-                                    onChange={setFilterCategory}
-                                    style={{ width: 200 }}
-                                    options={categoryOptions.map((c) => ({
-                                        value: c,
-                                        label: c,
-                                    }))}
-                                />
+                            {/* TOTAL STAT */}
+                            <div className="total-stat-box is-approved">
+                                <span>Total Value</span>
+                                <strong className="total-amount">{fmtAmt(totalFilteredAmount)}</strong>
                             </div>
-
-                            {/* Amount Sort */}
-                            <div className="filter-item">
-                                <label>Amount</label>
-                                <Select
-                                    value={filterAmount}
-                                    onChange={setFilterAmount}
-                                    style={{ width: 180 }}
-                                    options={[
-                                        { value: "", label: "None" },
-                                        { value: "low", label: "Low → High" },
-                                        { value: "high", label: "High → Low" },
-                                    ]}
-                                />
-                            </div>
-
-                            <Button className="clear-btn" onClick={clearAllFilters}>
-                                Clear All
-                            </Button>
-                        </motion.div>
+                        </div>
 
                         {/* ✅ TABLE */}
                         <div className="approvals-table-wrapper">

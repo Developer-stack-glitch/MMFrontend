@@ -4,31 +4,33 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { Skeleton } from "antd";
-import { getWalletEntriesApi, getAllWalletDetailsApi } from "../../Api/action";
 dayjs.extend(isBetween);
 
 export default function AmountDetails({
-    filteredIncome,
     filteredExpenses,
-    originalIncome,
     originalExpenses,
+    filteredIncome,
+    originalIncome,
     filters,
     loading,
     user,
-    walletEntries = []
+    walletEntries = [],
+    useFilteredIncome = false
 }) {
     const navigate = useNavigate();
-
-    // Calculate Summary (Unfiltered) from walletEntries prop AND originalExpenses (only if not User)
     const isUser = user?.role === "user";
 
     const walletSummary = {
-        income: walletEntries
-            .filter(e => (e.type || "").toLowerCase() === 'income')
-            .reduce((sum, e) => sum + Number(e.amount), 0),
-        expense: (walletEntries
-            .filter(e => (e.type || "").toLowerCase() === 'expense')
-            .reduce((sum, e) => sum + Number(e.amount), 0)) +
+        income: useFilteredIncome
+            ? (originalIncome || []).reduce((sum, e) => sum + Number(e.total || e.amount || 0), 0)
+            : walletEntries
+                .filter(e => (e.type || "").toLowerCase() === 'income')
+                .reduce((sum, e) => sum + Number(e.amount), 0),
+        expense: useFilteredIncome
+            ? (originalExpenses || []).reduce((sum, e) => sum + Number(e.total || e.amount || 0), 0)
+            : (walletEntries
+                .filter(e => (e.type || "").toLowerCase() === 'expense')
+                .reduce((sum, e) => sum + Number(e.amount), 0)) +
             (isUser ? 0 : (originalExpenses || []).reduce((sum, e) => sum + Number(e.total), 0)),
         get wallet() { return this.income - this.expense }
     };
@@ -70,20 +72,24 @@ export default function AmountDetails({
     });
 
     // Calculate totals from filtered wallet entries + filtered expenses (only if not User)
-    const calculateTotals = (wEntries, eEntries = []) => {
-        const income = wEntries
-            .filter(e => (e.type || "").toLowerCase() === 'income')
-            .reduce((sum, e) => sum + Number(e.amount), 0);
+    const calculateTotals = (wEntries, eEntries = [], iEntries = []) => {
+        const income = useFilteredIncome
+            ? iEntries.reduce((sum, e) => sum + Number(e.total || e.amount || 0), 0)
+            : wEntries
+                .filter(e => (e.type || "").toLowerCase() === 'income')
+                .reduce((sum, e) => sum + Number(e.amount), 0);
 
-        const expense = (wEntries
-            .filter(e => (e.type || "").toLowerCase() === 'expense')
-            .reduce((sum, e) => sum + Number(e.amount), 0)) +
+        const expense = useFilteredIncome
+            ? eEntries.reduce((sum, e) => sum + Number(e.total || e.amount || 0), 0)
+            : (wEntries
+                .filter(e => (e.type || "").toLowerCase() === 'expense')
+                .reduce((sum, e) => sum + Number(e.amount), 0)) +
             (isUser ? 0 : eEntries.reduce((sum, e) => sum + Number(e.total), 0));
 
         return { income, expense, balance: income - expense };
     };
 
-    const currentTotals = calculateTotals(filteredWallet, filteredExpenses);
+    const currentTotals = calculateTotals(filteredWallet, filteredExpenses, filteredIncome);
 
     // Calculate Previous Period Totals
     let lastTotals = { income: 0, expense: 0, balance: 0 };
@@ -115,7 +121,10 @@ export default function AmountDetails({
             const prevExpenses = (originalExpenses || []).filter((e) =>
                 dayjs(e.date).isBetween(prevStart, prevEnd, "day", "[]")
             );
-            lastTotals = calculateTotals(prevWallet, prevExpenses);
+            const prevIncome = (originalIncome || []).filter((i) =>
+                dayjs(i.date).isBetween(prevStart, prevEnd, "day", "[]")
+            );
+            lastTotals = calculateTotals(prevWallet, prevExpenses, prevIncome);
         }
     }
 
@@ -227,7 +236,7 @@ export default function AmountDetails({
                             {stat.title}
                         </h4>
                         <span
-                            onClick={() => navigate("/income-expense")}
+                            onClick={() => navigate("/approved-expense")}
                             className="detail-link"
                         >
                             See Detail →

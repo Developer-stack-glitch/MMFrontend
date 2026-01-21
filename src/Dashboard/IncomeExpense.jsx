@@ -109,17 +109,14 @@ export default function IncomeExpense() {
     const handleViewInvoice = (invoiceData) => {
         if (!invoiceData) return;
 
-        const BASE = import.meta.env.VITE_API_URL;
+        const BASE = import.meta.env.VITE_API_URL.replace(/\/$/, "");
         let invoicesArray = [];
 
         const normalize = (item) => {
             if (!item) return null;
             let str = String(item).trim().replace(/^"+|"+$/g, "");
-            // If it's base64, return as-is
             if (str.startsWith("data:")) return str;
-            // If it already has the full path, return as-is
             if (str.startsWith("http") || str.startsWith("/uploads")) return str.startsWith("http") ? str : `${BASE}${str}`;
-            // Otherwise, assume it's just a filename
             return `${BASE}/uploads/invoices/${str}`;
         };
 
@@ -443,8 +440,6 @@ export default function IncomeExpense() {
         document.body.removeChild(link);
     };
 
-
-
     const handleCloseModal = () => {
         setOpenModal(null);
         setEditData(null);
@@ -452,25 +447,20 @@ export default function IncomeExpense() {
     };
 
     const handleQuickAddExpense = (item) => {
-        setEditData(null); // Ensure it's treated as a new entry, not an edit
+        setEditData(null);
         setBranch(item.branch || "Select Branch");
         setDate(item.date ? dayjs(item.date).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
-        // Check for total/amount key
         setTotal(item.amount || item.total || "");
         setMainCategory(item.main_category || "Select Main Category");
         setSubCategory(item.sub_category || item.category || "Select Category");
-        // Approval description is often in 'role' or 'description'
         setDescription(item.description || item.role || "");
         setVendorName(item.vendor_name || "");
         setVendorNumber(item.vendor_number || "");
-
-        // Open Expense Modal
         setOpenModal("expense");
     };
 
     const isApprovalTab = activeTab === "approval";
     const gridStyle = { gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0fr" };
-    // Always show action column now
     const approvalGridStyle = {
         gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 0.5fr"
     };
@@ -490,7 +480,7 @@ export default function IncomeExpense() {
                                 className={`premium-tab ${activeTab === "approval" ? "active" : ""}`}
                                 onClick={() => handleTabChange("approval")}
                             >
-                                {userRole === "admin" ? "Approve" : "Approve"}
+                                {userRole === "admin" ? "Approved" : "Approved"}
                             </button>
 
                             <button
@@ -504,7 +494,7 @@ export default function IncomeExpense() {
                         <motion.div initial="hidden" animate="visible">
                             <div className="expense-header">
                                 <h1>
-                                    {activeTab === "expense" ? "Expenses" : "Approvals"}
+                                    {activeTab === "expense" ? "Expenses" : "Approved"}
                                 </h1>
                                 <div className="expense-actions">
                                     <button
@@ -527,85 +517,90 @@ export default function IncomeExpense() {
                                     >
                                         <Icons.Download size={16} /> Export CSV
                                     </button>
-                                    <button
-                                        className="btn-primary"
-                                        onClick={() => {
-                                            setOpenModal(activeTab);
-                                            resetForm();
-                                            setEditData(null);
-                                        }}
-                                    >
-                                        <Plus size={16} /> New {activeTab === "approval" ? "Approval" : "Expense"}
-                                    </button>
+                                    {!(userRole === "admin" && activeTab === "approval") && (
+                                        <button
+                                            className="btn-primary"
+                                            onClick={() => {
+                                                setOpenModal(activeTab);
+                                                resetForm();
+                                                setEditData(null);
+                                            }}
+                                        >
+                                            <Plus size={16} /> New {activeTab === "approval" ? "Approval" : "Expense"}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
                             {/* FILTER UI */}
-                            <div className="filter-dropdown">
-                                <div className="filter-item">
-                                    <label>Amount</label>
-                                    <Select
-                                        value={filterAmount}
-                                        onChange={(v) => setFilterAmount(v)}
-                                        style={{ width: 180 }}
-                                        options={[
-                                            { value: "", label: "None" },
-                                            { value: "low", label: "Low → High" },
-                                            { value: "high", label: "High → Low" },
-                                        ]}
-                                    />
-                                </div>
-                                <div className="filter-item">
-                                    <label>Name</label>
-                                    <Select
-                                        value={filterName}
-                                        onChange={setFilterName}
-                                        style={{ width: 180 }}
-                                        options={[
-                                            { value: "All", label: "All" },
-                                            ...allNames.map(n => ({ value: n, label: n }))
-                                        ]}
-                                    />
-                                </div>
-                                <div className="filter-item">
-                                    <label>Branch</label>
-                                    <Select
-                                        value={filterBranch}
-                                        onChange={setFilterBranch}
-                                        style={{ width: 180 }}
-                                        options={[
-                                            { value: "All", label: "All" },
-                                            ...allBranches.map(b => ({ value: b, label: b }))
-                                        ]}
-                                    />
-                                </div>
-                                <div className="filter-item">
-                                    <label>Search</label>
-                                    <input
-                                        type="text"
-                                        value={searchText}
-                                        onChange={(e) => setSearchText(e.target.value)}
-                                        placeholder="Search..."
-                                        style={{
-                                            width: 240,
-                                            padding: "8px 10px",
-                                            border: "1px solid #ccc",
-                                            borderRadius: 6,
-                                            height: 40,
-                                        }}
-                                    />
-                                </div>
-                                <div className="filter-item" style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <div style={{ height: 24 }}></div> {/* Spacer to align with inputs having labels */}
-                                    <Button className="clear-btn" onClick={clearAllFilters} style={{ marginTop: 0 }}>
-                                        Clear All
-                                    </Button>
+                            <div className="filter-card">
+                                <div className="filter-left">
+                                    <div className="search-wrapper">
+                                        <Icons.Search size={16} className="search-icon" />
+                                        <input
+                                            type="text"
+                                            value={searchText}
+                                            onChange={(e) => setSearchText(e.target.value)}
+                                            placeholder="Search by name, branch, etc..."
+                                        />
+                                    </div>
+
+                                    <div className="select-wrapper">
+                                        <Select
+                                            value={filterAmount}
+                                            onChange={(v) => setFilterAmount(v)}
+                                            style={{ width: 140 }}
+                                            placeholder="Amount"
+                                            suffixIcon={<Icons.ArrowUpDown size={14} />}
+                                            options={[
+                                                { value: "", label: "Amount: All" },
+                                                { value: "low", label: "Low → High" },
+                                                { value: "high", label: "High → Low" },
+                                            ]}
+                                        />
+                                    </div>
+
+                                    <div className="select-wrapper">
+                                        <Select
+                                            value={filterName}
+                                            onChange={setFilterName}
+                                            style={{ width: 150 }}
+                                            placeholder="Name"
+                                            showSearch
+                                            suffixIcon={<Icons.User size={14} />}
+                                            options={[
+                                                { value: "All", label: "Name: All" },
+                                                ...allNames.map(n => ({ value: n, label: n }))
+                                            ]}
+                                        />
+                                    </div>
+
+                                    <div className="select-wrapper">
+                                        <Select
+                                            value={filterBranch}
+                                            onChange={setFilterBranch}
+                                            style={{ width: 150 }}
+                                            placeholder="Branch"
+                                            showSearch
+                                            suffixIcon={<Icons.Building2 size={14} />}
+                                            options={[
+                                                { value: "All", label: "Branch: All" },
+                                                ...allBranches.map(b => ({ value: b, label: b }))
+                                            ]}
+                                        />
+                                    </div>
+
+                                    {(filterCategory !== "All" || filterAmount !== "" || filterName !== "All" || filterBranch !== "All" || searchText) && (
+                                        <button className="clear-filter-btn" onClick={clearAllFilters}>
+                                            <Icons.X size={14} /> Clear
+                                        </button>
+                                    )}
                                 </div>
 
-                                {/* TOTAL STAT PILL */}
-                                <div className={`simple-stat-pill ${activeTab === "expense" ? "expense" : "approved"}`}>
-                                    <span style={{ fontSize: 16, color: "#2a2a2a" }}>{activeTab === "expense" ? "Total Expense" : "Total Approved"}:</span>
-                                    <strong>{fmtAmt(totalApproved)}</strong>
+                                {/* TOTAL STAT */}
+                                <div className={`total-stat-box ${activeTab === "expense" ? "is-expense" : "is-approved"}`}>
+                                    <span>{activeTab === "expense" ? "Total Expense" : "Total Approved"}</span>
+                                    <strong className="total-amount">{fmtAmt(totalApproved)}</strong>
                                 </div>
                             </div>
 

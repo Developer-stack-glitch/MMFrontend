@@ -187,6 +187,36 @@ export const addIncomeCategoryApi = async (payload) => {
     return res.data;
 };
 
+// ✅ Delete expense category
+export const deleteExpenseCategoryApi = async (id, deleteMain = false) => {
+    const res = await api.delete(`/api/categories/expense/delete/${id}?deleteMain=${deleteMain}`);
+    return res.data;
+};
+
+// ✅ Delete MAIN expense category by Name
+export const deleteExpenseMainCategoryApi = async (mainCategory) => {
+    const res = await api.delete(`/api/categories/expense/delete-main/${encodeURIComponent(mainCategory)}`);
+    return res.data;
+};
+
+// ✅ Delete income category
+export const deleteIncomeCategoryApi = async (id) => {
+    const res = await api.delete(`/api/categories/income/delete/${id}`);
+    return res.data;
+};
+
+// ✅ Update expense category
+export const updateExpenseCategoryApi = async (id, payload) => {
+    const res = await api.put(`/api/categories/expense/update/${id}`, payload);
+    return res.data;
+};
+
+// ✅ Update income category
+export const updateIncomeCategoryApi = async (id, payload) => {
+    const res = await api.put(`/api/categories/income/update/${id}`, payload);
+    return res.data;
+};
+
 
 // ✅ ADD EXPENSE
 export const addExpenseApi = async (payload) => {
@@ -231,13 +261,13 @@ export const addApprovalApi = async (payload) => {
 };
 
 
-export const getExpensesApi = async (page = 1) => {
-    const res = await api.get(`/api/transactions/expenses-transactions?page=${page}&limit=10`);
+export const getExpensesApi = async (page = 1, limit = 10) => {
+    const res = await api.get(`/api/transactions/expenses-transactions?page=${page}&limit=${limit}`);
     return res.data;
 };
 
-export const getIncomeApi = async (page = 1) => {
-    const res = await api.get(`/api/transactions/income-transactions?page=${page}&limit=10`);
+export const getIncomeApi = async (page = 1, limit = 10) => {
+    const res = await api.get(`/api/transactions/income-transactions?page=${page}&limit=${limit}`);
     return res.data;
 };
 

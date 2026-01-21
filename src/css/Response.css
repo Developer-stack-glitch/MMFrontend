@@ -135,9 +135,37 @@
         margin: 0px !important;
     }
 
+    .invoice-modal-head {
+        display: grid !important;
+        justify-content: center !important;
+        gap: 10px !important;
+    }
+
+    .filter-card {
+        align-items: center !important;
+    }
+
+    .no-data-img {
+        width: 80px !important;
+        margin-bottom: 0px !important;
+    }
+
+    .no-data-box p {
+        margin: 0 !important;
+    }
+
+    .total-stat-box {
+        margin-left: 0 !important;
+    }
+
+    .filter-left {
+        justify-content: center !important;
+    }
+
     .tabs-wrapper {
         margin-bottom: 22px !important;
         margin-top: 20px !important;
+        justify-content: center !important;
     }
 
     .filter-dropdown {

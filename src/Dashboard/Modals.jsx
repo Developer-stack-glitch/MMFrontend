@@ -438,7 +438,7 @@ export default function Modals({
                 </div>
 
                 {/* TABS SWITCHER */}
-                {!isEdit && (
+                {!isEdit && type !== "income" && (
                     <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 15 }}>
                         {currentUser?.role === "admin" ? (
                             // ADMIN TABS: Expense only
@@ -533,17 +533,19 @@ export default function Modals({
                                                             key: cat,
                                                             label: cat,
                                                         })),
-                                                        {
-                                                            type: 'divider',
-                                                        },
-                                                        {
-                                                            key: "ADD_NEW_MAIN",
-                                                            label: (
-                                                                <span style={{ color: "#d4af37", fontWeight: 600 }}>
-                                                                    + Add New Main Category
-                                                                </span>
-                                                            ),
-                                                        }
+                                                        ...(currentUser?.role === "admin" ? [
+                                                            {
+                                                                type: 'divider',
+                                                            },
+                                                            {
+                                                                key: "ADD_NEW_MAIN",
+                                                                label: (
+                                                                    <span style={{ color: "#d4af37", fontWeight: 600 }}>
+                                                                        + Add New Main Category
+                                                                    </span>
+                                                                ),
+                                                            }
+                                                        ] : [])
                                                     ]}
                                                 />
                                             }
@@ -577,17 +579,19 @@ export default function Modals({
                                                                         label: sub,
                                                                     }))
                                                                     : []),
-                                                                {
-                                                                    type: 'divider',
-                                                                },
-                                                                {
-                                                                    key: "ADD_NEW_SUB",
-                                                                    label: (
-                                                                        <span style={{ color: "#d4af37", fontWeight: 600 }}>
-                                                                            + Add New Sub Category
-                                                                        </span>
-                                                                    ),
-                                                                }
+                                                                ...(currentUser?.role === "admin" ? [
+                                                                    {
+                                                                        type: 'divider',
+                                                                    },
+                                                                    {
+                                                                        key: "ADD_NEW_SUB",
+                                                                        label: (
+                                                                            <span style={{ color: "#d4af37", fontWeight: 600 }}>
+                                                                                + Add New Sub Category
+                                                                            </span>
+                                                                        ),
+                                                                    }
+                                                                ] : [])
                                                             ]}
                                                         />
                                                     }
@@ -807,10 +811,13 @@ export default function Modals({
                                             overlay={
                                                 <Menu
                                                     onClick={(e) => setMainCategory(e.key)}
-                                                    items={incomeCategories.map((cat) => ({
-                                                        key: cat,
-                                                        label: cat,
-                                                    }))}
+                                                    items={incomeCategories.map((cat) => {
+                                                        const label = cat.name || cat.category || cat;
+                                                        return {
+                                                            key: label,
+                                                            label: label,
+                                                        };
+                                                    })}
                                                 />
                                             }
                                             trigger={["click"]}
@@ -892,7 +899,7 @@ export default function Modals({
                                     {invoices.map((inv, idx) => {
                                         const isPreview = inv.preview;
                                         const isPdf = isPreview ? inv.type?.includes("pdf") : (typeof inv === "string" && inv.includes(".pdf"));
-                                        const displaySrc = isPreview ? inv.preview : (typeof inv === "string" ? `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${inv}` : inv);
+                                        const displaySrc = isPreview ? inv.preview : (typeof inv === "string" ? `${(import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, "")}${inv}` : inv);
 
                                         return (
                                             <div

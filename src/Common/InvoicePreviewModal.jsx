@@ -37,7 +37,7 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                 container.removeEventListener("wheel", onWheel);
             };
         }
-    }, [open, zoomLevel]); // Re-bind if necessary, but refs usually stable. Added zoomLevel just to be safe if dom changes? No, container ref should be enough.
+    }, [open, zoomLevel]);
 
     if (!open || invoices.length === 0) return null;
 
@@ -85,7 +85,7 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* HEAD */}
-                <div
+                <div className="invoice-modal-head"
                     style={{
                         display: "flex",
                         justifyContent: "space-between",
@@ -168,9 +168,8 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                     style={{
                         position: "relative",
                         overflow: "auto",
-                        height: "70vh", // Fixed height to allow scrolling
+                        height: "70vh",
                         display: "flex",
-                        // justifyContent / alignItems removed to allow scrolling to all edges
                         background: "#fafafa",
                         borderRadius: "8px",
                         padding: "10px",
