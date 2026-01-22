@@ -21,10 +21,11 @@ body {
   z-index: 999;
   border: none;
   bottom: 30px;
-  right: 10px;
+  right: 30px;
   font-weight: 400;
   transition: all 0.3s ease;
   letter-spacing: 1px;
+  display: none;
 }
 
 .new-category:hover {

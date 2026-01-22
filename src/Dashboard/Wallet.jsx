@@ -14,18 +14,10 @@ export default function WalletPage() {
     const [amount, setAmount] = useState("");
     const [date, setDate] = useState(dayjs());
     const [userId, setUserId] = useState(null);
-    const [branch, setBranch] = useState(null);
     const [note, setNote] = useState("");
     const [users, setUsers] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [reloadTable, setReloadTable] = useState(0);
-
-    const branches = [
-        "Velachery", "Anna Nagar", "Tambaram", "Porur", "Tnagar", "OMR", "Siruseri",
-        "Thiruvanmiyur", "Maraimalai Nagar", "Electronic City", "BTM Layout",
-        "Marathahalli", "Hebbal", "Rajaji Nagar", "Jayanagar", "Kalyan Nagar",
-        "Indira Nagar", "HSR Layout"
-    ];
 
     useEffect(() => {
         async function loadUsers() {
@@ -41,22 +33,20 @@ export default function WalletPage() {
     }, []);
 
     const handleSubmit = async () => {
-        if (!amount || !date || !userId || !branch) {
-            return CommonToaster("All fields including Branch are required", "error");
+        if (!amount || !date || !userId) {
+            return CommonToaster("All fields are required", "error");
         }
         try {
             await addWalletApi({
                 amount,
                 date: date.format("YYYY-MM-DD"),
                 user_id: userId,
-                branch,
                 note
             });
             CommonToaster("Wallet added successfully!", "success");
             setAmount("");
             setDate(dayjs());
             setUserId(null);
-            setBranch(null);
             setNote("");
             setIsModalOpen(false);
             setReloadTable(prev => prev + 1);
@@ -161,26 +151,6 @@ export default function WalletPage() {
                             style={{ width: "100%", borderRadius: 8 }}
                             format="DD MMM YYYY"
                         />
-                    </div>
-
-                    {/* Branch */}
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                        <label style={{ fontWeight: 500, marginBottom: 5, fontSize: 14 }}>
-                            Branch <span style={{ color: "red" }}>*</span>
-                        </label>
-                        <Select
-                            size="large"
-                            placeholder="Select Branch"
-                            value={branch}
-                            onChange={setBranch}
-                            style={{ width: "100%", borderRadius: 8 }}
-                        >
-                            {branches.map((b) => (
-                                <Select.Option key={b} value={b}>
-                                    {b}
-                                </Select.Option>
-                            ))}
-                        </Select>
                     </div>
 
                     {/* Note */}

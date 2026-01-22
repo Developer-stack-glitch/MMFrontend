@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Eye, Check, X } from "lucide-react";
 import * as Icons from "lucide-react";
 import { motion } from "framer-motion";
-import { Select, Button, Modal, Popconfirm, Tooltip } from "antd";
+import { Select, Button, Modal, Popconfirm, Tooltip, Pagination } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
@@ -27,6 +27,8 @@ export default function Approvals() {
     const [searchText, setSearchText] = useState("");
     const [loading, setLoading] = useState(true)
     const [requests, setRequests] = useState([]);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
     // Invoice Modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [currentInvoices, setCurrentInvoices] = useState([]);
@@ -43,12 +45,21 @@ export default function Approvals() {
             window.removeEventListener("incomeExpenseUpdated", loadApprovals);
             window.removeEventListener("summaryUpdated", loadApprovals);
         };
-    }, []);
+    }, [page]);
 
     const loadApprovals = async () => {
         setLoading(true)
-        const data = await getApprovalsApi();
-        setRequests(Array.isArray(data) ? data : []);
+        const response = await getApprovalsApi(page, 10);
+        if (response && response.data && Array.isArray(response.data)) {
+            setRequests(response.data);
+            setTotal(response.total || 0);
+        } else if (Array.isArray(response)) {
+            setRequests(response);
+            setTotal(response.length);
+        } else {
+            setRequests([]);
+            setTotal(0);
+        }
         setLoading(false)
     };
 
@@ -206,8 +217,8 @@ export default function Approvals() {
 
     const renderIcon = (iconVal) => {
         const MaybeIcon = Icons[iconVal];
-        if (MaybeIcon) return <MaybeIcon size={28} className="avatar" />;
-        return <img src={iconVal} className="avatar" alt="" />;
+        if (MaybeIcon) return <MaybeIcon size={20} color="#fff" />;
+        return <img src={iconVal} style={{ width: 20, height: 20, objectFit: 'contain' }} alt="" />;
     };
 
     const totalFilteredAmount = filteredRows.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
@@ -321,10 +332,24 @@ export default function Approvals() {
                                                 {/* 1️⃣ SPENDER NAME */}
                                                 <td>
                                                     <div className="owner-cell">
-                                                        {renderIcon(row.icon)}
+                                                        <div
+                                                            className="icon-circles"
+                                                            style={{
+                                                                backgroundColor: row.categoryColor || row.color || "#d4af37",
+                                                                width: 40,
+                                                                height: 40,
+                                                                borderRadius: "50%",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                minWidth: 40,
+                                                            }}
+                                                        >
+                                                            {renderIcon(row.icon)}
+                                                        </div>
                                                         <div>
                                                             <h4>{row.name}</h4>
-                                                            <p>{row.main_category}</p>
+                                                            <p style={{ textTransform: 'uppercase', fontSize: '12px', color: "#2a2a2a" }}>{row.branch}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -417,6 +442,19 @@ export default function Approvals() {
                             </motion.table>
                         </div>
 
+                        {/* PAGINATION */}
+                        {total > 10 && (
+                            <div className="pagination-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0' }}>
+                                <Pagination
+                                    current={page}
+                                    onChange={(p) => setPage(p)}
+                                    total={total}
+                                    pageSize={10}
+                                    showSizeChanger={false}
+                                />
+                            </div>
+                        )}
+
                         {/* ✅ DETAILS MODAL */}
                         <Modal
                             className="details-modal"
@@ -429,7 +467,7 @@ export default function Approvals() {
                             {selected && (
                                 <div className="details-grid" style={{ display: "grid", gap: 10 }}>
                                     <div><b>Spender Name:</b> {selected.name}</div>
-                                    <div><b>Description:</b> {selected.role || "-"}</div>
+                                    <div className="text-truncate11"><b>Description:</b> {selected.role || "-"}</div>
                                     <div><b>Branch:</b> {selected.branch || "-"}</div>
                                     <div><b>Category:</b> {selected.sub_category}</div>
                                     <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>

@@ -27,6 +27,7 @@ import {
     Calendar as CalendarIcon,
     ClockFading,
     TrendingUp,
+    TimerResetIcon,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
@@ -158,8 +159,15 @@ export default function SideBarLayout() {
 
     const loadPendingApprovals = async () => {
         try {
-            const data = await getApprovalsApi();
-            setPendingCount(data?.length || 0);
+            const response = await getApprovalsApi();
+            if (response && response.data && Array.isArray(response.data)) {
+                // If total is provided, use it, otherwise fallback to current page length
+                setPendingCount(response.total ?? response.data.length);
+            } else if (Array.isArray(response)) {
+                setPendingCount(response.length);
+            } else {
+                setPendingCount(0);
+            }
         } catch (error) {
             console.log("Approval count error:", error);
         }
@@ -382,7 +390,7 @@ export default function SideBarLayout() {
                             { key: "3", icon: <DollarSign size={16} />, label: "Approved / Expense" },
 
                             ...(isAdmin ? [
-                                { key: "4", icon: <FileCheck2 size={16} />, label: "Approvals" },
+                                { key: "4", icon: <TimerResetIcon size={16} />, label: "Pending Approvals" },
                                 { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
                                 { key: "10", icon: <TrendingUp size={16} />, label: "Income" },
                             ] : []),

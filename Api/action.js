@@ -283,8 +283,8 @@ export const getLastMonthSummaryApi = async (date) => {
     return res.data;
 };
 
-export const getApprovalsApi = async () => {
-    const res = await api.get("/api/transactions/approvals");
+export const getApprovalsApi = async (page = 1, limit = 10) => {
+    const res = await api.get(`/api/transactions/approvals?page=${page}&limit=${limit}`);
     return res.data;
 };
 
@@ -381,8 +381,17 @@ export const editExpenseApi = async (payload) => {
     return await api.post("/api/transactions/edit-expense", payload, config);
 };
 
-export const getUserAllExpensesApi = async () => {
-    const res = await api.get("/api/transactions/user-all-expenses");
+export const deleteExpenseApi = async (id) => {
+    try {
+        const res = await api.delete(`/api/transactions/delete-expense/${id}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const getUserAllExpensesApi = async (page = 1, limit = 10) => {
+    const res = await api.get(`/api/transactions/user-all-expenses?page=${page}&limit=${limit}`);
     return res.data;
 };
 

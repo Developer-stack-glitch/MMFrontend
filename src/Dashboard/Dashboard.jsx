@@ -39,7 +39,6 @@ import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { FullPageLoader } from "../../Common/FullPageLoader";
 import Modals from "./Modals";
-import { CommonToaster } from "../../Common/CommonToaster";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 dayjs.extend(isBetween);
 ChartJS.register(ArcElement, ChartTooltip, Legend);
@@ -65,9 +64,6 @@ export default function Dashboard() {
     const [mainCategory, setMainCategory] = useState("Select Main Category");
     const [subCategory, setSubCategory] = useState("Select Category");
     const [description, setDescription] = useState("");
-    const [vendorName, setVendorName] = useState("");
-    const [vendorNumber, setVendorNumber] = useState("");
-    const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [filters, setFilters] = useState({
         filterType: "date",
         compareMode: false,
@@ -95,7 +91,7 @@ export default function Dashboard() {
             setExpenseCategories(grouped);
             setIncomeCategories(incCat || []);
 
-            const res = await getUserAllExpensesApi();
+            const res = await getUserAllExpensesApi(1, 100000);
 
             // For Dashboard charts:
             const expensesData = res.expenses || [];
@@ -127,10 +123,8 @@ export default function Dashboard() {
         const reloadData = () => fetchOriginalData();
 
         window.addEventListener("incomeExpenseUpdated", reloadData);
-        window.addEventListener("summaryUpdated", reloadData);
         return () => {
             window.removeEventListener("incomeExpenseUpdated", reloadData);
-            window.removeEventListener("summaryUpdated", reloadData);
         };
     }, []);
 
@@ -220,7 +214,8 @@ export default function Dashboard() {
         let latestIncomeOrWallet = [];
 
         // Filter only approved approvals for the Wallet/Income tab
-        const approvedApprovals = filteredIncome.filter(item => item.status === 'approved');
+        // Filter only approved approvals for the Wallet/Income tab
+
 
         let latestExpense = [];
 
@@ -312,8 +307,7 @@ export default function Dashboard() {
 
     const expensePieData = useMemo(() => {
         const latestFive = [...expenseDataDb]
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 5);
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
 
         const map = {};
         latestFive.forEach((item) => {
@@ -472,12 +466,6 @@ export default function Dashboard() {
                                     setDescription={setDescription}
                                     expenseCategories={expenseCategories}
                                     incomeCategories={incomeCategories}
-                                    vendorName={vendorName}
-                                    setVendorName={setVendorName}
-                                    vendorNumber={vendorNumber}
-                                    setVendorNumber={setVendorNumber}
-                                    endDate={endDate}
-                                    setEndDate={setEndDate}
                                 />
                             </AnimatePresence>
 

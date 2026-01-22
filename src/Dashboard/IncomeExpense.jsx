@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Plus } from "lucide-react";
-import { Select, Button } from "antd";
+import { Select, Button, Pagination, Popconfirm } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import Filters from "../Filters/Filters";
@@ -9,11 +9,14 @@ import {
     getExpenseCategoriesApi,
     getUserAllExpensesApi,
     getApprovalsApi,
-    safeGetLocalStorage
+    safeGetLocalStorage,
+    deleteExpenseApi,
+    getVendorsApi
 } from "../../Api/action";
 
 import * as Icons from "lucide-react";
 import { FullPageLoader } from "../../Common/FullPageLoader";
+import { CommonToaster } from "../../Common/CommonToaster";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 
 export default function IncomeExpense() {
@@ -43,10 +46,20 @@ export default function IncomeExpense() {
     // Vendor Details Modal
     const [showVendorModal, setShowVendorModal] = useState(false);
     const [selectedVendorStats, setSelectedVendorStats] = useState(null);
+    const [vendorList, setVendorList] = useState([]);
+
+    useEffect(() => {
+        getVendorsApi().then((res) => {
+            setVendorList(res || []);
+        }).catch(err => console.error("Failed to load vendors", err));
+    }, []);
 
     const handleViewVendor = (row) => {
         const vName = row.vendorName || row.transaction_to;
         if (!vName) return;
+
+        // Find full details from vendorList
+        const fullVendor = vendorList.find(v => v.name === vName);
 
         // Calculate total for this vendor
         const relevantExpenses = expenseData.filter(e =>
@@ -59,8 +72,11 @@ export default function IncomeExpense() {
 
         setSelectedVendorStats({
             name: vName,
-            number: row.vendorNumber || "-",
-            gst: row.vendorGst || "-",
+            company: fullVendor?.company_name || "-",
+            number: row.vendorNumber || fullVendor?.number || "-",
+            email: fullVendor?.email || "-",
+            address: fullVendor?.address || "-",
+            gst: row.vendorGst || fullVendor?.gst || "-",
             totalPaid: fmtAmt(totalPaid),
             count: relevantExpenses.length
         });
@@ -205,21 +221,38 @@ export default function IncomeExpense() {
             let expenses = { data: [], total: 0 };
             let income = { data: [], total: 0 };
 
-            const res = await getUserAllExpensesApi();
+            // Pass page and limit=10
+            const res = await getUserAllExpensesApi(page, 10);
 
-            let pendingApprovals = [];
-            pendingApprovals = await getApprovalsApi().catch(() => []);
-            expenses = { data: res.expenses || [], total: res.expenses?.length || 0 };
-            let combinedApprovals = [...(res.approvals || []), ...pendingApprovals];
+            let pendingResults = { data: [], total: 0 };
+            try {
+                pendingResults = await getApprovalsApi(page, 10);
+                // Handle legacy response if it was just an array
+                if (Array.isArray(pendingResults)) {
+                    pendingResults = { data: pendingResults, total: pendingResults.length };
+                }
+            } catch (e) {
+                pendingResults = { data: [], total: 0 };
+            }
+
+            expenses = {
+                data: res.expenses || [],
+                total: res.expensesTotal || 0
+            };
+
+            let combinedApprovals = [...(res.approvals || []), ...(pendingResults.data || [])];
+            let combinedTotal = (res.approvalsTotal || 0) + (pendingResults.total || 0);
 
             if (userRole === "admin") {
                 combinedApprovals = combinedApprovals.filter(item => item.status !== "pending");
+                combinedTotal = res.approvalsTotal || 0;
             }
 
-            income = { data: combinedApprovals, total: combinedApprovals.length };
+            income = { data: combinedApprovals, total: combinedTotal };
 
             setExpenseData(expenses.data || []);
             setIncomeData(income.data || []);
+
             if (activeTab === "expense") {
                 setPageTotal(expenses.total);
             } else {
@@ -258,6 +291,7 @@ export default function IncomeExpense() {
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
+        setPage(1); // Reset page on tab change
         resetForm();
     };
 
@@ -459,10 +493,29 @@ export default function IncomeExpense() {
         setOpenModal("expense");
     };
 
+    const handleDelete = async (row) => {
+        const idToDelete = row.id || row.original_expense_id;
+
+        // Optimistic UI Update
+        setExpenseData(prev => prev.filter(item => item.id !== idToDelete));
+
+        try {
+            await deleteExpenseApi(idToDelete);
+            CommonToaster("Expense deleted successfully", "success");
+            window.dispatchEvent(new Event("incomeExpenseUpdated"));
+            window.dispatchEvent(new Event("summaryUpdated"));
+        } catch (error) {
+            CommonToaster(error.message || "Failed to delete expense", "error");
+            setRefreshKey(prev => prev + 1);
+        }
+    };
+
     const isApprovalTab = activeTab === "approval";
-    const gridStyle = { gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0fr" };
+    const gridStyle = (userRole === "admin" && activeTab === "expense")
+        ? { gridTemplateColumns: "240px 1.3fr 160px 140px 100px 130px 130px 90px" }
+        : { gridTemplateColumns: "240px 1.8fr 1fr 1fr 1fr 120px 120px 110px" };
     const approvalGridStyle = {
-        gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 0.5fr"
+        gridTemplateColumns: "260px 1.5fr 140px 130px 80px 120px 120px 80px"
     };
 
     return (
@@ -628,11 +681,11 @@ export default function IncomeExpense() {
                                                     <div>DESCRIPTION</div>
                                                     <div>VENDOR</div>
                                                     <div>TRANSACTION</div>
-                                                    <div>MODE</div>
+
                                                     <div>AMOUNT</div>
                                                     <div>BRANCH</div>
                                                     <div>STATUS</div>
-                                                    {/* <div>ACTION</div> */}
+                                                    {userRole === "admin" && <div>ACTION</div>}
                                                 </>
                                             )}
                                         </div>
@@ -664,19 +717,19 @@ export default function IncomeExpense() {
                                                                 display: "flex",
                                                                 alignItems: "center",
                                                                 justifyContent: "center",
+                                                                minWidth: 40, // Prevent shrink
                                                             }}
                                                         >
                                                             {row.icon}
                                                         </div>
                                                         <div className="details-text">
                                                             <span className="date">{row.date}</span>
-                                                            <span className="title">{row.title}</span>
+                                                            <span className="title" style={{ fontWeight: 700, fontSize: 13 }}>{row.title}</span>
                                                             {/* Invoice Button */}
                                                             {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" && (
                                                                 <button
                                                                     className="view-invoice-btn"
                                                                     onClick={() => handleViewInvoice(row.invoice)}
-                                                                    style={{ marginTop: 5 }}
                                                                 >
                                                                     View Invoice
                                                                 </button>
@@ -686,9 +739,11 @@ export default function IncomeExpense() {
 
                                                     {isApprovalTab ? (
                                                         <>
-                                                            <div>{row.note}</div>
+                                                            <div className="text-truncate-2" title={row.note}>
+                                                                {row.note}
+                                                            </div>
                                                             <div>{row.report}</div>
-                                                            <div>{row.amount}<br></br>
+                                                            <div style={{ fontWeight: 600 }}>{row.amount}<br></br>
                                                                 {Boolean(row.is_edit) && <span className="editable-pill">Editable</span>}
                                                             </div>
                                                             <div>{row.gst === 'Yes' ? <span className="status-badge" style={{ background: '#d4377f', color: 'white' }}>GST</span> : '-'}</div>
@@ -728,7 +783,9 @@ export default function IncomeExpense() {
                                                     ) : (
                                                         <>
                                                             <div className="vendor-col">
-                                                                {row.description || "-"}
+                                                                <div className="text-truncate-2" title={row.description}>
+                                                                    {row.description || "-"}
+                                                                </div>
                                                             </div>
                                                             <div className="vendor-col">
                                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -745,10 +802,11 @@ export default function IncomeExpense() {
                                                                         className="view-invoice-btn"
                                                                         style={{
                                                                             fontSize: '10px',
-                                                                            padding: '2px 6px',
+                                                                            padding: '2px 8px',
                                                                             marginTop: '4px',
                                                                             height: 'auto',
-                                                                            lineHeight: 'normal'
+                                                                            lineHeight: 'normal',
+                                                                            width: 'auto'
                                                                         }}
                                                                     >
                                                                         View Info
@@ -758,12 +816,12 @@ export default function IncomeExpense() {
                                                             <div className="vendor-col">
                                                                 {row.transaction_from ? (
                                                                     <>
-                                                                        <span className="title">{row.transaction_from}</span>
+                                                                        <span className="title" style={{ fontSize: 13 }}>{row.transaction_from}</span>
+                                                                        <span className="title" style={{ fontSize: 13 }}>{row.spendMode}</span>
                                                                     </>
                                                                 ) : "-"}
                                                             </div>
-                                                            <div>{row.spendMode}</div>
-                                                            <div>{row.amount}</div>
+                                                            <div style={{ fontWeight: 600 }}>{row.amount}</div>
                                                             <div>{row.report}</div>
                                                             <div>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -772,6 +830,24 @@ export default function IncomeExpense() {
                                                                     </span>
                                                                 </div>
                                                             </div>
+                                                            {userRole === "admin" && (
+                                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                                    <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
+                                                                        <Icons.Edit size={16} />
+                                                                    </button>
+                                                                    <Popconfirm
+                                                                        title="Delete this expense?"
+                                                                        description="This action cannot be undone and will revert any associated approval to pending."
+                                                                        onConfirm={() => handleDelete(row.originalItem || row)}
+                                                                        okText="Yes"
+                                                                        cancelText="No"
+                                                                    >
+                                                                        <button className="edit-btn" style={{ color: '#ff4d4f' }}>
+                                                                            <Icons.Trash2 size={16} />
+                                                                        </button>
+                                                                    </Popconfirm>
+                                                                </div>
+                                                            )}
                                                         </>
                                                     )}
                                                 </div>
@@ -779,10 +855,10 @@ export default function IncomeExpense() {
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            </div >
 
                             {/* MODAL */}
-                            <AnimatePresence>
+                            < AnimatePresence >
                                 {openModal && (
                                     <Modals
                                         open={!!openModal}
@@ -810,20 +886,37 @@ export default function IncomeExpense() {
                                         setVendorName={setVendorName}
                                         editData={editData}
                                     />
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-                    </div>
+                                )
+                                }
+                            </AnimatePresence >
+
+                            {/* Pagination */}
+                            {PageTotal > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                                    <Pagination
+                                        current={page}
+                                        total={PageTotal}
+                                        pageSize={10}
+                                        onChange={(p) => setPage(p)}
+                                        showSizeChanger={false}
+                                    />
+                                </div>
+                            )}
+
+                        </motion.div >
+                    </div >
                 </>
             )}
 
-            {showInvoiceModal && currentInvoices.length > 0 && (
-                <InvoicePreviewModal
-                    open={showInvoiceModal}
-                    onClose={() => setShowInvoiceModal(false)}
-                    invoices={currentInvoices}
-                />
-            )}
+            {
+                showInvoiceModal && currentInvoices.length > 0 && (
+                    <InvoicePreviewModal
+                        open={showInvoiceModal}
+                        onClose={() => setShowInvoiceModal(false)}
+                        invoices={currentInvoices}
+                    />
+                )
+            }
 
             {/* Vendor Stats Modal */}
             <AnimatePresence>
@@ -848,7 +941,10 @@ export default function IncomeExpense() {
                             </h3>
                             <div style={{ display: 'grid', gap: '12px', fontSize: '14px' }}>
                                 <div><strong>Name:</strong> {selectedVendorStats.name}</div>
+                                <div><strong>Company:</strong> {selectedVendorStats.company}</div>
                                 <div><strong>Number:</strong> {selectedVendorStats.number}</div>
+                                <div><strong>Email:</strong> {selectedVendorStats.email}</div>
+                                <div><strong>Address:</strong> {selectedVendorStats.address}</div>
                                 <div><strong>GST Number:</strong> {selectedVendorStats.gst}</div>
                                 <div style={{ marginTop: '10px', fontSize: '16px', color: '#d4af37' }}>
                                     <strong>Total Paid:</strong> {selectedVendorStats.totalPaid}

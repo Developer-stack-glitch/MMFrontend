@@ -351,6 +351,7 @@ export default function Modals({
                     type: 'group',
                     label: 'CHENNAI',
                     children: [
+                        { key: "Chennai", label: "Chennai" },
                         { key: "Velachery", label: "Velachery" },
                         { key: "Anna Nagar", label: "Anna Nagar" },
                         { key: "Porur", label: "Porur" },
@@ -361,6 +362,7 @@ export default function Modals({
                     type: 'group',
                     label: 'BANGALORE',
                     children: [
+                        { key: "Bangalore", label: "Bangalore" },
                         { key: "Electronic City", label: "Electronic City" },
                         { key: "BTM Layout", label: "BTM Layout" },
                         { key: "Marathahalli", label: "Marathahalli" },
@@ -644,11 +646,12 @@ export default function Modals({
                                                 <Menu
                                                     onClick={(e) => setSpendMode(e.key)}
                                                     items={[
-                                                        { key: "Cash", label: "Cash" },
-                                                        { key: "Upi", label: "Upi" },
+                                                        { key: "CASH", label: "CASH" },
+                                                        { key: "UPI", label: "UPI" },
                                                         { key: "NEFT", label: "NEFT" },
                                                         { key: "IMPS", label: "IMPS" },
-                                                        { key: "Card", label: "Card" },
+                                                        { key: "CARD", label: "CARD" },
+                                                        { key: "NET BANKING", label: "NET BANKING" },
                                                     ]}
                                                 />
                                             }
