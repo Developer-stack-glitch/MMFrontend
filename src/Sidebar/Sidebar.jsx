@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
     Layout,
     Menu,
@@ -13,9 +13,7 @@ import {
     X,
     LayoutDashboard,
     DollarSign,
-    FileCheck2,
     Settings,
-    Bell,
     LogOut,
     PlusIcon,
     Plus,
@@ -65,6 +63,7 @@ export default function SideBarLayout() {
     const [user, setUser] = useState("");
     const [pendingCount, setPendingCount] = useState(0);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const previousPendingCount = useRef(0);
 
     const [branch, setBranch] = useState("Select Branch");
     const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -125,6 +124,15 @@ export default function SideBarLayout() {
         return () => window.removeEventListener("incomeExpenseUpdated", update);
     }, []);
 
+    // Poll for new approvals every 30 seconds
+    useEffect(() => {
+        const pollInterval = setInterval(() => {
+            loadPendingApprovals();
+        }, 20000); // Check every 30 seconds
+
+        return () => clearInterval(pollInterval);
+    }, []);
+
     useEffect(() => {
         loadAlerts();
     }, []);
@@ -157,17 +165,41 @@ export default function SideBarLayout() {
     }, []);
 
 
+    // Function to play notification sound - Custom Alert
+    const playNotificationSound = () => {
+        try {
+            const audio = new Audio('/Notification_sound/alert.mp3');
+            audio.volume = 0.7;
+            audio.play().catch(error => {
+                console.error("Error playing notification sound:", error);
+            });
+        } catch (error) {
+            console.error("Error playing notification sound:", error);
+        }
+    };
+
     const loadPendingApprovals = async () => {
         try {
             const response = await getApprovalsApi();
+            let newCount = 0;
+
             if (response && response.data && Array.isArray(response.data)) {
                 // If total is provided, use it, otherwise fallback to current page length
-                setPendingCount(response.total ?? response.data.length);
+                newCount = response.total ?? response.data.length;
             } else if (Array.isArray(response)) {
-                setPendingCount(response.length);
-            } else {
-                setPendingCount(0);
+                newCount = response.length;
             }
+
+            // Check if there are new approvals (count increased) AND user is admin
+            if (previousPendingCount.current > 0 && newCount > previousPendingCount.current && user?.role === "admin") {
+                // Play notification sound for new approvals (admin only)
+                playNotificationSound();
+                CommonToaster(`${newCount - previousPendingCount.current} new approval(s) received!`, "info");
+            }
+
+            // Update the counts
+            previousPendingCount.current = newCount;
+            setPendingCount(newCount);
         } catch (error) {
             console.log("Approval count error:", error);
         }

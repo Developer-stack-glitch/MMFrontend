@@ -97,7 +97,46 @@ export default function InvoicePreviewModal({ open, onClose, invoices = [] }) {
                         Invoice Preview ({currentIndex + 1} of {invoices.length})
                     </h3>
 
-                    <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        {/* Download Button */}
+                        <button
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                    const response = await fetch(currentSrc);
+                                    const blob = await response.blob();
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    const fileName = currentSrc.split('/').pop() || `invoice_${currentIndex + 1}`;
+                                    link.setAttribute('download', fileName);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                    window.URL.revokeObjectURL(url);
+                                } catch (error) {
+                                    console.error("Download failed:", error);
+                                    window.open(currentSrc, '_blank');
+                                }
+                            }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "#f0f0f0",
+                                border: "none",
+                                borderRadius: "8px",
+                                width: "36px",
+                                height: "36px",
+                                cursor: "pointer",
+                                color: "#333",
+                                padding: 0
+                            }}
+                            title="Download Invoice"
+                        >
+                            <Icons.Download size={18} />
+                        </button>
+
                         {/* Zoom Controls */}
                         {!isPDF(currentSrc) && (
                             <div style={{ display: "flex", gap: 5, background: "#f0f0f0", padding: "5px", borderRadius: "8px", alignItems: "center" }}>

@@ -22,6 +22,8 @@ import {
     CreditCard,
     Wallet,
     Receipt,
+    MoreHorizontal,
+    Minimize2
 } from "lucide-react";
 import "../css/Dashboard.css";
 import "../css/Calendar.css";
@@ -45,6 +47,7 @@ ChartJS.register(ArcElement, ChartTooltip, Legend);
 
 export default function Dashboard() {
     const [originalIncome, setOriginalIncome] = useState([]);
+    const [showAllCategories, setShowAllCategories] = useState(false);
     const [originalExpenses, setOriginalExpenses] = useState([]);
     const [walletEntries, setWalletEntries] = useState([]);
     const [expenseCategories, setExpenseCategories] = useState({});
@@ -213,14 +216,9 @@ export default function Dashboard() {
         setExpenseDataDb(filteredExpenses);
         let latestIncomeOrWallet = [];
 
-        // Filter only approved approvals for the Wallet/Income tab
-        // Filter only approved approvals for the Wallet/Income tab
-
-
         let latestExpense = [];
 
         if (user.role === "admin") {
-            // Admin: Use all wallet entries (Income types)
             latestIncomeOrWallet = [...filteredWalletEntries]
                 .filter(w => (w.type || "").toLowerCase() === 'income')
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -306,33 +304,46 @@ export default function Dashboard() {
     }, [filteredWalletEntries]);
 
     const expensePieData = useMemo(() => {
-        const latestFive = [...expenseDataDb]
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
-
+        // Aggregate totals by sub_category
         const map = {};
-        latestFive.forEach((item) => {
+        (expenseDataDb || []).forEach((item) => {
             const cat = item.sub_category || "Other";
             map[cat] = (map[cat] || 0) + Number(item.total);
         });
 
+        // Convert to array and sort by value (descending)
+        const sortedEntries = Object.entries(map)
+            .sort(([, valA], [, valB]) => valB - valA);
+
+        const totalCategories = sortedEntries.length;
+
+        // Slice if not showing all
+        const displayedEntries = showAllCategories
+            ? sortedEntries
+            : sortedEntries.slice(0, 5);
+
+        // Extended Color Palette
+        const baseColors = [
+            "#4BC0C0", "#FFCD56", "#FF6384", "#36A2EB", "#d4af37",
+            "#8e5ea2", "#3cba9f", "#e8c3b9", "#c45850", "#7e57c2",
+            "#ff9f40", "#ffcd56", "#4bc0c0", "#36a2eb", "#9966ff"
+        ];
+        const bgColors = displayedEntries.map((_, i) => baseColors[i % baseColors.length]);
+
         return {
-            labels: Object.keys(map),
+            labels: displayedEntries.map(([name]) => name),
             datasets: [
                 {
-                    data: Object.values(map),
-                    backgroundColor: [
-                        "#4BC0C0",
-                        "#FFCD56",
-                        "#FF6384",
-                        "#36A2EB",
-                        "#d4af37",
-                    ],
+                    data: displayedEntries.map(([, val]) => val),
+                    backgroundColor: bgColors,
                     borderColor: "#fff",
                     borderWidth: 2,
                 },
             ],
+            // Custom flag to control UI
+            hasMore: totalCategories > 5
         };
-    }, [expenseDataDb]);
+    }, [expenseDataDb, showAllCategories]);
 
     // -------------------------
     // Small helper for "no data" box
@@ -476,6 +487,22 @@ export default function Dashboard() {
                                         <PieChart size={18} style={{ marginRight: 8, color: "#d4af37" }} />
                                         Expense Breakdown
                                     </h3>
+                                    {expensePieData.hasMore && (
+                                        <button
+                                            onClick={() => setShowAllCategories(!showAllCategories)}
+                                            style={{
+                                                background: "none",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                color: "#6b7280",
+                                                display: "flex",
+                                                alignItems: "center"
+                                            }}
+                                            title={showAllCategories ? "Show Less" : "Show All"}
+                                        >
+                                            {showAllCategories ? <Minimize2 size={18} /> : <MoreHorizontal size={18} />}
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="chart-wrapper">
                                     {expensePieData.labels.length === 0 ? (

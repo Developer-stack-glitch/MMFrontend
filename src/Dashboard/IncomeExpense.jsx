@@ -427,11 +427,38 @@ export default function IncomeExpense() {
     const handleExportCSV = () => {
         if (!filteredRows.length) return;
 
+        // Helper for invoice URLs
+        const getInvoiceUrls = (invoiceData) => {
+            if (!invoiceData || String(invoiceData).trim() === "" || String(invoiceData) === "[]") return "-";
+            const BASE = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+            const normalize = (item) => {
+                if (!item) return "";
+                let str = String(item).trim().replace(/^"+|"+$/g, "");
+                if (str.startsWith("data:")) return "base64-content";
+                if (str.startsWith("http") || str.startsWith("/uploads")) return str.startsWith("http") ? str : `${BASE}${str}`;
+                return `${BASE}/uploads/invoices/${str}`;
+            };
+
+            let arr = [];
+            if (Array.isArray(invoiceData)) {
+                arr = invoiceData;
+            } else if (typeof invoiceData === "string" && invoiceData.startsWith("[")) {
+                try {
+                    const parsed = JSON.parse(invoiceData);
+                    if (Array.isArray(parsed)) arr = parsed;
+                    else arr = [invoiceData];
+                } catch { arr = [invoiceData]; }
+            } else {
+                arr = [invoiceData];
+            }
+            return arr.map(normalize).filter(Boolean).join(" ; ");
+        };
+
         let headers = [];
         let rowMapper = (row) => [];
 
         if (activeTab === "approval") {
-            headers = ["Date", "Category", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status"];
+            headers = ["Date", "Category", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
             rowMapper = (row) => [
                 row.date,
                 row.title,
@@ -441,10 +468,11 @@ export default function IncomeExpense() {
                 row.amount,
                 row.gst || "No",
                 row.end_date || "-",
-                row.status
+                row.status,
+                getInvoiceUrls(row.invoice)
             ];
         } else {
-            headers = ["Date", "Category", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "Branch", "Status"];
+            headers = ["Date", "Category", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "Branch", "Status", "Invoice"];
             rowMapper = (row) => [
                 row.date,
                 row.title,
@@ -455,7 +483,8 @@ export default function IncomeExpense() {
                 row.spendMode || "-",
                 row.amount,
                 row.report || "-",
-                row.status
+                row.status,
+                getInvoiceUrls(row.invoice)
             ];
         }
 
