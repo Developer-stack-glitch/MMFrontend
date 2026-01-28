@@ -390,8 +390,17 @@ export const deleteExpenseApi = async (id) => {
     }
 };
 
-export const getUserAllExpensesApi = async (page = 1, limit = 10) => {
-    const res = await api.get(`/api/transactions/user-all-expenses?page=${page}&limit=${limit}`);
+export const getUserAllExpensesApi = async (page = 1, limit = 10, filters = {}) => {
+    let query = `/api/transactions/user-all-expenses?page=${page}&limit=${limit}`;
+    if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
+    if (filters.branch && filters.branch !== 'All') query += `&branch=${encodeURIComponent(filters.branch)}`;
+
+    const res = await api.get(query);
+    return res.data;
+};
+
+export const getTransactionFilterOptionsApi = async () => {
+    const res = await api.get("/api/transactions/filter-options");
     return res.data;
 };
 

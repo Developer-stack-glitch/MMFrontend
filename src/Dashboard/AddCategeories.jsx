@@ -15,7 +15,8 @@ import { Modal, Tabs, Button, Input, Select, Radio, Popconfirm } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Icons from "lucide-react";
 import { Plus, X, Trash2, Edit, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
-import { FullPageLoader } from "../../Common/FullPageLoader";
+import CategoriesSkeleton from "./CategoriesSkeleton";
+
 import { CommonToaster } from "../../Common/CommonToaster";
 
 const { TabPane } = Tabs;
@@ -209,7 +210,8 @@ export default function AddCategories() {
 
     return (
         <>
-            {loading ? (<FullPageLoader />) : (
+            {loading ? (<CategoriesSkeleton />) : (
+
                 <div className="categories-container">
                     <div className="categories-header">
                         <h2>Manage Categories</h2>

@@ -11,13 +11,16 @@ import {
     getApprovalsApi,
     safeGetLocalStorage,
     deleteExpenseApi,
-    getVendorsApi
+    getVendorsApi,
+    getTransactionFilterOptionsApi
 } from "../../Api/action";
 
 import * as Icons from "lucide-react";
-import { FullPageLoader } from "../../Common/FullPageLoader";
+
 import { CommonToaster } from "../../Common/CommonToaster";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
+import IncomeExpenseSkeleton from "./IncomeExpenseSkeleton";
+
 
 export default function IncomeExpense() {
     const userDetails = safeGetLocalStorage("loginDetails", {});
@@ -48,10 +51,20 @@ export default function IncomeExpense() {
     const [selectedVendorStats, setSelectedVendorStats] = useState(null);
     const [vendorList, setVendorList] = useState([]);
 
+    // Description Modal
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+    const [selectedDescription, setSelectedDescription] = useState("");
+
+    const [globalFilterOptions, setGlobalFilterOptions] = useState({ names: [], branches: [] });
+
     useEffect(() => {
         getVendorsApi().then((res) => {
             setVendorList(res || []);
         }).catch(err => console.error("Failed to load vendors", err));
+
+        getTransactionFilterOptionsApi().then((res) => {
+            setGlobalFilterOptions(res || { names: [], branches: [] });
+        }).catch(err => console.error("Failed to load filter options", err));
     }, []);
 
     const handleViewVendor = (row) => {
@@ -81,6 +94,11 @@ export default function IncomeExpense() {
             count: relevantExpenses.length
         });
         setShowVendorModal(true);
+    };
+
+    const handleViewDescription = (desc) => {
+        setSelectedDescription(desc || "");
+        setShowDescriptionModal(true);
     };
 
     // Filters
@@ -214,6 +232,9 @@ export default function IncomeExpense() {
     // -------------------------------------
     // Load Income + Expense + Approval
     // -------------------------------------
+    // -------------------------------------
+    // Load Income + Expense + Approval
+    // -------------------------------------
     useEffect(() => {
         async function loadData() {
             setLoading(true);
@@ -221,8 +242,8 @@ export default function IncomeExpense() {
             let expenses = { data: [], total: 0 };
             let income = { data: [], total: 0 };
 
-            // Pass page and limit=10
-            const res = await getUserAllExpensesApi(page, 10);
+            // Pass page and limit=10, plus filters
+            const res = await getUserAllExpensesApi(page, 10, { name: filterName, branch: filterBranch });
 
             let pendingResults = { data: [], total: 0 };
             try {
@@ -248,6 +269,10 @@ export default function IncomeExpense() {
                 combinedTotal = res.approvalsTotal || 0;
             }
 
+            // Client-side filtering for pending items might be needed if they are mixed in
+            if (filterName !== 'All') {
+            }
+
             income = { data: combinedApprovals, total: combinedTotal };
 
             setExpenseData(expenses.data || []);
@@ -263,7 +288,7 @@ export default function IncomeExpense() {
         }
 
         loadData();
-    }, [page, activeTab, userRole, refreshKey]);
+    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch]);
 
     useEffect(() => {
         const reload = () => {
@@ -375,8 +400,8 @@ export default function IncomeExpense() {
     // -------------------------------------
     // SEARCH / CATEGORY / SORT
     // -------------------------------------
-    const allNames = [...new Set(baseRows.map(r => r.merchant))].filter(Boolean);
-    const allBranches = [...new Set(baseRows.map(r => r.report))].filter(Boolean);
+    const allNames = globalFilterOptions?.names?.length ? globalFilterOptions.names : [...new Set(baseRows.map(r => r.merchant))].filter(Boolean);
+    const allBranches = globalFilterOptions?.branches?.length ? globalFilterOptions.branches : [...new Set(baseRows.map(r => r.report))].filter(Boolean);
     let filteredRows = [...baseRows];
 
     if (searchText.trim()) {
@@ -422,6 +447,7 @@ export default function IncomeExpense() {
         setSearchText("");
         setFilterName("All");
         setFilterBranch("All");
+        setPage(1);
     };
 
     const handleExportCSV = () => {
@@ -544,14 +570,15 @@ export default function IncomeExpense() {
         ? { gridTemplateColumns: "240px 1.3fr 160px 140px 100px 130px 130px 90px" }
         : { gridTemplateColumns: "240px 1.8fr 1fr 1fr 1fr 120px 120px 110px" };
     const approvalGridStyle = {
-        gridTemplateColumns: "260px 1.5fr 140px 130px 80px 120px 120px 80px"
+        gridTemplateColumns: "220px 1.3fr 160px 140px 100px 130px 130px 90px"
     };
 
     return (
         <>
             {loading ? (
-                <FullPageLoader />
+                <IncomeExpenseSkeleton />
             ) : (
+
                 <>
                     <Filters onFilterChange={setFilters} />
 
@@ -645,7 +672,7 @@ export default function IncomeExpense() {
                                     <div className="select-wrapper">
                                         <Select
                                             value={filterName}
-                                            onChange={setFilterName}
+                                            onChange={(v) => { setFilterName(v); setPage(1); }}
                                             style={{ width: 150 }}
                                             placeholder="Name"
                                             showSearch
@@ -660,7 +687,7 @@ export default function IncomeExpense() {
                                     <div className="select-wrapper">
                                         <Select
                                             value={filterBranch}
-                                            onChange={setFilterBranch}
+                                            onChange={(v) => { setFilterBranch(v); setPage(1); }}
                                             style={{ width: 150 }}
                                             placeholder="Branch"
                                             showSearch
@@ -768,8 +795,29 @@ export default function IncomeExpense() {
 
                                                     {isApprovalTab ? (
                                                         <>
-                                                            <div className="text-truncate-2" title={row.note}>
-                                                                {row.note}
+                                                            <div>
+                                                                <div className="text-truncate-2" title={row.note}>
+                                                                    {row.note}
+                                                                </div>
+                                                                {row.note && row.note.length > 50 && (
+                                                                    <button
+                                                                        onClick={() => handleViewDescription(row.note)}
+                                                                        className="view-invoice-btn"
+                                                                        style={{
+                                                                            fontSize: '10px',
+                                                                            padding: '2px 8px',
+                                                                            marginTop: '4px',
+                                                                            height: 'auto',
+                                                                            lineHeight: 'normal',
+                                                                            width: 'max-content',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center'
+                                                                        }}
+                                                                    >
+                                                                        View
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                             <div>{row.report}</div>
                                                             <div style={{ fontWeight: 600 }}>{row.amount}<br></br>
@@ -815,6 +863,23 @@ export default function IncomeExpense() {
                                                                 <div className="text-truncate-2" title={row.description}>
                                                                     {row.description || "-"}
                                                                 </div>
+                                                                {row.description && row.description.length > 50 && (
+                                                                    <button
+                                                                        onClick={() => handleViewDescription(row.description)}
+                                                                        className="view-invoice-btn"
+                                                                        style={{
+                                                                            fontSize: '10px',
+                                                                            padding: '2px 8px',
+                                                                            marginTop: '4px',
+                                                                            height: 'auto',
+                                                                            lineHeight: 'normal',
+                                                                            width: 'auto',
+                                                                            display: 'inline-flex'
+                                                                        }}
+                                                                    >
+                                                                        View
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                             <div className="vendor-col">
                                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -984,6 +1049,38 @@ export default function IncomeExpense() {
                             </div>
                             <div style={{ marginTop: '24px', textAlign: 'right' }}>
                                 <Button onClick={() => setShowVendorModal(false)}>Close</Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Description Modal */}
+            <AnimatePresence>
+                {showDescriptionModal && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }} onClick={() => setShowDescriptionModal(false)}>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            style={{
+                                background: '#fff', padding: '24px', borderRadius: '12px',
+                                width: '500px', maxWidth: '90%', maxHeight: '80vh', overflowY: 'auto'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <h3 style={{ marginTop: 0, marginBottom: '15px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                                Full Description
+                            </h3>
+                            <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#333', whiteSpace: 'pre-wrap' }}>
+                                {selectedDescription}
+                            </div>
+                            <div style={{ marginTop: '20px', textAlign: 'right' }}>
+                                <Button onClick={() => setShowDescriptionModal(false)}>Close</Button>
                             </div>
                         </motion.div>
                     </div>

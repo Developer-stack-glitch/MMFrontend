@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { createUserApi, getUsersApi, deleteUserApi, safeGetLocalStorage } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
 import { Input, Select, Button, Card, Popconfirm } from "antd";
-import { FullPageLoader } from "../../Common/FullPageLoader";
+
 import { motion } from "framer-motion";
+import SettingsSkeleton from "./SettingsSkeleton";
+
 
 export default function SettingPage() {
     const [form, setForm] = useState({
@@ -85,8 +87,9 @@ export default function SettingPage() {
     return (
         <>
             {/* ✅ FULL SCREEN LOADER */}
-            {loading ? (<FullPageLoader />) : (
+            {loading ? (<SettingsSkeleton />) : (
                 <>
+
                     <div className="settings-page">
 
                         {/* ✅ CREATE USER FORM (Admin Only) */}

@@ -114,24 +114,28 @@ export default function SideBarLayout() {
     }, [])
 
     useEffect(() => {
-        loadPendingApprovals();
-    }, []);
+        if (user) {
+            loadPendingApprovals();
+        }
+    }, [user]);
 
     useEffect(() => {
         const update = () => loadPendingApprovals();
         window.addEventListener("incomeExpenseUpdated", update);
 
         return () => window.removeEventListener("incomeExpenseUpdated", update);
-    }, []);
+    }, [user]);
 
-    // Poll for new approvals every 30 seconds
+    // Poll for new approvals every 20 seconds
     useEffect(() => {
+        if (!user) return; // Don't start polling until user is loaded
+
         const pollInterval = setInterval(() => {
             loadPendingApprovals();
-        }, 20000); // Check every 30 seconds
+        }, 20000); // Check every 20 seconds
 
         return () => clearInterval(pollInterval);
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         loadAlerts();
@@ -168,13 +172,26 @@ export default function SideBarLayout() {
     // Function to play notification sound - Custom Alert
     const playNotificationSound = () => {
         try {
+            // Create a new audio instance
             const audio = new Audio('/Notification_sound/alert.mp3');
-            audio.volume = 0.7;
-            audio.play().catch(error => {
-                console.error("Error playing notification sound:", error);
-            });
+            audio.volume = 1.0; // Set to full volume
+
+            // Attempt to play the audio
+            const playPromise = audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log("Notification sound played successfully");
+                    })
+                    .catch(error => {
+                        console.error("Error playing notification sound:", error);
+                        // If autoplay is blocked, show a visual notification instead
+                        CommonToaster("New approvals received! (Sound blocked by browser)", "info");
+                    });
+            }
         } catch (error) {
-            console.error("Error playing notification sound:", error);
+            console.error("Error creating audio:", error);
         }
     };
 
@@ -191,10 +208,16 @@ export default function SideBarLayout() {
             }
 
             // Check if there are new approvals (count increased) AND user is admin
-            if (previousPendingCount.current > 0 && newCount > previousPendingCount.current && user?.role === "admin") {
+            // Only play sound if this is not the initial load (previousPendingCount has been set)
+            const isInitialLoad = previousPendingCount.current === 0 && newCount > 0;
+            const hasNewApprovals = newCount > previousPendingCount.current;
+
+            if (hasNewApprovals && user?.role === "admin" && !isInitialLoad) {
                 // Play notification sound for new approvals (admin only)
                 playNotificationSound();
                 CommonToaster(`${newCount - previousPendingCount.current} new approval(s) received!`, "info");
+                // Dispatch event to notify Approvals page to refresh
+                window.dispatchEvent(new Event("newApprovalsReceived"));
             }
 
             // Update the counts
@@ -475,14 +498,29 @@ export default function SideBarLayout() {
                     <h2 className="header-title">Hello, {user.name}</h2>
                     <div className="header-right">
                         {isAdmin ? (
-                            <Tooltip title="Approvals pending">
-                                <Button onClick={() => navigate("/approvals")} type="text" className="icon-btn notification-btn">
-                                    <ClockFading size={18} />
-                                    {pendingCount > 0 && (
-                                        <span className="pending-badge">{pendingCount}</span>
-                                    )}
-                                </Button>
-                            </Tooltip>
+                            <>
+                                <Tooltip title="Test notification sound">
+                                    <Button
+                                        onClick={() => {
+                                            playNotificationSound();
+                                            CommonToaster("Testing notification sound", "info");
+                                        }}
+                                        type="text"
+                                        className="icon-btn"
+                                        style={{ marginRight: '8px' }}
+                                    >
+                                        🔊
+                                    </Button>
+                                </Tooltip>
+                                <Tooltip title="Approvals pending">
+                                    <Button onClick={() => navigate("/approvals")} type="text" className="icon-btn notification-btn">
+                                        <ClockFading size={18} />
+                                        {pendingCount > 0 && (
+                                            <span className="pending-badge">{pendingCount}</span>
+                                        )}
+                                    </Button>
+                                </Tooltip>
+                            </>
                         ) : ""}
                         <Dropdown menu={profileMenu} placement="bottomRight" arrow>
                             <Avatar

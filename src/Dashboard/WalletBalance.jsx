@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Table, Button, Input, Spin, Empty } from "antd";
 import { getAllWalletDetailsApi, getWalletEntriesApi } from "../../Api/action";
 import { Wallet2, Plus } from "lucide-react";
+import WalletSkeleton, { WalletTableSkeleton } from "./WalletSkeleton";
+
+
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import weekOfYear from "dayjs/plugin/weekOfYear";
@@ -305,7 +308,9 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         },
     ];
 
+
     return (
+
         <div className="wallet-table-container">
             <h2 className="wallet-table-title">
                 <Wallet2 size={24} color="#d4af37" /> User Wallet List
@@ -321,19 +326,24 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                     className="wallet-filter-input"
                 />
             </div>
-            <Table
-                className="wallet-table"
-                loading={loading}
-                columns={columns}
-                dataSource={filteredUsers}
-                rowKey={(record) => record.id}
-                pagination={{ pageSize: 8 }}
-                expandable={{
-                    expandedRowRender,
-                    onExpand: handleExpand,
-                    rowExpandable: (record) => true,
-                }}
-            />
+            {loading ? (
+                <WalletTableSkeleton />
+            ) : (
+                <Table
+                    className="wallet-table"
+                    loading={loading}
+                    columns={columns}
+                    dataSource={filteredUsers}
+                    rowKey={(record) => record.id}
+                    pagination={{ pageSize: 8 }}
+                    expandable={{
+                        expandedRowRender,
+                        onExpand: handleExpand,
+                        rowExpandable: (record) => true,
+                    }}
+                />
+            )}
         </div>
     );
 }
+

@@ -13,8 +13,9 @@ import {
 } from "../../Api/action";
 import { CommonToaster } from "../../Common/CommonToaster";
 import Filters from "../Filters/Filters";
-import { FullPageLoader } from "../../Common/FullPageLoader";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
+import ApprovalsSkeleton from "./ApprovalsSkeleton";
+
 
 export default function Approvals() {
     const [filters, setFilters] = useState({
@@ -41,9 +42,11 @@ export default function Approvals() {
         loadApprovals();
         window.addEventListener("incomeExpenseUpdated", loadApprovals);
         window.addEventListener("summaryUpdated", loadApprovals);
+        window.addEventListener("newApprovalsReceived", loadApprovals);
         return () => {
             window.removeEventListener("incomeExpenseUpdated", loadApprovals);
             window.removeEventListener("summaryUpdated", loadApprovals);
+            window.removeEventListener("newApprovalsReceived", loadApprovals);
         };
     }, [page]);
 
@@ -105,7 +108,7 @@ export default function Approvals() {
     // ✅ Extract categories from Requests
     const categoryOptions = useMemo(() => {
         const set = new Set();
-        requests.forEach((r) => r?.category && set.add(r.category));
+        requests.forEach((r) => r?.sub_category && set.add(r.sub_category));
         return ["All", ...Array.from(set)];
     }, [requests]);
 
@@ -192,13 +195,13 @@ export default function Approvals() {
     let filteredRows = applyFilters(requests);
     if (searchText.trim()) {
         filteredRows = filteredRows.filter((r) =>
-            `${r.name} ${r.category} ${r.branch} ${fmtDate(r.date)}`
+            `${r.name} ${r.sub_category} ${r.branch} ${fmtDate(r.date)}`
                 .toLowerCase()
                 .includes(searchText.toLowerCase())
         );
     }
     if (filterCategory !== "All") {
-        filteredRows = filteredRows.filter((r) => r.category === filterCategory);
+        filteredRows = filteredRows.filter((r) => r.sub_category === filterCategory);
     }
     const parseAmt = (n) =>
         Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
@@ -225,8 +228,9 @@ export default function Approvals() {
 
     return (
         <>
-            {loading ? (<FullPageLoader />) : (
+            {loading ? (<ApprovalsSkeleton />) : (
                 <>
+
                     <Filters onFilterChange={setFilters} />
                     <div className="approvals-container">
                         <div className="approvals-header-top">
@@ -362,7 +366,7 @@ export default function Approvals() {
                                                                 backgroundColor: row.categoryColor || row.color,
                                                             }}
                                                         >
-                                                            {row.category}
+                                                            {row.sub_category}
                                                         </span>
                                                     </div>
                                                 </td>

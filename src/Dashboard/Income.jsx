@@ -38,7 +38,8 @@ import {
 } from "../../Api/action";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-import { FullPageLoader } from "../../Common/FullPageLoader";
+import IncomeSkeleton from "./IncomeSkeleton";
+
 import Modals from "./Modals";
 import { CommonToaster } from "../../Common/CommonToaster";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
@@ -355,8 +356,9 @@ export default function Income() {
     return (
         <>
             {loading ? (
-                <FullPageLoader />
+                <IncomeSkeleton />
             ) : (
+
                 <>
                     <Filters onFilterChange={setFilters} />
                     <div className="dashboard-container">

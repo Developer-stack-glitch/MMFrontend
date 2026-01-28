@@ -39,11 +39,13 @@ import {
 } from "../../Api/action";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-import { FullPageLoader } from "../../Common/FullPageLoader";
+
 import Modals from "./Modals";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 dayjs.extend(isBetween);
 ChartJS.register(ArcElement, ChartTooltip, Legend);
+import DashboardSkeleton from "./DashboardSkeleton";
+
 
 export default function Dashboard() {
     const [originalIncome, setOriginalIncome] = useState([]);
@@ -361,9 +363,10 @@ export default function Dashboard() {
     );
 
     return (
+
         <>
             {loading ? (
-                <FullPageLoader />
+                <DashboardSkeleton />
             ) : (
                 <>
                     <Filters onFilterChange={setFilters} />
