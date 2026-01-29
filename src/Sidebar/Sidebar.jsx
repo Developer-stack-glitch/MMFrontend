@@ -26,6 +26,7 @@ import {
     ClockFading,
     TrendingUp,
     TimerResetIcon,
+    Volume2,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
@@ -509,7 +510,7 @@ export default function SideBarLayout() {
                                         className="icon-btn"
                                         style={{ marginRight: '8px' }}
                                     >
-                                        🔊
+                                        <Volume2 size={18} />
                                     </Button>
                                 </Tooltip>
                                 <Tooltip title="Approvals pending">

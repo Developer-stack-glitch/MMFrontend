@@ -153,7 +153,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                         color: type.toLowerCase() === 'income' ? 'green' : 'red',
                         fontWeight: 500
                     }}>
-                        {type}
+                        Recieved
                     </span>
                 ),
             },
@@ -186,25 +186,21 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         return (
             <div style={{ margin: 0, background: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
                 <h4 style={{ marginBottom: '0px', marginTop: '0px', color: '#555' }}>Transaction History</h4>
-                <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
-                    <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '8px' }}>
+                    {/* <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
                         <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Total Income</span>
                         <span style={{ color: 'green', fontWeight: 'bold', fontSize: '16px' }}>₹{filteredIncome.toLocaleString()}</span>
                     </div>
-                    {/* <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
-                        <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Total Spent</span>
-                        <span style={{ color: 'red', fontWeight: 'bold', fontSize: '16px' }}>₹{filteredExpense.toLocaleString()}</span>
-                    </div> */}
 
                     <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
                         <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Wallet Balance</span>
                         <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>₹{Number(fullData.wallet).toLocaleString()}</span>
-                    </div>
+                    </div> */}
                 </div>
                 <Table
                     columns={historyColumns}
                     dataSource={entries}
-                    pagination={false}
+                    pagination={{ pageSize: 5 }}
                     rowKey="id"
                     size="small"
                     bordered

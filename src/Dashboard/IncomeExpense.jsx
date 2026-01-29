@@ -115,6 +115,7 @@ export default function IncomeExpense() {
 
     const [page, setPage] = useState(1);
     const [PageTotal, setPageTotal] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
 
     const [expenseCategories, setExpenseCategories] = useState({});
     const [incomeCategories, setIncomeCategories] = useState([]);
@@ -134,8 +135,10 @@ export default function IncomeExpense() {
         // loadWallet(); 
     }, [userId, userRole]);
 
-    const fmtAmt = (n) =>
-        `₹${Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0}`;
+    const fmtAmt = (n) => {
+        const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
+        return `₹${val.toLocaleString('en-IN')}`;
+    };
 
     // -------------------------------------
     // Invoice Slider
@@ -175,9 +178,23 @@ export default function IncomeExpense() {
 
 
 
-    // -------------------------------------
-    // APPLY FILTERS
-    // -------------------------------------
+    const getDateRange = (f) => {
+        if (!f.value) return { startDate: null, endDate: null };
+        const type = f.filterType;
+        let start, end;
+
+        if (!f.compareMode) {
+            start = dayjs(f.value).startOf(type).format("YYYY-MM-DD");
+            end = dayjs(f.value).endOf(type).format("YYYY-MM-DD");
+        } else {
+            if (!Array.isArray(f.value) || f.value.length !== 2)
+                return { startDate: null, endDate: null };
+            start = dayjs(f.value[0]).startOf('day').format("YYYY-MM-DD");
+            end = dayjs(f.value[1]).endOf('day').format("YYYY-MM-DD");
+        }
+        return { startDate: start, endDate: end };
+    };
+
     const applyFilters = (items) => {
         if (!items || !Array.isArray(items)) return [];
         if (!filters.value) return items;
@@ -242,12 +259,19 @@ export default function IncomeExpense() {
             let expenses = { data: [], total: 0 };
             let income = { data: [], total: 0 };
 
-            // Pass page and limit=10, plus filters
-            const res = await getUserAllExpensesApi(page, 10, { name: filterName, branch: filterBranch });
+            const { startDate, endDate } = getDateRange(filters);
+
+            // Pass page and limit, plus filters
+            const res = await getUserAllExpensesApi(page, pageSize, {
+                name: filterName,
+                branch: filterBranch,
+                startDate,
+                endDate
+            });
 
             let pendingResults = { data: [], total: 0 };
             try {
-                pendingResults = await getApprovalsApi(page, 10);
+                pendingResults = await getApprovalsApi(page, pageSize, { startDate, endDate });
                 // Handle legacy response if it was just an array
                 if (Array.isArray(pendingResults)) {
                     pendingResults = { data: pendingResults, total: pendingResults.length };
@@ -288,7 +312,12 @@ export default function IncomeExpense() {
         }
 
         loadData();
-    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch]);
+    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, pageSize, filters]);
+
+    // Reset to page 1 when filters change (except page change itself)
+    useEffect(() => {
+        setPage(1);
+    }, [filterName, filterBranch, filters, activeTab]);
 
     useEffect(() => {
         const reload = () => {
@@ -450,83 +479,166 @@ export default function IncomeExpense() {
         setPage(1);
     };
 
-    const handleExportCSV = () => {
-        if (!filteredRows.length) return;
+    const handleExportCSV = async () => {
+        setLoading(true);
+        try {
+            let allExportItems = [];
+            const LARGE_LIMIT = 10000;
 
-        // Helper for invoice URLs
-        const getInvoiceUrls = (invoiceData) => {
-            if (!invoiceData || String(invoiceData).trim() === "" || String(invoiceData) === "[]") return "-";
-            const BASE = import.meta.env.VITE_API_URL.replace(/\/$/, "");
-            const normalize = (item) => {
-                if (!item) return "";
-                let str = String(item).trim().replace(/^"+|"+$/g, "");
-                if (str.startsWith("data:")) return "base64-content";
-                if (str.startsWith("http") || str.startsWith("/uploads")) return str.startsWith("http") ? str : `${BASE}${str}`;
-                return `${BASE}/uploads/invoices/${str}`;
+            if (activeTab === "expense") {
+                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch });
+                const rawExpenses = applyFilters(res.expenses || []);
+                allExportItems = rawExpenses.map((item) => {
+                    const DynamicIcon = Icons[item.icon] || Icons.Circle;
+                    return {
+                        date: dayjs(item.date).format("DD/MM/YYYY"),
+                        title: item.sub_category,
+                        description: item.description,
+                        merchant: item.user_name,
+                        amount: `₹${item.total}`,
+                        report: item.branch,
+                        status: item.status === "pending" ? "Pending" : item.status === "approved" ? "Approved" : item.status,
+                        icon: <DynamicIcon size={20} />,
+                        invoice: item.invoice,
+                        vendorName: item.vendor_name,
+                        vendorNumber: item.vendor_number,
+                        transaction_from: item.transaction_from,
+                        transaction_to: item.transaction_to,
+                        spendMode: item.spend_mode,
+                        gst: item.gst
+                    };
+                });
+            } else {
+                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch });
+                let pendingResults = { data: [] };
+                try {
+                    pendingResults = await getApprovalsApi(1, LARGE_LIMIT);
+                } catch (e) { }
+
+                let combinedApprovals = [...(res.approvals || []), ...(Array.isArray(pendingResults) ? pendingResults : (pendingResults.data || []))];
+
+                if (userRole === "admin") {
+                    combinedApprovals = combinedApprovals.filter(item => item.status !== "pending");
+                }
+
+                const rawApprovals = applyFilters(combinedApprovals);
+
+                allExportItems = rawApprovals.map((item) => {
+                    const DynamicIcon = Icons[item.icon] || Icons.Circle;
+                    return {
+                        date: dayjs(item.date).format("DD/MM/YYYY"),
+                        title: item.sub_category || item.category,
+                        note: item.role || item.description || "-",
+                        merchant: item.user_name || userDetails.name || "You",
+                        amount: `₹${item.total || item.amount}`,
+                        report: item.branch || "-",
+                        status: item.status,
+                        icon: <DynamicIcon size={20} />,
+                        invoice: item.invoice,
+                        gst: item.gst,
+                        vendorName: item.vendor_name,
+                        vendorNumber: item.vendor_number,
+                        transaction_to: item.transaction_to,
+                        end_date: item.end_date ? dayjs(item.end_date).format("DD/MM/YYYY") : "-",
+                    };
+                });
+            }
+
+            // Apply Search filter client-side if active
+            if (searchText.trim()) {
+                allExportItems = allExportItems.filter((r) =>
+                    `${r.title} ${r.merchant} ${r.date} ${r.report}`
+                        .toLowerCase()
+                        .includes(searchText.toLowerCase())
+                );
+            }
+
+            if (!allExportItems.length) {
+                CommonToaster("No data to export", "info");
+                setLoading(false);
+                return;
+            }
+
+            // Helper for invoice URLs
+            const getInvoiceUrls = (invoiceData) => {
+                if (!invoiceData || String(invoiceData).trim() === "" || String(invoiceData) === "[]") return "-";
+                const BASE = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+                const normalize = (item) => {
+                    if (!item) return "";
+                    let str = String(item).trim().replace(/^"+|"+$/g, "");
+                    if (str.startsWith("data:")) return "base64-content";
+                    if (str.startsWith("http") || str.startsWith("/uploads")) return str.startsWith("http") ? str : `${BASE}${str}`;
+                    return `${BASE}/uploads/invoices/${str}`;
+                };
+
+                let arr = [];
+                if (Array.isArray(invoiceData)) {
+                    arr = invoiceData;
+                } else if (typeof invoiceData === "string" && invoiceData.startsWith("[")) {
+                    try {
+                        const parsed = JSON.parse(invoiceData);
+                        if (Array.isArray(parsed)) arr = parsed;
+                        else arr = [invoiceData];
+                    } catch { arr = [invoiceData]; }
+                } else {
+                    arr = [invoiceData];
+                }
+                return arr.map(normalize).filter(Boolean).join(" ; ");
             };
 
-            let arr = [];
-            if (Array.isArray(invoiceData)) {
-                arr = invoiceData;
-            } else if (typeof invoiceData === "string" && invoiceData.startsWith("[")) {
-                try {
-                    const parsed = JSON.parse(invoiceData);
-                    if (Array.isArray(parsed)) arr = parsed;
-                    else arr = [invoiceData];
-                } catch { arr = [invoiceData]; }
+            let headers = [];
+            let rowMapper = (row) => [];
+
+            if (activeTab === "approval") {
+                headers = ["Date", "Category", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
+                rowMapper = (row) => [
+                    row.date,
+                    row.title,
+                    row.note || "-",
+                    row.report || "-",
+                    row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
+                    row.amount,
+                    row.gst || "No",
+                    row.end_date || "-",
+                    row.status,
+                    getInvoiceUrls(row.invoice)
+                ];
             } else {
-                arr = [invoiceData];
+                headers = ["Date", "Category", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "Branch", "Status", "Invoice"];
+                rowMapper = (row) => [
+                    row.date,
+                    row.title,
+                    row.description || "-",
+                    row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
+                    row.transaction_from || "-",
+                    row.transaction_to || "-",
+                    row.spendMode || "-",
+                    row.amount,
+                    row.report || "-",
+                    row.status,
+                    getInvoiceUrls(row.invoice)
+                ];
             }
-            return arr.map(normalize).filter(Boolean).join(" ; ");
-        };
 
-        let headers = [];
-        let rowMapper = (row) => [];
+            const csvContent = [
+                headers.join(","),
+                ...allExportItems.map(row => rowMapper(row).map(e => `"${String(e).replace(/"/g, '""')}"`).join(","))
+            ].join("\n");
 
-        if (activeTab === "approval") {
-            headers = ["Date", "Category", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
-            rowMapper = (row) => [
-                row.date,
-                row.title,
-                row.note || "-",
-                row.report || "-",
-                row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
-                row.amount,
-                row.gst || "No",
-                row.end_date || "-",
-                row.status,
-                getInvoiceUrls(row.invoice)
-            ];
-        } else {
-            headers = ["Date", "Category", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "Branch", "Status", "Invoice"];
-            rowMapper = (row) => [
-                row.date,
-                row.title,
-                row.description || "-",
-                row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
-                row.transaction_from || "-",
-                row.transaction_to || "-",
-                row.spendMode || "-",
-                row.amount,
-                row.report || "-",
-                row.status,
-                getInvoiceUrls(row.invoice)
-            ];
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${activeTab}_export_${dayjs().format("YYYY-MM-DD")}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error("Export failed", error);
+            CommonToaster("Export failed", "error");
+        } finally {
+            setLoading(false);
         }
-
-        const csvContent = [
-            headers.join(","),
-            ...filteredRows.map(row => rowMapper(row).map(e => `"${String(e).replace(/"/g, '""')}"`).join(","))
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `${activeTab}_export_${dayjs().format("YYYY-MM-DD")}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     const handleCloseModal = () => {
@@ -567,7 +679,7 @@ export default function IncomeExpense() {
 
     const isApprovalTab = activeTab === "approval";
     const gridStyle = (userRole === "admin" && activeTab === "expense")
-        ? { gridTemplateColumns: "240px 1.3fr 160px 140px 100px 130px 130px 90px" }
+        ? { gridTemplateColumns: "215px 1.5fr 160px 140px 100px 130px 130px 90px" }
         : { gridTemplateColumns: "240px 1.8fr 1fr 1fr 1fr 120px 120px 110px" };
     const approvalGridStyle = {
         gridTemplateColumns: "220px 1.3fr 160px 140px 100px 130px 130px 90px"
@@ -575,442 +687,456 @@ export default function IncomeExpense() {
 
     return (
         <>
+            <Filters onFilterChange={setFilters} />
             {loading ? (
                 <IncomeExpenseSkeleton />
             ) : (
 
-                <>
-                    <Filters onFilterChange={setFilters} />
+                <div className="expense-container">
+                    {/* TABS */}
+                    <div className="tabs-wrapper">
+                        <button
+                            className={`premium-tab ${activeTab === "approval" ? "active" : ""}`}
+                            onClick={() => handleTabChange("approval")}
+                        >
+                            {userRole === "admin" ? "Approved" : "Approved"}
+                        </button>
 
-                    <div className="expense-container">
-                        {/* TABS */}
-                        <div className="tabs-wrapper">
-                            <button
-                                className={`premium-tab ${activeTab === "approval" ? "active" : ""}`}
-                                onClick={() => handleTabChange("approval")}
-                            >
-                                {userRole === "admin" ? "Approved" : "Approved"}
-                            </button>
+                        <button
+                            className={`premium-tab ${activeTab === "expense" ? "active" : ""}`}
+                            onClick={() => handleTabChange("expense")}
+                        >
+                            Expense
+                        </button>
+                    </div>
 
-                            <button
-                                className={`premium-tab ${activeTab === "expense" ? "active" : ""}`}
-                                onClick={() => handleTabChange("expense")}
-                            >
-                                Expense
-                            </button>
-                        </div>
-
-                        <motion.div initial="hidden" animate="visible">
-                            <div className="expense-header">
-                                <h1>
-                                    {activeTab === "expense" ? "Expenses" : "Approved"}
-                                </h1>
-                                <div className="expense-actions">
+                    <motion.div initial="hidden" animate="visible">
+                        <div className="expense-header">
+                            <h1>
+                                {activeTab === "expense" ? "Expenses" : "Approved"}
+                            </h1>
+                            <div className="expense-actions">
+                                <button
+                                    onClick={handleExportCSV}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        padding: "8px 14px",
+                                        backgroundColor: "#fff",
+                                        border: "1px solid #e0e0e0",
+                                        borderRadius: "8px",
+                                        cursor: "pointer",
+                                        fontSize: "13px",
+                                        fontWeight: 500,
+                                        transition: "all 0.2s",
+                                        marginRight: "8px",
+                                        color: "#333"
+                                    }}
+                                >
+                                    <Icons.Download size={16} /> Export CSV
+                                </button>
+                                {!(userRole === "admin" && activeTab === "approval") && (
                                     <button
-                                        onClick={handleExportCSV}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "8px 14px",
-                                            backgroundColor: "#fff",
-                                            border: "1px solid #e0e0e0",
-                                            borderRadius: "8px",
-                                            cursor: "pointer",
-                                            fontSize: "13px",
-                                            fontWeight: 500,
-                                            transition: "all 0.2s",
-                                            marginRight: "8px",
-                                            color: "#333"
+                                        className="btn-primary"
+                                        onClick={() => {
+                                            setOpenModal(activeTab);
+                                            resetForm();
+                                            setEditData(null);
                                         }}
                                     >
-                                        <Icons.Download size={16} /> Export CSV
+                                        <Plus size={16} /> New {activeTab === "approval" ? "Approval" : "Expense"}
                                     </button>
-                                    {!(userRole === "admin" && activeTab === "approval") && (
-                                        <button
-                                            className="btn-primary"
-                                            onClick={() => {
-                                                setOpenModal(activeTab);
-                                                resetForm();
-                                                setEditData(null);
-                                            }}
-                                        >
-                                            <Plus size={16} /> New {activeTab === "approval" ? "Approval" : "Expense"}
-                                        </button>
-                                    )}
+                                )}
+                            </div>
+                        </div>
+
+                        {/* FILTER UI */}
+                        <div className="filter-card">
+                            <div className="filter-left">
+                                <div className="search-wrapper">
+                                    <Icons.Search size={16} className="search-icon" />
+                                    <input
+                                        type="text"
+                                        value={searchText}
+                                        onChange={(e) => setSearchText(e.target.value)}
+                                        placeholder="Search by name, branch, etc..."
+                                    />
                                 </div>
+
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterAmount}
+                                        onChange={(v) => setFilterAmount(v)}
+                                        style={{ width: 140 }}
+                                        placeholder="Amount"
+                                        suffixIcon={<Icons.ArrowUpDown size={14} />}
+                                        options={[
+                                            { value: "", label: "Amount: All" },
+                                            { value: "low", label: "Low → High" },
+                                            { value: "high", label: "High → Low" },
+                                        ]}
+                                    />
+                                </div>
+
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterName}
+                                        onChange={(v) => { setFilterName(v); setPage(1); }}
+                                        style={{ width: 150 }}
+                                        placeholder="Name"
+                                        showSearch
+                                        suffixIcon={<Icons.User size={14} />}
+                                        options={[
+                                            { value: "All", label: "Name: All" },
+                                            ...allNames.map(n => ({ value: n, label: n }))
+                                        ]}
+                                    />
+                                </div>
+
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterBranch}
+                                        onChange={(v) => { setFilterBranch(v); setPage(1); }}
+                                        style={{ width: 150 }}
+                                        placeholder="Branch"
+                                        showSearch
+                                        suffixIcon={<Icons.Building2 size={14} />}
+                                        options={[
+                                            { value: "All", label: "Branch: All" },
+                                            ...allBranches.map(b => ({ value: b, label: b }))
+                                        ]}
+                                    />
+                                </div>
+
+                                {(filterCategory !== "All" || filterAmount !== "" || filterName !== "All" || filterBranch !== "All" || searchText) && (
+                                    <button className="clear-filter-btn" onClick={clearAllFilters}>
+                                        <Icons.X size={14} /> Clear
+                                    </button>
+                                )}
                             </div>
 
-                            {/* FILTER UI */}
-                            <div className="filter-card">
-                                <div className="filter-left">
-                                    <div className="search-wrapper">
-                                        <Icons.Search size={16} className="search-icon" />
-                                        <input
-                                            type="text"
-                                            value={searchText}
-                                            onChange={(e) => setSearchText(e.target.value)}
-                                            placeholder="Search by name, branch, etc..."
-                                        />
-                                    </div>
-
-                                    <div className="select-wrapper">
-                                        <Select
-                                            value={filterAmount}
-                                            onChange={(v) => setFilterAmount(v)}
-                                            style={{ width: 140 }}
-                                            placeholder="Amount"
-                                            suffixIcon={<Icons.ArrowUpDown size={14} />}
-                                            options={[
-                                                { value: "", label: "Amount: All" },
-                                                { value: "low", label: "Low → High" },
-                                                { value: "high", label: "High → Low" },
-                                            ]}
-                                        />
-                                    </div>
-
-                                    <div className="select-wrapper">
-                                        <Select
-                                            value={filterName}
-                                            onChange={(v) => { setFilterName(v); setPage(1); }}
-                                            style={{ width: 150 }}
-                                            placeholder="Name"
-                                            showSearch
-                                            suffixIcon={<Icons.User size={14} />}
-                                            options={[
-                                                { value: "All", label: "Name: All" },
-                                                ...allNames.map(n => ({ value: n, label: n }))
-                                            ]}
-                                        />
-                                    </div>
-
-                                    <div className="select-wrapper">
-                                        <Select
-                                            value={filterBranch}
-                                            onChange={(v) => { setFilterBranch(v); setPage(1); }}
-                                            style={{ width: 150 }}
-                                            placeholder="Branch"
-                                            showSearch
-                                            suffixIcon={<Icons.Building2 size={14} />}
-                                            options={[
-                                                { value: "All", label: "Branch: All" },
-                                                ...allBranches.map(b => ({ value: b, label: b }))
-                                            ]}
-                                        />
-                                    </div>
-
-                                    {(filterCategory !== "All" || filterAmount !== "" || filterName !== "All" || filterBranch !== "All" || searchText) && (
-                                        <button className="clear-filter-btn" onClick={clearAllFilters}>
-                                            <Icons.X size={14} /> Clear
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* TOTAL STAT */}
-                                <div className={`total-stat-box ${activeTab === "expense" ? "is-expense" : "is-approved"}`}>
-                                    <span>{activeTab === "expense" ? "Total Expense" : "Total Approved"}</span>
-                                    <strong className="total-amount">{fmtAmt(totalApproved)}</strong>
-                                </div>
+                            {/* TOTAL STAT */}
+                            <div className={`total-stat-box ${activeTab === "expense" ? "is-expense" : "is-approved"}`}>
+                                <span>{activeTab === "expense" ? "Total Expense" : "Total Approved"}</span>
+                                <strong className="total-amount">{fmtAmt(totalApproved)}</strong>
                             </div>
+                        </div>
 
-                            {/* TABLE */}
-                            <div className="table-scroll-wrapper">
-                                <div className="expense-table-wrapper">
-                                    <div className="expense-table">
-                                        <div
-                                            className="expense-row expense-header-row"
-                                            style={isApprovalTab ? approvalGridStyle : gridStyle}
-                                        >
-                                            <div>DETAILS</div>
-                                            {isApprovalTab ? (
-                                                <>
-                                                    <div>DESCRIPTION</div>
-                                                    <div>BRANCH</div>
-                                                    <div>AMOUNT</div>
-                                                    <div>GST</div>
-                                                    <div>END DATE</div>
-                                                    <div>STATUS</div>
-                                                    <div>ACTION</div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div>DESCRIPTION</div>
-                                                    <div>VENDOR</div>
-                                                    <div>TRANSACTION</div>
-
-                                                    <div>AMOUNT</div>
-                                                    <div>BRANCH</div>
-                                                    <div>STATUS</div>
-                                                    {userRole === "admin" && <div>ACTION</div>}
-                                                </>
-                                            )}
-                                        </div>
-                                        {filteredRows.length === 0 ? (
-                                            <div className="no-data-box">
-                                                <img
-                                                    src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
-                                                    alt="no data"
-                                                    className="no-data-img"
-                                                />
-                                                <h3>No Data Found</h3>
-                                            </div>
+                        {/* TABLE */}
+                        <div className="table-scroll-wrapper">
+                            <div className="expense-table-wrapper">
+                                <div className="expense-table">
+                                    <div
+                                        className="expense-row expense-header-row"
+                                        style={isApprovalTab ? approvalGridStyle : gridStyle}
+                                    >
+                                        <div>DETAILS</div>
+                                        {isApprovalTab ? (
+                                            <>
+                                                <div>DESCRIPTION</div>
+                                                <div>BRANCH</div>
+                                                <div>AMOUNT</div>
+                                                <div>GST</div>
+                                                <div>END DATE</div>
+                                                <div>STATUS</div>
+                                                <div>ACTION</div>
+                                            </>
                                         ) : (
-                                            filteredRows.map((row, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="expense-row"
-                                                    style={isApprovalTab ? approvalGridStyle : gridStyle}
-                                                >
-                                                    {/* DETAILS */}
-                                                    <div className="col details-col">
-                                                        <div
-                                                            className="icon-circles"
-                                                            style={{
-                                                                backgroundColor: row.color,
-                                                                width: 40,
-                                                                height: 40,
-                                                                borderRadius: "50%",
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                justifyContent: "center",
-                                                                minWidth: 40, // Prevent shrink
-                                                            }}
-                                                        >
-                                                            {row.icon}
-                                                        </div>
-                                                        <div className="details-text">
-                                                            <span className="date">{row.date}</span>
-                                                            <span className="title" style={{ fontWeight: 700, fontSize: 13 }}>{row.title}</span>
-                                                            {/* Invoice Button */}
-                                                            {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" && (
+                                            <>
+                                                <div>DESCRIPTION</div>
+                                                <div>VENDOR</div>
+                                                <div>TRANSACTION</div>
+
+                                                <div>AMOUNT</div>
+                                                <div>BRANCH</div>
+                                                <div>STATUS</div>
+                                                {userRole === "admin" && <div>ACTION</div>}
+                                            </>
+                                        )}
+                                    </div>
+                                    {filteredRows.length === 0 ? (
+                                        <div className="no-data-box">
+                                            <img
+                                                src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
+                                                alt="no data"
+                                                className="no-data-img"
+                                            />
+                                            <h3>No Data Found</h3>
+                                        </div>
+                                    ) : (
+                                        filteredRows.map((row, i) => (
+                                            <div
+                                                key={i}
+                                                className="expense-row"
+                                                style={isApprovalTab ? approvalGridStyle : gridStyle}
+                                            >
+                                                {/* DETAILS */}
+                                                <div className="col details-col">
+                                                    <div
+                                                        className="icon-circles"
+                                                        style={{
+                                                            backgroundColor: row.color,
+                                                            width: 40,
+                                                            height: 40,
+                                                            borderRadius: "50%",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            minWidth: 40, // Prevent shrink
+                                                        }}
+                                                    >
+                                                        {row.icon}
+                                                    </div>
+                                                    <div className="details-text">
+                                                        <span className="date">{row.date}</span>
+                                                        <span className="title" style={{ fontWeight: 700, fontSize: 13 }}>{row.title}</span>
+                                                        {/* Invoice Button */}
+                                                        {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" && (
+                                                            <button
+                                                                className="view-invoice-btn"
+                                                                onClick={() => handleViewInvoice(row.invoice)}
+                                                            >
+                                                                View Invoice
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {isApprovalTab ? (
+                                                    <>
+                                                        <div>
+                                                            <div className="text-truncate-2" title={row.note}>
+                                                                {row.note}
+                                                            </div>
+                                                            {row.note && row.note.length > 50 && (
                                                                 <button
+                                                                    onClick={() => handleViewDescription(row.note)}
                                                                     className="view-invoice-btn"
-                                                                    onClick={() => handleViewInvoice(row.invoice)}
+                                                                    style={{
+                                                                        fontSize: '10px',
+                                                                        padding: '2px 8px',
+                                                                        marginTop: '4px',
+                                                                        height: 'auto',
+                                                                        lineHeight: 'normal',
+                                                                        width: 'max-content',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center'
+                                                                    }}
                                                                 >
-                                                                    View Invoice
+                                                                    View
                                                                 </button>
                                                             )}
                                                         </div>
-                                                    </div>
-
-                                                    {isApprovalTab ? (
-                                                        <>
-                                                            <div>
-                                                                <div className="text-truncate-2" title={row.note}>
-                                                                    {row.note}
-                                                                </div>
-                                                                {row.note && row.note.length > 50 && (
-                                                                    <button
-                                                                        onClick={() => handleViewDescription(row.note)}
-                                                                        className="view-invoice-btn"
-                                                                        style={{
-                                                                            fontSize: '10px',
-                                                                            padding: '2px 8px',
-                                                                            marginTop: '4px',
-                                                                            height: 'auto',
-                                                                            lineHeight: 'normal',
-                                                                            width: 'max-content',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center'
-                                                                        }}
-                                                                    >
-                                                                        View
-                                                                    </button>
-                                                                )}
+                                                        <div>{row.report}</div>
+                                                        <div style={{ fontWeight: 600 }}>{row.amount}<br></br>
+                                                            {Boolean(row.is_edit) && <span className="editable-pill">Editable</span>}
+                                                        </div>
+                                                        <div>{row.gst === 'Yes' ? <span className="status-badge" style={{ background: '#d4377f', color: 'white' }}>GST</span> : '-'}</div>
+                                                        <div>{row.end_date}</div>
+                                                        <div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <span className={row.status === "approved" ? "status-approved" : row.status === "pending" ? "status-pending" : "status-rejected"}>
+                                                                    {row.status}
+                                                                </span>
                                                             </div>
-                                                            <div>{row.report}</div>
-                                                            <div style={{ fontWeight: 600 }}>{row.amount}<br></br>
-                                                                {Boolean(row.is_edit) && <span className="editable-pill">Editable</span>}
-                                                            </div>
-                                                            <div>{row.gst === 'Yes' ? <span className="status-badge" style={{ background: '#d4377f', color: 'white' }}>GST</span> : '-'}</div>
-                                                            <div>{row.end_date}</div>
-                                                            <div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                    <span className={row.status === "approved" ? "status-approved" : row.status === "pending" ? "status-pending" : "status-rejected"}>
-                                                                        {row.status}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                {userRole === "admin" ? (
-                                                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                                                        <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
-                                                                            <Icons.Edit size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                                                        <button
-                                                                            className="edit-btn"
-                                                                            onClick={() => handleQuickAddExpense(row.originalItem || row)}
-                                                                            title="Add to Expense"
-                                                                            style={{
-                                                                                backgroundColor: '#edf7ed',
-                                                                                color: '#2e7d32',
-                                                                                border: '1px solid #c8e6c9'
-                                                                            }}
-                                                                        >
-                                                                            Expense <Plus size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div className="vendor-col">
-                                                                <div className="text-truncate-2" title={row.description}>
-                                                                    {row.description || "-"}
-                                                                </div>
-                                                                {row.description && row.description.length > 50 && (
-                                                                    <button
-                                                                        onClick={() => handleViewDescription(row.description)}
-                                                                        className="view-invoice-btn"
-                                                                        style={{
-                                                                            fontSize: '10px',
-                                                                            padding: '2px 8px',
-                                                                            marginTop: '4px',
-                                                                            height: 'auto',
-                                                                            lineHeight: 'normal',
-                                                                            width: 'auto',
-                                                                            display: 'inline-flex'
-                                                                        }}
-                                                                    >
-                                                                        View
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                            <div className="vendor-col">
-                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                                    {row.vendorName ? (
-                                                                        <>
-                                                                            <span className="title">{row.vendorName}</span>
-                                                                            {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
-                                                                        </>
-                                                                    ) : (
-                                                                        <span className="title">{row.transaction_to || "-"}</span>
-                                                                    )}
-                                                                    <button
-                                                                        onClick={() => handleViewVendor(row)}
-                                                                        className="view-invoice-btn"
-                                                                        style={{
-                                                                            fontSize: '10px',
-                                                                            padding: '2px 8px',
-                                                                            marginTop: '4px',
-                                                                            height: 'auto',
-                                                                            lineHeight: 'normal',
-                                                                            width: 'auto'
-                                                                        }}
-                                                                    >
-                                                                        View Info
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="vendor-col">
-                                                                {row.transaction_from ? (
-                                                                    <>
-                                                                        <span className="title" style={{ fontSize: 13 }}>{row.transaction_from}</span>
-                                                                        <span className="title" style={{ fontSize: 13 }}>{row.spendMode}</span>
-                                                                    </>
-                                                                ) : "-"}
-                                                            </div>
-                                                            <div style={{ fontWeight: 600 }}>{row.amount}</div>
-                                                            <div>{row.report}</div>
-                                                            <div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                    <span className={row.status === "approved" ? "status-approved" : row.status === "pending" ? "status-pending" : "status-rejected"}>
-                                                                        {row.status}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            {userRole === "admin" && (
-                                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                        </div>
+                                                        <div>
+                                                            {userRole === "admin" ? (
+                                                                <div style={{ display: 'flex', justifyContent: 'center' }}>
                                                                     <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
                                                                         <Icons.Edit size={16} />
                                                                     </button>
-                                                                    <Popconfirm
-                                                                        title="Delete this expense?"
-                                                                        description="This action cannot be undone and will revert any associated approval to pending."
-                                                                        onConfirm={() => handleDelete(row.originalItem || row)}
-                                                                        okText="Yes"
-                                                                        cancelText="No"
+                                                                </div>
+                                                            ) : (
+                                                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                                    <button
+                                                                        className="edit-btn"
+                                                                        onClick={() => handleQuickAddExpense(row.originalItem || row)}
+                                                                        title="Add to Expense"
+                                                                        style={{
+                                                                            backgroundColor: '#edf7ed',
+                                                                            color: '#2e7d32',
+                                                                            border: '1px solid #c8e6c9'
+                                                                        }}
                                                                     >
-                                                                        <button className="edit-btn" style={{ color: '#ff4d4f' }}>
-                                                                            <Icons.Trash2 size={16} />
-                                                                        </button>
-                                                                    </Popconfirm>
+                                                                        Expense <Plus size={16} />
+                                                                    </button>
                                                                 </div>
                                                             )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="vendor-col">
+                                                            <div className="text-truncate-2" title={row.description}>
+                                                                {row.description || "-"}
+                                                            </div>
+                                                            {row.description && row.description.length > 50 && (
+                                                                <button
+                                                                    onClick={() => handleViewDescription(row.description)}
+                                                                    className="view-invoice-btn"
+                                                                    style={{
+                                                                        fontSize: '10px',
+                                                                        padding: '2px 8px',
+                                                                        marginTop: '4px',
+                                                                        height: 'auto',
+                                                                        lineHeight: 'normal',
+                                                                        width: 'auto',
+                                                                        display: 'inline-flex'
+                                                                    }}
+                                                                >
+                                                                    View
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="vendor-col">
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                                {row.vendorName ? (
+                                                                    <>
+                                                                        <span className="title">{row.vendorName}</span>
+                                                                        {row.vendorNumber && <span className="date">{row.vendorNumber}</span>}
+                                                                    </>
+                                                                ) : (
+                                                                    <span className="title">{row.transaction_to || "-"}</span>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleViewVendor(row)}
+                                                                    className="view-invoice-btn"
+                                                                    style={{
+                                                                        fontSize: '10px',
+                                                                        padding: '2px 8px',
+                                                                        marginTop: '4px',
+                                                                        height: 'auto',
+                                                                        lineHeight: 'normal',
+                                                                        width: 'auto'
+                                                                    }}
+                                                                >
+                                                                    View Info
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="vendor-col">
+                                                            {row.transaction_from ? (
+                                                                <>
+                                                                    <span className="title" style={{ fontSize: 13 }}>{row.transaction_from}</span>
+                                                                    <span className="title" style={{ fontSize: 13 }}>{row.spendMode}</span>
+                                                                </>
+                                                            ) : "-"}
+                                                        </div>
+                                                        <div style={{ fontWeight: 600 }}>{row.amount}</div>
+                                                        <div>{row.report}</div>
+                                                        <div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <span className={row.status === "approved" ? "status-approved" : row.status === "pending" ? "status-pending" : "status-rejected"}>
+                                                                    {row.status}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {userRole === "admin" && (
+                                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                                <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
+                                                                    <Icons.Edit size={16} />
+                                                                </button>
+                                                                <Popconfirm
+                                                                    title="Delete this expense?"
+                                                                    description="This action cannot be undone and will revert any associated approval to pending."
+                                                                    onConfirm={() => handleDelete(row.originalItem || row)}
+                                                                    okText="Yes"
+                                                                    cancelText="No"
+                                                                >
+                                                                    <button className="edit-btn" style={{ color: '#ff4d4f' }}>
+                                                                        <Icons.Trash2 size={16} />
+                                                                    </button>
+                                                                </Popconfirm>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
-                            </div >
+                            </div>
+                        </div >
 
-                            {/* MODAL */}
-                            < AnimatePresence >
-                                {openModal && (
-                                    <Modals
-                                        open={!!openModal}
-                                        type={openModal}
-                                        isEdit={openModal === "edit-approval" || (openModal === "expense" && editData)}
-                                        onClose={handleCloseModal}
-                                        branch={branch}
-                                        setBranch={setBranch}
-                                        date={date}
-                                        setDate={setDate}
-                                        total={total}
-                                        setTotal={setTotal}
-                                        mainCategory={mainCategory}
-                                        setMainCategory={setMainCategory}
-                                        subCategory={subCategory}
-                                        setSubCategory={setSubCategory}
-                                        description={description}
-                                        setDescription={setDescription}
-                                        expenseCategories={expenseCategories}
-                                        incomeCategories={incomeCategories}
+                        {/* MODAL */}
+                        < AnimatePresence >
+                            {openModal && (
+                                <Modals
+                                    open={!!openModal}
+                                    type={openModal}
+                                    isEdit={openModal === "edit-approval" || (openModal === "expense" && editData)}
+                                    onClose={handleCloseModal}
+                                    branch={branch}
+                                    setBranch={setBranch}
+                                    date={date}
+                                    setDate={setDate}
+                                    total={total}
+                                    setTotal={setTotal}
+                                    mainCategory={mainCategory}
+                                    setMainCategory={setMainCategory}
+                                    subCategory={subCategory}
+                                    setSubCategory={setSubCategory}
+                                    description={description}
+                                    setDescription={setDescription}
+                                    expenseCategories={expenseCategories}
+                                    incomeCategories={incomeCategories}
 
-                                        vendorNumber={vendorNumber}
-                                        setVendorNumber={setVendorNumber}
-                                        vendorName={vendorName}
-                                        setVendorName={setVendorName}
-                                        editData={editData}
-                                    />
-                                )
-                                }
-                            </AnimatePresence >
+                                    vendorNumber={vendorNumber}
+                                    setVendorNumber={setVendorNumber}
+                                    vendorName={vendorName}
+                                    setVendorName={setVendorName}
+                                    editData={editData}
+                                />
+                            )
+                            }
+                        </AnimatePresence >
 
-                            {/* Pagination */}
-                            {PageTotal > 0 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-                                    <Pagination
-                                        current={page}
-                                        total={PageTotal}
-                                        pageSize={10}
-                                        onChange={(p) => setPage(p)}
-                                        showSizeChanger={false}
+                        {/* Pagination */}
+                        {PageTotal > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', alignItems: 'center', gap: '20px' }}>
+                                <div className="rows-per-page-container">
+                                    Rows per page:
+                                    <Select
+                                        value={pageSize}
+                                        onChange={(v) => {
+                                            setPageSize(v);
+                                            setPage(1);
+                                        }}
+                                        size="small"
+                                        className="rows-per-page-select"
+                                        style={{ width: 70 }}
+                                        options={[
+                                            { value: 10, label: '10' },
+                                            { value: 25, label: '25' },
+                                            { value: 50, label: '50' },
+                                            { value: 100, label: '100' },
+                                        ]}
                                     />
                                 </div>
-                            )}
+                                <Pagination
+                                    current={page}
+                                    total={PageTotal}
+                                    pageSize={pageSize}
+                                    onChange={(p) => setPage(p)}
+                                    showSizeChanger={false}
+                                />
+                            </div>
+                        )}
 
-                        </motion.div >
-                    </div >
-                </>
+                    </motion.div >
+                </div>
             )}
 
-            {
-                showInvoiceModal && currentInvoices.length > 0 && (
-                    <InvoicePreviewModal
-                        open={showInvoiceModal}
-                        onClose={() => setShowInvoiceModal(false)}
-                        invoices={currentInvoices}
-                    />
-                )
-            }
+            {showInvoiceModal && currentInvoices.length > 0 && (
+                <InvoicePreviewModal
+                    open={showInvoiceModal}
+                    onClose={() => setShowInvoiceModal(false)}
+                    invoices={currentInvoices}
+                />
+            )}
 
             {/* Vendor Stats Modal */}
             <AnimatePresence>

@@ -355,209 +355,207 @@ export default function Income() {
 
     return (
         <>
+            <Filters onFilterChange={setFilters} />
             {loading ? (
                 <IncomeSkeleton />
             ) : (
 
-                <>
-                    <Filters onFilterChange={setFilters} />
-                    <div className="dashboard-container">
-                        <AmountDetails
-                            filteredIncome={incomeData}
-                            filteredExpenses={expenseDataDb}
-                            originalIncome={originalIncome}
-                            originalExpenses={originalExpenses}
-                            filters={filters}
-                            loading={loading}
-                            user={user}
-                            walletEntries={walletEntries}
-                            useFilteredIncome={true}
-                        />
+                <div className="dashboard-container">
+                    <AmountDetails
+                        filteredIncome={incomeData}
+                        filteredExpenses={expenseDataDb}
+                        originalIncome={originalIncome}
+                        originalExpenses={originalExpenses}
+                        filters={filters}
+                        loading={loading}
+                        user={user}
+                        walletEntries={walletEntries}
+                        useFilteredIncome={true}
+                    />
 
-                        {/* QUICK ADD */}
-                        <motion.div
-                            className="quick-access-card"
-                            initial="hidden"
-                            animate="visible"
-                        >
-                            <h3 className="quick-access-title">Income Actions</h3>
-                            <div className="quick-access-grid">
-                                <div className="quick-access-item" onClick={() => {
-                                    setOpenModal("income");
-                                    setMainCategory("Select Main Category");
-                                    setSubCategory("Select Category");
-                                }}>
-                                    <div className="quick-access-icon" style={{ background: "#006b29ff" }}>
-                                        <Wallet size={18} />
-                                    </div>
-                                    <span>+ Add Income</span>
+                    {/* QUICK ADD */}
+                    <motion.div
+                        className="quick-access-card"
+                        initial="hidden"
+                        animate="visible"
+                    >
+                        <h3 className="quick-access-title">Income Actions</h3>
+                        <div className="quick-access-grid">
+                            <div className="quick-access-item" onClick={() => {
+                                setOpenModal("income");
+                                setMainCategory("Select Main Category");
+                                setSubCategory("Select Category");
+                            }}>
+                                <div className="quick-access-icon" style={{ background: "#006b29ff" }}>
+                                    <Wallet size={18} />
                                 </div>
+                                <span>+ Add Income</span>
                             </div>
-                        </motion.div>
-
-                        {/* CHARTS */}
-                        <div className="graphs-grid">
-                            <motion.div className="chart-card" initial="hidden" animate="visible">
-                                <div className="chart-header">
-                                    <h3>
-                                        <TrendingUp size={18} style={{ marginRight: 8, color: "#d4af37" }} />
-                                        Income Flow
-                                    </h3>
-                                </div>
-                                {walletChartData.length === 0 ? (
-                                    <NoDataBox title="No Data Found" subtitle="No Income Data available." />
-                                ) : (
-                                    <ResponsiveContainer width="100%" height={260}>
-                                        <AreaChart data={walletChartData}>
-                                            <defs>
-                                                <linearGradient id="walletCashFlow" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#009688" stopOpacity={0.8} />
-                                                    <stop offset="95%" stopColor="#009688" stopOpacity={0.1} />
-                                                </linearGradient>
-                                            </defs>
-
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                                            <XAxis dataKey="month" stroke="#1c2431" fontSize={12} tickLine={false} />
-                                            <YAxis stroke="#1c2431" fontSize={12} tickLine={false} />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor: "#1c2431",
-                                                    borderRadius: "10px",
-                                                    border: "1px solid #009688",
-                                                    color: "#fff",
-                                                }}
-                                            />
-                                            <Area type="monotone" dataKey="value" stroke="#009688" strokeWidth={3} fill="url(#walletCashFlow)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                )}
-                            </motion.div>
-
-                            {/* MODALS */}
-                            <AnimatePresence>
-                                <Modals
-                                    open={openModal}
-                                    type={openModal}
-                                    onClose={() => setOpenModal(null)}
-                                    branch={branch}
-                                    setBranch={setBranch}
-                                    date={date}
-                                    setDate={setDate}
-                                    total={total}
-                                    setTotal={setTotal}
-                                    mainCategory={mainCategory}
-                                    setMainCategory={setMainCategory}
-                                    subCategory={subCategory}
-                                    setSubCategory={setSubCategory}
-                                    description={description}
-                                    setDescription={setDescription}
-                                    expenseCategories={expenseCategories}
-                                    incomeCategories={incomeCategories}
-                                    vendorName={vendorName}
-                                    setVendorName={setVendorName}
-                                    vendorNumber={vendorNumber}
-                                    setVendorNumber={setVendorNumber}
-                                    endDate={endDate}
-                                    setEndDate={setEndDate}
-                                />
-                            </AnimatePresence>
-
-                            {/* Expense Breakdown / Flow */}
-                            <motion.div className="chart-card" initial="hidden" animate="visible">
-                                <div className="chart-header">
-                                    <h3>
-                                        <PieChart size={18} style={{ marginRight: 8, color: "#d4af37" }} />
-                                        Expense Breakdown
-                                    </h3>
-                                </div>
-                                <div className="chart-wrapper">
-                                    {expensePieData.labels.length === 0 ? (
-                                        <NoDataBox title="No Data Found" subtitle="No Expense Data available." />
-                                    ) : (
-                                        <Pie
-                                            data={expensePieData}
-                                            options={{
-                                                cutout: "65%",
-                                                plugins: {
-                                                    legend: {
-                                                        position: "bottom",
-                                                        labels: {
-                                                            color: "#1c2431",
-                                                            font: { size: 13 },
-                                                            padding: 16,
-                                                            usePointStyle: true,
-                                                            pointStyle: "circle",
-                                                        },
-                                                    },
-                                                    tooltip: {
-                                                        backgroundColor: "#1c2431",
-                                                        titleColor: "#fff",
-                                                        bodyColor: "#fff",
-                                                    },
-                                                },
-                                                responsive: true,
-                                                maintainAspectRatio: false,
-                                            }}
-                                        />
-                                    )}
-                                </div>
-                            </motion.div>
                         </div>
+                    </motion.div>
 
-                        {/* RECENT TRANSACTIONS */}
-                        <motion.div className="transactions-card" initial="hidden" animate="visible">
-                            <div className="transactions-header">
+                    {/* CHARTS */}
+                    <div className="graphs-grid">
+                        <motion.div className="chart-card" initial="hidden" animate="visible">
+                            <div className="chart-header">
                                 <h3>
-                                    <CreditCard size={18} style={{ marginRight: 8, color: "#d4af37" }} />
-                                    Recent Income Transactions
+                                    <TrendingUp size={18} style={{ marginRight: 8, color: "#d4af37" }} />
+                                    Income Flow
                                 </h3>
                             </div>
+                            {walletChartData.length === 0 ? (
+                                <NoDataBox title="No Data Found" subtitle="No Income Data available." />
+                            ) : (
+                                <ResponsiveContainer width="100%" height={260}>
+                                    <AreaChart data={walletChartData}>
+                                        <defs>
+                                            <linearGradient id="walletCashFlow" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#009688" stopOpacity={0.8} />
+                                                <stop offset="95%" stopColor="#009688" stopOpacity={0.1} />
+                                            </linearGradient>
+                                        </defs>
 
-                            <div className="rt-content">
-                                <table className="transactions-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Category</th>
-                                            <th>Branch</th>
-                                            <th>Name</th>
-                                            <th>Amount</th>
-                                            <th>Invoice</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {recentTransactions.income.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="6" className="no-data">
-                                                    <NoDataBox title="No Income Data Found" />
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            recentTransactions.income.map((t, i) => (
-                                                <motion.tr key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: i * 0.05 }}>
-                                                    <td>{dayjs(t.date).format("DD MMM YYYY")}</td>
-                                                    <td>{t.category}</td>
-                                                    <td>{t.branch}</td>
-                                                    <td>{t.user_name}</td>
-                                                    <td className="positive">₹{Number(t.amount).toLocaleString()}</td>
-                                                    <td>
-                                                        {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
-                                                            <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>
-                                                                View
-                                                            </button>
-                                                        ) : (
-                                                            <span className="no-invoice">No Invoice</span>
-                                                        )}
-                                                    </td>
-                                                </motion.tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                                        <XAxis dataKey="month" stroke="#1c2431" fontSize={12} tickLine={false} />
+                                        <YAxis stroke="#1c2431" fontSize={12} tickLine={false} />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: "#1c2431",
+                                                borderRadius: "10px",
+                                                border: "1px solid #009688",
+                                                color: "#fff",
+                                            }}
+                                        />
+                                        <Area type="monotone" dataKey="value" stroke="#009688" strokeWidth={3} fill="url(#walletCashFlow)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            )}
+                        </motion.div>
+
+                        {/* MODALS */}
+                        <AnimatePresence>
+                            <Modals
+                                open={openModal}
+                                type={openModal}
+                                onClose={() => setOpenModal(null)}
+                                branch={branch}
+                                setBranch={setBranch}
+                                date={date}
+                                setDate={setDate}
+                                total={total}
+                                setTotal={setTotal}
+                                mainCategory={mainCategory}
+                                setMainCategory={setMainCategory}
+                                subCategory={subCategory}
+                                setSubCategory={setSubCategory}
+                                description={description}
+                                setDescription={setDescription}
+                                expenseCategories={expenseCategories}
+                                incomeCategories={incomeCategories}
+                                vendorName={vendorName}
+                                setVendorName={setVendorName}
+                                vendorNumber={vendorNumber}
+                                setVendorNumber={setVendorNumber}
+                                endDate={endDate}
+                                setEndDate={setEndDate}
+                            />
+                        </AnimatePresence>
+
+                        {/* Expense Breakdown / Flow */}
+                        <motion.div className="chart-card" initial="hidden" animate="visible">
+                            <div className="chart-header">
+                                <h3>
+                                    <PieChart size={18} style={{ marginRight: 8, color: "#d4af37" }} />
+                                    Expense Breakdown
+                                </h3>
+                            </div>
+                            <div className="chart-wrapper">
+                                {expensePieData.labels.length === 0 ? (
+                                    <NoDataBox title="No Data Found" subtitle="No Expense Data available." />
+                                ) : (
+                                    <Pie
+                                        data={expensePieData}
+                                        options={{
+                                            cutout: "65%",
+                                            plugins: {
+                                                legend: {
+                                                    position: "bottom",
+                                                    labels: {
+                                                        color: "#1c2431",
+                                                        font: { size: 13 },
+                                                        padding: 16,
+                                                        usePointStyle: true,
+                                                        pointStyle: "circle",
+                                                    },
+                                                },
+                                                tooltip: {
+                                                    backgroundColor: "#1c2431",
+                                                    titleColor: "#fff",
+                                                    bodyColor: "#fff",
+                                                },
+                                            },
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                        }}
+                                    />
+                                )}
                             </div>
                         </motion.div>
                     </div>
-                </>
+
+                    {/* RECENT TRANSACTIONS */}
+                    <motion.div className="transactions-card" initial="hidden" animate="visible">
+                        <div className="transactions-header">
+                            <h3>
+                                <CreditCard size={18} style={{ marginRight: 8, color: "#d4af37" }} />
+                                Recent Income Transactions
+                            </h3>
+                        </div>
+
+                        <div className="rt-content">
+                            <table className="transactions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Category</th>
+                                        <th>Branch</th>
+                                        <th>Name</th>
+                                        <th>Amount</th>
+                                        <th>Invoice</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentTransactions.income.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" className="no-data">
+                                                <NoDataBox title="No Income Data Found" />
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        recentTransactions.income.map((t, i) => (
+                                            <motion.tr key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: i * 0.05 }}>
+                                                <td>{dayjs(t.date).format("DD MMM YYYY")}</td>
+                                                <td>{t.category}</td>
+                                                <td>{t.branch}</td>
+                                                <td>{t.user_name}</td>
+                                                <td className="positive">₹{Number(t.amount).toLocaleString()}</td>
+                                                <td>
+                                                    {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
+                                                        <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>
+                                                            View
+                                                        </button>
+                                                    ) : (
+                                                        <span className="no-invoice">No Invoice</span>
+                                                    )}
+                                                </td>
+                                            </motion.tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </motion.div>
+                </div>
             )}
             {showInvoiceModal && currentInvoices.length > 0 && (
                 <InvoicePreviewModal

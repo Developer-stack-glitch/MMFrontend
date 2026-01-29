@@ -29,6 +29,7 @@ export default function Approvals() {
     const [loading, setLoading] = useState(true)
     const [requests, setRequests] = useState([]);
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [total, setTotal] = useState(0);
     // Invoice Modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -48,11 +49,16 @@ export default function Approvals() {
             window.removeEventListener("summaryUpdated", loadApprovals);
             window.removeEventListener("newApprovalsReceived", loadApprovals);
         };
-    }, [page]);
+    }, [page, pageSize, filters]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [filters]);
 
     const loadApprovals = async () => {
         setLoading(true)
-        const response = await getApprovalsApi(page, 10);
+        const { startDate, endDate } = getDateRange(filters);
+        const response = await getApprovalsApi(page, pageSize, { startDate, endDate });
         if (response && response.data && Array.isArray(response.data)) {
             setRequests(response.data);
             setTotal(response.total || 0);
@@ -68,8 +74,10 @@ export default function Approvals() {
 
     // ✅ Helper
     const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "-");
-    const fmtAmt = (n) =>
-        `₹${Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0}`;
+    const fmtAmt = (n) => {
+        const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
+        return `₹${val.toLocaleString('en-IN')}`;
+    };
 
     const openDetails = (row) => {
         setSelected(row);
@@ -103,6 +111,23 @@ export default function Approvals() {
         } catch (err) {
             CommonToaster("Error rejecting!", "error");
         }
+    };
+
+    const getDateRange = (f) => {
+        if (!f.value) return { startDate: null, endDate: null };
+        const type = f.filterType;
+        let start, end;
+
+        if (!f.compareMode) {
+            start = dayjs(f.value).startOf(type).format("YYYY-MM-DD");
+            end = dayjs(f.value).endOf(type).format("YYYY-MM-DD");
+        } else {
+            if (!Array.isArray(f.value) || f.value.length !== 2)
+                return { startDate: null, endDate: null };
+            start = dayjs(f.value[0]).startOf('day').format("YYYY-MM-DD");
+            end = dayjs(f.value[1]).endOf('day').format("YYYY-MM-DD");
+        }
+        return { startDate: start, endDate: end };
     };
 
     // ✅ Extract categories from Requests
@@ -228,282 +253,298 @@ export default function Approvals() {
 
     return (
         <>
+            <Filters onFilterChange={setFilters} />
             {loading ? (<ApprovalsSkeleton />) : (
-                <>
+                <div className="approvals-container">
+                    <div className="approvals-header-top">
+                        <h1 className="approvals-title">Approvals</h1>
+                    </div>
 
-                    <Filters onFilterChange={setFilters} />
-                    <div className="approvals-container">
-                        <div className="approvals-header-top">
-                            <h1 className="approvals-title">Approvals</h1>
-                        </div>
-
-                        {/* FILTER UI */}
-                        <div className="filter-card">
-                            <div className="filter-left">
-                                <div className="search-wrapper">
-                                    <Icons.Search size={16} className="search-icon" />
-                                    <input
-                                        type="text"
-                                        value={searchText}
-                                        onChange={(e) => setSearchText(e.target.value)}
-                                        placeholder="Search owner, category..."
-                                    />
-                                </div>
-
-                                <div className="select-wrapper">
-                                    <Select
-                                        value={filterCategory}
-                                        onChange={setFilterCategory}
-                                        style={{ width: 160 }}
-                                        placeholder="Category"
-                                        suffixIcon={<Icons.LayoutGrid size={14} />}
-                                        options={categoryOptions.map((c) => ({
-                                            value: c,
-                                            label: c === "All" ? "Category: All" : c,
-                                        }))}
-                                    />
-                                </div>
-
-                                <div className="select-wrapper">
-                                    <Select
-                                        value={filterAmount}
-                                        onChange={setFilterAmount}
-                                        style={{ width: 150 }}
-                                        placeholder="Amount"
-                                        suffixIcon={<Icons.ArrowUpDown size={14} />}
-                                        options={[
-                                            { value: "", label: "Amount: All" },
-                                            { value: "low", label: "Low → High" },
-                                            { value: "high", label: "High → Low" },
-                                        ]}
-                                    />
-                                </div>
-
-                                {(filterCategory !== "All" || filterAmount !== "" || searchText) && (
-                                    <button className="clear-filter-btn" onClick={clearAllFilters}>
-                                        <Icons.X size={14} /> Clear
-                                    </button>
-                                )}
+                    {/* FILTER UI */}
+                    <div className="filter-card">
+                        <div className="filter-left">
+                            <div className="search-wrapper">
+                                <Icons.Search size={16} className="search-icon" />
+                                <input
+                                    type="text"
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    placeholder="Search owner, category..."
+                                />
                             </div>
 
-                            {/* TOTAL STAT */}
-                            <div className="total-stat-box is-approved">
-                                <span>Total Value</span>
-                                <strong className="total-amount">{fmtAmt(totalFilteredAmount)}</strong>
+                            <div className="select-wrapper">
+                                <Select
+                                    value={filterCategory}
+                                    onChange={setFilterCategory}
+                                    style={{ width: 160 }}
+                                    placeholder="Category"
+                                    suffixIcon={<Icons.LayoutGrid size={14} />}
+                                    options={categoryOptions.map((c) => ({
+                                        value: c,
+                                        label: c === "All" ? "Category: All" : c,
+                                    }))}
+                                />
                             </div>
+
+                            <div className="select-wrapper">
+                                <Select
+                                    value={filterAmount}
+                                    onChange={setFilterAmount}
+                                    style={{ width: 150 }}
+                                    placeholder="Amount"
+                                    suffixIcon={<Icons.ArrowUpDown size={14} />}
+                                    options={[
+                                        { value: "", label: "Amount: All" },
+                                        { value: "low", label: "Low → High" },
+                                        { value: "high", label: "High → Low" },
+                                    ]}
+                                />
+                            </div>
+
+                            {(filterCategory !== "All" || filterAmount !== "" || searchText) && (
+                                <button className="clear-filter-btn" onClick={clearAllFilters}>
+                                    <Icons.X size={14} /> Clear
+                                </button>
+                            )}
                         </div>
 
-                        {/* ✅ TABLE */}
-                        <div className="approvals-table-wrapper">
-                            <motion.table
-                                initial="hidden"
-                                animate="visible"
-                                className="approvals-table real-table"
-                            >
-                                {/* HEADER */}
-                                <thead>
-                                    <tr className="table-header">
-                                        <th>SPENDER NAME</th>
-                                        <th>CATEGORY</th>
-                                        <th>DESCRIPTION</th>
-                                        <th>AMOUNT</th>
-                                        <th>INVOICE</th>
-                                        <th>REQUEST DATE</th>
-                                        <th>END DATE</th>
-                                        <th>ACTION</th>
+                        {/* TOTAL STAT */}
+                        <div className="total-stat-box is-approved">
+                            <span>Total Value</span>
+                            <strong className="total-amount">{fmtAmt(totalFilteredAmount)}</strong>
+                        </div>
+                    </div>
+
+                    {/* ✅ TABLE */}
+                    <div className="approvals-table-wrapper">
+                        <motion.table
+                            initial="hidden"
+                            animate="visible"
+                            className="approvals-table real-table"
+                        >
+                            {/* HEADER */}
+                            <thead>
+                                <tr className="table-header">
+                                    <th>SPENDER NAME</th>
+                                    <th>CATEGORY</th>
+                                    <th>DESCRIPTION</th>
+                                    <th>AMOUNT</th>
+                                    <th>INVOICE</th>
+                                    <th>REQUEST DATE</th>
+                                    <th>END DATE</th>
+                                    <th>ACTION</th>
+                                </tr>
+                            </thead>
+
+                            {/* BODY */}
+                            <tbody>
+                                {filteredRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="9">
+                                            <div className="no-data-box" style={{ textAlign: "center", padding: "40px 0" }}>
+                                                <img
+                                                    src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
+                                                    alt="no data"
+                                                    className="no-data-img"
+                                                />
+                                                <h3>No Data Found</h3>
+                                                <p>No approval requests available.</p>
+                                            </div>
+                                        </td>
                                     </tr>
-                                </thead>
+                                ) : (
+                                    filteredRows.map((row) => (
+                                        <tr key={row.id} className="table-row">
+                                            {/* 1️⃣ SPENDER NAME */}
+                                            <td>
+                                                <div className="owner-cell">
+                                                    <div
+                                                        className="icon-circles"
+                                                        style={{
+                                                            backgroundColor: row.categoryColor || row.color || "#d4af37",
+                                                            width: 40,
+                                                            height: 40,
+                                                            borderRadius: "50%",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            minWidth: 40,
+                                                        }}
+                                                    >
+                                                        {renderIcon(row.icon)}
+                                                    </div>
+                                                    <div>
+                                                        <h4>{row.name}</h4>
+                                                        <p style={{ textTransform: 'uppercase', fontSize: '12px', color: "#2a2a2a" }}>{row.branch}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            {/* 2️⃣ CATEGORY */}
+                                            <td>
+                                                <div>
+                                                    <span
+                                                        className="category-pill"
+                                                        style={{
+                                                            backgroundColor: row.categoryColor || row.color,
+                                                        }}
+                                                    >
+                                                        {row.sub_category}
+                                                    </span>
+                                                </div>
+                                            </td>
 
-                                {/* BODY */}
-                                <tbody>
-                                    {filteredRows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="9">
-                                                <div className="no-data-box" style={{ textAlign: "center", padding: "40px 0" }}>
-                                                    <img
-                                                        src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
-                                                        alt="no data"
-                                                        className="no-data-img"
-                                                    />
-                                                    <h3>No Data Found</h3>
-                                                    <p>No approval requests available.</p>
+                                            {/* 3️⃣ DESCRIPTION */}
+                                            <td>
+                                                <div className="description-cell">
+                                                    {row.description || row.role || "-"}
+                                                </div>
+                                            </td>
+                                            {/* 4️⃣ AMOUNT */}
+                                            <td>
+                                                {fmtAmt(row.amount)}<br></br>
+                                                {Boolean(row.original_expense_id || row.is_edit) && (
+                                                    <span className="editable-pill">
+                                                        Editable
+                                                    </span>
+                                                )}
+                                            </td>
+                                            {/* 5️⃣ INVOICE */}
+                                            <td>
+                                                {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" ? (
+                                                    <button
+                                                        className="view-invoice-btn"
+                                                        onClick={() =>
+                                                            handleViewInvoice(row.invoice)
+                                                        }
+                                                    >
+                                                        View
+                                                    </button>
+                                                ) : (
+                                                    <span className="no-invoice">No Invoice</span>
+                                                )}
+                                            </td>
+                                            {/* 5️⃣ Request DATE */}
+                                            <td>{fmtDate(row.date)}</td>
+                                            {/* 6️⃣ END DATE */}
+                                            <td>{fmtDate(row.end_date)}</td>
+                                            {/* 7️⃣ ACTION */}
+                                            <td>
+                                                <div className="action-cell">
+                                                    <Tooltip title="View">
+                                                        <Eye
+                                                            size={19}
+                                                            className="icon view"
+                                                            onClick={() => openDetails(row)}
+                                                        />
+                                                    </Tooltip>
+
+                                                    <Popconfirm
+                                                        title="Approve this request?"
+                                                        okText="Yes"
+                                                        cancelText="No"
+                                                        onConfirm={() => doApprove(row)}
+                                                    >
+                                                        <Tooltip title="Approve">
+                                                            <Check size={20} className="icon approve" />
+                                                        </Tooltip>
+                                                    </Popconfirm>
+
+                                                    <Popconfirm
+                                                        title="Reject this request?"
+                                                        okText="Yes"
+                                                        cancelText="No"
+                                                        onConfirm={() => doReject(row)}
+                                                    >
+                                                        <Tooltip title="Reject">
+                                                            <X size={20} className="icon reject" />
+                                                        </Tooltip>
+                                                    </Popconfirm>
                                                 </div>
                                             </td>
                                         </tr>
-                                    ) : (
-                                        filteredRows.map((row) => (
-                                            <tr key={row.id} className="table-row">
-                                                {/* 1️⃣ SPENDER NAME */}
-                                                <td>
-                                                    <div className="owner-cell">
-                                                        <div
-                                                            className="icon-circles"
-                                                            style={{
-                                                                backgroundColor: row.categoryColor || row.color || "#d4af37",
-                                                                width: 40,
-                                                                height: 40,
-                                                                borderRadius: "50%",
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                justifyContent: "center",
-                                                                minWidth: 40,
-                                                            }}
-                                                        >
-                                                            {renderIcon(row.icon)}
-                                                        </div>
-                                                        <div>
-                                                            <h4>{row.name}</h4>
-                                                            <p style={{ textTransform: 'uppercase', fontSize: '12px', color: "#2a2a2a" }}>{row.branch}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                {/* 2️⃣ CATEGORY */}
-                                                <td>
-                                                    <div>
-                                                        <span
-                                                            className="category-pill"
-                                                            style={{
-                                                                backgroundColor: row.categoryColor || row.color,
-                                                            }}
-                                                        >
-                                                            {row.sub_category}
-                                                        </span>
-                                                    </div>
-                                                </td>
+                                    ))
+                                )}
+                            </tbody>
+                        </motion.table>
+                    </div>
 
-                                                {/* 3️⃣ DESCRIPTION */}
-                                                <td>
-                                                    <div className="description-cell">
-                                                        {row.description || row.role || "-"}
-                                                    </div>
-                                                </td>
-                                                {/* 4️⃣ AMOUNT */}
-                                                <td>
-                                                    {fmtAmt(row.amount)}<br></br>
-                                                    {Boolean(row.original_expense_id || row.is_edit) && (
-                                                        <span className="editable-pill">
-                                                            Editable
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                {/* 5️⃣ INVOICE */}
-                                                <td>
-                                                    {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" ? (
-                                                        <button
-                                                            className="view-invoice-btn"
-                                                            onClick={() =>
-                                                                handleViewInvoice(row.invoice)
-                                                            }
-                                                        >
-                                                            View
-                                                        </button>
-                                                    ) : (
-                                                        <span className="no-invoice">No Invoice</span>
-                                                    )}
-                                                </td>
-                                                {/* 5️⃣ Request DATE */}
-                                                <td>{fmtDate(row.date)}</td>
-                                                {/* 6️⃣ END DATE */}
-                                                <td>{fmtDate(row.end_date)}</td>
-                                                {/* 7️⃣ ACTION */}
-                                                <td>
-                                                    <div className="action-cell">
-                                                        <Tooltip title="View">
-                                                            <Eye
-                                                                size={19}
-                                                                className="icon view"
-                                                                onClick={() => openDetails(row)}
-                                                            />
-                                                        </Tooltip>
-
-                                                        <Popconfirm
-                                                            title="Approve this request?"
-                                                            okText="Yes"
-                                                            cancelText="No"
-                                                            onConfirm={() => doApprove(row)}
-                                                        >
-                                                            <Tooltip title="Approve">
-                                                                <Check size={20} className="icon approve" />
-                                                            </Tooltip>
-                                                        </Popconfirm>
-
-                                                        <Popconfirm
-                                                            title="Reject this request?"
-                                                            okText="Yes"
-                                                            cancelText="No"
-                                                            onConfirm={() => doReject(row)}
-                                                        >
-                                                            <Tooltip title="Reject">
-                                                                <X size={20} className="icon reject" />
-                                                            </Tooltip>
-                                                        </Popconfirm>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </motion.table>
-                        </div>
-
-                        {/* PAGINATION */}
-                        {total > 10 && (
-                            <div className="pagination-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0' }}>
-                                <Pagination
-                                    current={page}
-                                    onChange={(p) => setPage(p)}
-                                    total={total}
-                                    pageSize={10}
-                                    showSizeChanger={false}
+                    {/* PAGINATION */}
+                    {total > 0 && (
+                        <div className="pagination-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0', alignItems: 'center', gap: '20px' }}>
+                            <div className="rows-per-page-container">
+                                Rows per page:
+                                <Select
+                                    value={pageSize}
+                                    onChange={(v) => {
+                                        setPageSize(v);
+                                        setPage(1);
+                                    }}
+                                    size="small"
+                                    className="rows-per-page-select"
+                                    style={{ width: 70 }}
+                                    options={[
+                                        { value: 10, label: '10' },
+                                        { value: 25, label: '25' },
+                                        { value: 50, label: '50' },
+                                        { value: 100, label: '100' },
+                                    ]}
                                 />
                             </div>
-                        )}
+                            <Pagination
+                                current={page}
+                                onChange={(p) => setPage(p)}
+                                total={total}
+                                pageSize={pageSize}
+                                showSizeChanger={false}
+                            />
+                        </div>
+                    )}
 
-                        {/* ✅ DETAILS MODAL */}
-                        <Modal
-                            className="details-modal"
-                            open={showDetails}
-                            onCancel={() => setShowDetails(false)}
-                            footer={null}
-                            title="Request Details"
-                            centered
-                        >
-                            {selected && (
-                                <div className="details-grid" style={{ display: "grid", gap: 10 }}>
-                                    <div><b>Spender Name:</b> {selected.name}</div>
-                                    <div className="text-truncate11"><b>Description:</b> {selected.role || "-"}</div>
-                                    <div><b>Branch:</b> {selected.branch || "-"}</div>
-                                    <div><b>Category:</b> {selected.sub_category}</div>
-                                    <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
-                                    <div><b>Request Date:</b> {fmtDate(selected.date)}</div>
-                                    <div><b>End Date:</b> {fmtDate(selected.end_date)}</div>
-                                    <div><b>GST:</b> {selected.gst}</div>
-                                    <div><b>Transaction From:</b> {selected.transaction_from}</div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            gap: 8,
-                                            marginTop: 12,
-                                            border: "none",
-                                            padding: 0,
-                                            justifyContent: "flex-start"
-                                        }}
+                    {/* ✅ DETAILS MODAL */}
+                    <Modal
+                        className="details-modal"
+                        open={showDetails}
+                        onCancel={() => setShowDetails(false)}
+                        footer={null}
+                        title="Request Details"
+                        centered
+                    >
+                        {selected && (
+                            <div className="details-grid" style={{ display: "grid", gap: 10 }}>
+                                <div><b>Spender Name:</b> {selected.name}</div>
+                                <div className="text-truncate11"><b>Description:</b> {selected.role || "-"}</div>
+                                <div><b>Branch:</b> {selected.branch || "-"}</div>
+                                <div><b>Category:</b> {selected.sub_category}</div>
+                                <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
+                                <div><b>Request Date:</b> {fmtDate(selected.date)}</div>
+                                <div><b>End Date:</b> {fmtDate(selected.end_date)}</div>
+                                <div><b>GST:</b> {selected.gst}</div>
+                                <div><b>Transaction From:</b> {selected.transaction_from}</div>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: 8,
+                                        marginTop: 12,
+                                        border: "none",
+                                        padding: 0,
+                                        justifyContent: "flex-start"
+                                    }}
+                                >
+                                    <Button onClick={() => setShowDetails(false)}>Close</Button>
+                                    <Popconfirm
+                                        title="Approve this request?"
+                                        okText="Yes"
+                                        cancelText="No"
+                                        onConfirm={() => doApprove(selected)}
                                     >
-                                        <Button onClick={() => setShowDetails(false)}>Close</Button>
-                                        <Popconfirm
-                                            title="Approve this request?"
-                                            okText="Yes"
-                                            cancelText="No"
-                                            onConfirm={() => doApprove(selected)}
-                                        >
-                                            <Button type="primary">Approve</Button>
-                                        </Popconfirm>
-                                    </div>
+                                        <Button type="primary">Approve</Button>
+                                    </Popconfirm>
                                 </div>
-                            )}
-                        </Modal>
-                    </div>
-                </>
+                            </div>
+                        )}
+                    </Modal>
+                </div>
             )}
             {showInvoiceModal && currentInvoices.length > 0 && (
                 <InvoicePreviewModal

@@ -372,7 +372,7 @@ export default function CalendarPage() {
         <div className="calendar-wrapper">
             <Spin spinning={loading}>
                 <div className="calendar-header">
-                    <h1 className="page-title">📅 Calendar & Events</h1>
+                    <h1 className="page-title"><Icons.Calendar1 size={24} /> Calendar & Events</h1>
                     {/* Search Bar */}
                     <div className="search-bar">
                         <input
