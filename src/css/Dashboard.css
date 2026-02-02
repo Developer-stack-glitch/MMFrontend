@@ -327,7 +327,7 @@ body {
 .status-pill {
   padding: 5px 12px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 16px;
   color: #0b0f19;
   font-weight: 500;
   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -1279,6 +1279,12 @@ body {
 
 .details-col {
   gap: 16px;
+}
+
+.sno-col {
+  font-weight: 600;
+  justify-content: center;
+  width: 100%;
 }
 
 /* Icon Circle */
@@ -2283,8 +2289,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px;
-  background: #261d011a;
+  padding: 0px;
   height: 100%;
 }
 
@@ -2454,7 +2459,16 @@ body {
 /* ✅ Responsive fixes */
 @media (max-width: 600px) {
   .settings-page .form-grid {
+    display: block !important;
     grid-template-columns: 1fr;
+  }
+
+  .add-vendor-btn {
+    padding: 0px 5px !important;
+  }
+
+  .add-user-btn {
+    margin-top: 25px !important;
   }
 }
 

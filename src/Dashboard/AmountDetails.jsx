@@ -6,6 +6,14 @@ import isBetween from "dayjs/plugin/isBetween";
 import { Skeleton } from "antd";
 dayjs.extend(isBetween);
 
+const fmtAmt = (n) => {
+    const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
+    return `₹${val.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+};
+
 export default function AmountDetails({
     filteredExpenses,
     originalExpenses,
@@ -151,8 +159,8 @@ export default function AmountDetails({
         const periodText = prevPeriod ? ` (${prevPeriod})` : "";
 
         return diff > 0
-            ? `+ ₹${diff.toLocaleString()} compared to previous period${periodText}`
-            : `- ₹${Math.abs(diff).toLocaleString()} compared to previous period${periodText}`;
+            ? `+ ${fmtAmt(diff)} compared to previous period${periodText}`
+            : `- ${fmtAmt(Math.abs(diff))} compared to previous period${periodText}`;
     };
 
     // Get current period text for stat titles
@@ -181,7 +189,7 @@ export default function AmountDetails({
     const periodText = getPeriodText();
 
     let stats = [];
-    if (user?.role === "admin") {
+    if (user?.role === "admin" || user?.role === "superadmin") {
         stats = [
             {
                 title: `Overall Balance${periodText}`,
@@ -242,7 +250,7 @@ export default function AmountDetails({
                             See Detail →
                         </span>
                     </div>
-                    <h2>₹ {stat.value.toLocaleString()}</h2>
+                    <h2>{fmtAmt(stat.value)}</h2>
                     {stat.diff && (
                         <p
                             className={`stat-change ${stat.diff.startsWith("+")

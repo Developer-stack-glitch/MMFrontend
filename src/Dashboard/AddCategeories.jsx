@@ -44,7 +44,8 @@ export default function AddCategories() {
     // Expand State for Expense Groups
     const [expandedGroups, setExpandedGroups] = useState({});
 
-    const isAdmin = safeGetLocalStorage("loginDetails", {})?.role === "admin";
+    const loginDetails = safeGetLocalStorage("loginDetails", {});
+    const isAdmin = loginDetails?.role === "admin" || loginDetails?.role === "superadmin";
 
     const loadCategories = React.useCallback(async () => {
         try {

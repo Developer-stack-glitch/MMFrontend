@@ -442,7 +442,7 @@ export default function Modals({
                 {/* TABS SWITCHER */}
                 {!isEdit && type !== "income" && (
                     <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 15 }}>
-                        {currentUser?.role === "admin" ? (
+                        {currentUser?.role === "admin" || currentUser?.role === "superadmin" ? (
                             // ADMIN TABS: Expense only
                             ["expense"].map(t => (
                                 <motion.button
@@ -535,7 +535,7 @@ export default function Modals({
                                                             key: cat,
                                                             label: cat,
                                                         })),
-                                                        ...(currentUser?.role === "admin" ? [
+                                                        ...(currentUser?.role === "admin" || currentUser?.role === "superadmin" ? [
                                                             {
                                                                 type: 'divider',
                                                             },
@@ -581,7 +581,7 @@ export default function Modals({
                                                                         label: sub,
                                                                     }))
                                                                     : []),
-                                                                ...(currentUser?.role === "admin" ? [
+                                                                ...(currentUser?.role === "admin" || currentUser?.role === "superadmin" ? [
                                                                     {
                                                                         type: 'divider',
                                                                     },

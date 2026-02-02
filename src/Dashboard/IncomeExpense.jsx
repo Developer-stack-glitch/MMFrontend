@@ -137,7 +137,10 @@ export default function IncomeExpense() {
 
     const fmtAmt = (n) => {
         const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
-        return `₹${val.toLocaleString('en-IN')}`;
+        return `₹${val.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
     };
 
     // -------------------------------------
@@ -288,7 +291,7 @@ export default function IncomeExpense() {
             let combinedApprovals = [...(res.approvals || []), ...(pendingResults.data || [])];
             let combinedTotal = (res.approvalsTotal || 0) + (pendingResults.total || 0);
 
-            if (userRole === "admin") {
+            if (userRole === "admin" || userRole === "superadmin") {
                 combinedApprovals = combinedApprovals.filter(item => item.status !== "pending");
                 combinedTotal = res.approvalsTotal || 0;
             }
@@ -380,7 +383,7 @@ export default function IncomeExpense() {
                     title: item.sub_category,
                     description: item.description,
                     merchant: item.user_name,
-                    amount: `₹${item.total}`,
+                    amount: fmtAmt(item.total),
                     report: item.branch,
                     status: item.status === "pending" ? "Pending" : item.status === "approved" ? "Approved" : item.status,
                     icon: <DynamicIcon size={20} />,
@@ -406,7 +409,7 @@ export default function IncomeExpense() {
                     title: item.sub_category || item.category,
                     note: item.role || item.description || "-",
                     merchant: item.user_name || userDetails.name || "You",
-                    amount: `₹${item.total || item.amount}`,
+                    amount: fmtAmt(item.total || item.amount),
                     report: item.branch || "-",
                     status: item.status,
                     icon: <DynamicIcon size={20} />,
@@ -517,7 +520,7 @@ export default function IncomeExpense() {
 
                 let combinedApprovals = [...(res.approvals || []), ...(Array.isArray(pendingResults) ? pendingResults : (pendingResults.data || []))];
 
-                if (userRole === "admin") {
+                if (userRole === "admin" || userRole === "superadmin") {
                     combinedApprovals = combinedApprovals.filter(item => item.status !== "pending");
                 }
 
@@ -597,7 +600,7 @@ export default function IncomeExpense() {
                     row.note || "-",
                     row.report || "-",
                     row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
-                    row.amount,
+                    row.amount.replace("₹", "").trim(),
                     row.gst || "No",
                     row.end_date || "-",
                     row.status,
@@ -613,14 +616,14 @@ export default function IncomeExpense() {
                     row.transaction_from || "-",
                     row.transaction_to || "-",
                     row.spendMode || "-",
-                    row.amount,
+                    row.amount.replace("₹", "").trim(),
                     row.report || "-",
                     row.status,
                     getInvoiceUrls(row.invoice)
                 ];
             }
 
-            const csvContent = [
+            const csvContent = "\uFEFF" + [
                 headers.join(","),
                 ...allExportItems.map(row => rowMapper(row).map(e => `"${String(e).replace(/"/g, '""')}"`).join(","))
             ].join("\n");
@@ -678,11 +681,11 @@ export default function IncomeExpense() {
     };
 
     const isApprovalTab = activeTab === "approval";
-    const gridStyle = (userRole === "admin" && activeTab === "expense")
-        ? { gridTemplateColumns: "215px 1.5fr 160px 140px 100px 130px 130px 90px" }
-        : { gridTemplateColumns: "240px 1.8fr 1fr 1fr 1fr 120px 120px 110px" };
+    const gridStyle = ((userRole === "admin" || userRole === "superadmin") && activeTab === "expense")
+        ? { gridTemplateColumns: "50px 215px 1.5fr 160px 140px 100px 130px 130px 90px" }
+        : { gridTemplateColumns: "50px 240px 1.8fr 1fr 1fr 1fr 120px 120px 110px" };
     const approvalGridStyle = {
-        gridTemplateColumns: "220px 1.3fr 160px 140px 100px 130px 130px 90px"
+        gridTemplateColumns: "50px 215px 1.5fr 160px 140px 100px 130px 130px 90px"
     };
 
     return (
@@ -699,7 +702,7 @@ export default function IncomeExpense() {
                             className={`premium-tab ${activeTab === "approval" ? "active" : ""}`}
                             onClick={() => handleTabChange("approval")}
                         >
-                            {userRole === "admin" ? "Approved" : "Approved"}
+                            {userRole === "admin" || userRole === "superadmin" ? "Approved" : "Approved"}
                         </button>
 
                         <button
@@ -736,7 +739,7 @@ export default function IncomeExpense() {
                                 >
                                     <Icons.Download size={16} /> Export CSV
                                 </button>
-                                {!(userRole === "admin" && activeTab === "approval") && (
+                                {!((userRole === "admin" || userRole === "superadmin") && activeTab === "approval") && (
                                     <button
                                         className="btn-primary"
                                         onClick={() => {
@@ -831,7 +834,8 @@ export default function IncomeExpense() {
                                         className="expense-row expense-header-row"
                                         style={isApprovalTab ? approvalGridStyle : gridStyle}
                                     >
-                                        <div>DETAILS</div>
+                                        <div className="sno-col" style={{ fontWeight: 700 }}>S.NO</div>
+                                        <div style={{ width: "100%", textAlign: "center" }}>DETAILS</div>
                                         {isApprovalTab ? (
                                             <>
                                                 <div>DESCRIPTION</div>
@@ -851,7 +855,7 @@ export default function IncomeExpense() {
                                                 <div>AMOUNT</div>
                                                 <div>BRANCH</div>
                                                 <div>STATUS</div>
-                                                {userRole === "admin" && <div>ACTION</div>}
+                                                {(userRole === "admin" || userRole === "superadmin") && <div>ACTION</div>}
                                             </>
                                         )}
                                     </div>
@@ -871,6 +875,9 @@ export default function IncomeExpense() {
                                                 className="expense-row"
                                                 style={isApprovalTab ? approvalGridStyle : gridStyle}
                                             >
+                                                <div className="col sno-col" style={{ fontWeight: 600, justifyContent: "flex-start", color: '#666' }}>
+                                                    {(page - 1) * pageSize + i + 1}.
+                                                </div>
                                                 {/* DETAILS */}
                                                 <div className="col details-col">
                                                     <div
@@ -943,11 +950,22 @@ export default function IncomeExpense() {
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            {userRole === "admin" ? (
-                                                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                            {(userRole === "admin" || userRole === "superadmin") ? (
+                                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                                                                     <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
                                                                         <Icons.Edit size={16} />
                                                                     </button>
+                                                                    <Popconfirm
+                                                                        title="Delete this approved item?"
+                                                                        description="This action will delete the associated expense entry."
+                                                                        onConfirm={() => handleDelete(row.originalItem || row)}
+                                                                        okText="Yes"
+                                                                        cancelText="No"
+                                                                    >
+                                                                        <button className="edit-btn" style={{ color: '#ff4d4f' }}>
+                                                                            <Icons.Trash2 size={16} />
+                                                                        </button>
+                                                                    </Popconfirm>
                                                                 </div>
                                                             ) : (
                                                                 <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1034,7 +1052,7 @@ export default function IncomeExpense() {
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        {userRole === "admin" && (
+                                                        {(userRole === "admin" || userRole === "superadmin") && (
                                                             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                                                                 <button className="edit-btn" onClick={() => openEditModal(row.originalItem || row)}>
                                                                     <Icons.Edit size={16} />

@@ -46,6 +46,14 @@ dayjs.extend(isBetween);
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 import DashboardSkeleton from "./DashboardSkeleton";
 
+const fmtAmt = (n) => {
+    const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
+    return `₹${val.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+};
+
 
 export default function Dashboard() {
     const [originalIncome, setOriginalIncome] = useState([]);
@@ -107,7 +115,7 @@ export default function Dashboard() {
             if (user?.role === "user") {
                 const wallets = await getWalletEntriesApi(user.id).catch(() => ({ entries: [] }));
                 setWalletEntries(wallets.entries || []);
-            } else if (user?.role === "admin") {
+            } else if (user?.role === "admin" || user?.role === "superadmin") {
                 const allWallets = await getAllWalletTransactionsApi().catch(() => ({ entries: [] }));
                 setWalletEntries(allWallets.entries || []);
             } else {
@@ -220,7 +228,7 @@ export default function Dashboard() {
 
         let latestExpense = [];
 
-        if (user.role === "admin") {
+        if (user.role === "admin" || user.role === "superadmin") {
             latestIncomeOrWallet = [...filteredWalletEntries]
                 .filter(w => (w.type || "").toLowerCase() === 'income')
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -273,7 +281,7 @@ export default function Dashboard() {
 
         setRecentTransactions({
             income: latestIncomeOrWallet,
-            expense: user.role === "admin" ? [...filteredExpenses]
+            expense: (user.role === "admin" || user.role === "superadmin") ? [...filteredExpenses]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5)
                 .map((e) => ({
@@ -391,7 +399,7 @@ export default function Dashboard() {
                             <h3 className="quick-access-title">Add New Records</h3>
                             <div className="quick-access-grid">
                                 {[
-                                    ...(user?.role !== "admin" ? [{
+                                    ...((user?.role !== "admin" && user?.role !== "superadmin") ? [{
                                         icon: <Receipt size={18} />,
                                         label: "+ New Approve",
                                         bg: "#006b29ff",
@@ -554,7 +562,7 @@ export default function Dashboard() {
                                     className={`rt-tab ${activeTab === "income" ? "active" : ""}`}
                                     onClick={() => setActiveTab("income")}
                                 >
-                                    {user.role === "admin" ? "Wallet" : "Wallet"}
+                                    {(user.role === "admin" || user.role === "superadmin") ? "Wallet" : "Wallet"}
                                 </button>
                                 <button
                                     className={`rt-tab ${activeTab === "expense" ? "active" : ""}`}
@@ -590,7 +598,7 @@ export default function Dashboard() {
                                                         <td>{t.category}</td>
                                                         <td>{t.branch}</td>
                                                         <td>{t.user_name}</td>
-                                                        <td className="positive">₹{Number(t.amount).toLocaleString()}</td>
+                                                        <td className="positive">{fmtAmt(t.amount)}</td>
                                                         <td>
                                                             {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
                                                                 <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>
@@ -631,7 +639,7 @@ export default function Dashboard() {
                                                         <td>{t.category}</td>
                                                         <td>{t.branch}</td>
                                                         <td>{t.user_name}</td>
-                                                        <td className="negative">-₹{Math.abs(t.amount)}</td>
+                                                        <td className="negative">-{fmtAmt(Math.abs(t.amount))}</td>
                                                         <td>
                                                             {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
                                                                 <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>

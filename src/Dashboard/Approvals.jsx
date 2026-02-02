@@ -76,7 +76,10 @@ export default function Approvals() {
     const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "-");
     const fmtAmt = (n) => {
         const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
-        return `₹${val.toLocaleString('en-IN')}`;
+        return `₹${val.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
     };
 
     const openDetails = (row) => {

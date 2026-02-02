@@ -13,6 +13,14 @@ import Filters from "../Filters/Filters";
 dayjs.extend(isBetween);
 dayjs.extend(weekOfYear);
 
+const fmtAmt = (n) => {
+    const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
+    return `₹${val.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+};
+
 export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
@@ -121,16 +129,9 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         // Filter out expenses as per user request
         entries = entries.filter(e => e.type.toLowerCase() !== 'expense');
 
-        // Recalculate totals based on filtered entries (Expense will be 0 now effectively if we used filtered list, but we can compute before if we wanted to show it. But user said don't show expense)
-        // actually if we don't show rows, we probably shouldn't show the total spent either.
-
         const filteredIncome = entries
             .filter(e => e.type.toLowerCase() === 'income')
             .reduce((sum, e) => sum + Number(e.amount), 0);
-
-        // const filteredExpense = entries
-        //    .filter(e => e.type.toLowerCase() === 'expense')
-        //    .reduce((sum, e) => sum + Number(e.amount), 0);
 
         if (!entries || entries.length === 0) {
             return <Empty description="No transaction history for selected period" />;
@@ -177,7 +178,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                         fontWeight: "bold",
                         color: (item.type || "").toLowerCase() === 'income' ? 'green' : 'red'
                     }}>
-                        {item.type.toLowerCase() === 'expense' ? '-' : '+'}₹{Number(amount).toLocaleString()}
+                        {item.type.toLowerCase() === 'expense' ? '-' : '+'}{fmtAmt(amount)}
                     </span>
                 ),
             },
@@ -229,7 +230,6 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             dataIndex: "received",
             key: "received",
             render: (amount) => {
-                const num = Number(amount);
                 return (
                     <span
                         style={{
@@ -238,7 +238,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                             color: "#28a745",
                         }}
                     >
-                        ₹{num.toLocaleString()}
+                        {fmtAmt(amount)}
                     </span>
                 );
             },
@@ -248,7 +248,6 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             dataIndex: "spend",
             key: "spend",
             render: (amount) => {
-                const num = Number(amount);
                 return (
                     <span
                         style={{
@@ -257,7 +256,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                             color: "#dc3545",
                         }}
                     >
-                        ₹{num.toLocaleString()}
+                        {fmtAmt(amount)}
                     </span>
                 );
             },
@@ -280,7 +279,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                                         "#555",
                         }}
                     >
-                        ₹{num.toLocaleString()}
+                        {fmtAmt(amount)}
                     </span>
                 );
             },

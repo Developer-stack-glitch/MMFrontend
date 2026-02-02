@@ -46,6 +46,14 @@ import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 dayjs.extend(isBetween);
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
+const fmtAmt = (n) => {
+    const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
+    return `₹${val.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+};
+
 export default function Income() {
     const [originalIncome, setOriginalIncome] = useState([]);
     const [originalExpenses, setOriginalExpenses] = useState([]);
@@ -107,7 +115,7 @@ export default function Income() {
             if (user?.role === "user") {
                 const wallets = await getWalletEntriesApi(user.id).catch(() => ({ entries: [] }));
                 setWalletEntries(wallets.entries || []);
-            } else if (user?.role === "admin") {
+            } else if (user?.role === "admin" || user?.role === "superadmin") {
                 const allWallets = await getAllWalletTransactionsApi().catch(() => ({ entries: [] }));
                 setWalletEntries(allWallets.entries || []);
             } else {
@@ -225,7 +233,7 @@ export default function Income() {
 
         let latestExpense = [];
 
-        if (user.role === "admin") {
+        if (user.role === "admin" || user.role === "superadmin") {
             // Admin: Use filtered income from API
             latestIncomeOrWallet = [...filteredIncome]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -277,7 +285,7 @@ export default function Income() {
 
         setRecentTransactions({
             income: latestIncomeOrWallet,
-            expense: user.role === "admin" ? [...filteredExpenses]
+            expense: (user.role === "admin" || user.role === "superadmin") ? [...filteredExpenses]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5)
                 .map((e) => ({
@@ -538,7 +546,7 @@ export default function Income() {
                                                 <td>{t.category}</td>
                                                 <td>{t.branch}</td>
                                                 <td>{t.user_name}</td>
-                                                <td className="positive">₹{Number(t.amount).toLocaleString()}</td>
+                                                <td className="positive">{fmtAmt(t.amount)}</td>
                                                 <td>
                                                     {t.method && String(t.method).trim() !== "" && String(t.method).trim() !== "[]" ? (
                                                         <button className="view-invoice-btn" onClick={() => handleViewInvoice(t.method)}>

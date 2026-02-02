@@ -81,7 +81,7 @@ export default function SideBarLayout() {
     const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
 
     const [isMobile, setIsMobile] = useState(false);
-    const isAdmin = user?.role === "admin";
+    const isElevated = user?.role === "admin" || user?.role === "superadmin";
 
     useEffect(() => {
         if (user?.role === "user") {
@@ -213,7 +213,7 @@ export default function SideBarLayout() {
             const isInitialLoad = previousPendingCount.current === 0 && newCount > 0;
             const hasNewApprovals = newCount > previousPendingCount.current;
 
-            if (hasNewApprovals && user?.role === "admin" && !isInitialLoad) {
+            if (hasNewApprovals && isElevated && !isInitialLoad) {
                 // Play notification sound for new approvals (admin only)
                 playNotificationSound();
                 CommonToaster(`${newCount - previousPendingCount.current} new approval(s) received!`, "info");
@@ -445,7 +445,7 @@ export default function SideBarLayout() {
                             { key: "1", icon: <LayoutDashboard size={16} />, label: "Dashboard" },
                             { key: "3", icon: <DollarSign size={16} />, label: "Approved / Expense" },
 
-                            ...(isAdmin ? [
+                            ...(isElevated ? [
                                 { key: "4", icon: <TimerResetIcon size={16} />, label: "Pending Approvals" },
                                 { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
                                 { key: "10", icon: <TrendingUp size={16} />, label: "Income" },
@@ -466,7 +466,7 @@ export default function SideBarLayout() {
                         items={[
                             { key: "8", icon: <Settings size={16} />, label: "Settings" },
                             { key: "9", icon: <Calendar size={16} />, label: "Schedule Calendar" },
-                            { key: "2", icon: <PlusIcon size={16} />, label: isAdmin ? "Add Category" : "Categories" },
+                            { key: "2", icon: <PlusIcon size={16} />, label: isElevated ? "Add Category" : "Categories" },
                         ]}
                     />
                 </div>
@@ -498,7 +498,7 @@ export default function SideBarLayout() {
 
                     <h2 className="header-title">Hello, {user.name}</h2>
                     <div className="header-right">
-                        {isAdmin ? (
+                        {isElevated ? (
                             <>
                                 <Tooltip title="Test notification sound">
                                     <Button

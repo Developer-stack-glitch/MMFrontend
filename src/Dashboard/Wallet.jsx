@@ -23,7 +23,7 @@ export default function WalletPage() {
         async function loadUsers() {
             try {
                 const res = await getUsersApi();
-                const onlyUsers = res.filter(u => u.role !== "admin");
+                const onlyUsers = res.filter(u => u.role !== "admin" && u.role !== "superadmin");
                 setUsers(onlyUsers);
             } catch (err) {
                 console.log(err);

@@ -321,6 +321,11 @@ export const deleteUserApi = async (id) => {
     return res.data;
 };
 
+export const changeUserPasswordApi = async (id, password) => {
+    const res = await api.put(`/api/auth/users/${id}/password`, { password });
+    return res.data;
+};
+
 
 // ADD WALLET AMOUNT
 export const addWalletApi = async (payload) => {
@@ -340,6 +345,16 @@ export const getVendorsApi = async () => {
 
 export const addVendorApi = async (payload) => {
     const res = await api.post("/api/wallet/add-vendor", payload);
+    return res.data;
+};
+
+export const updateVendorApi = async (id, payload) => {
+    const res = await api.put(`/api/wallet/update-vendor/${id}`, payload);
+    return res.data;
+};
+
+export const deleteVendorApi = async (id) => {
+    const res = await api.delete(`/api/wallet/delete-vendor/${id}`);
     return res.data;
 };
 
