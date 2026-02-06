@@ -593,10 +593,11 @@ export default function IncomeExpense() {
             let rowMapper = (row) => [];
 
             if (activeTab === "approval") {
-                headers = ["Date", "Category", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
+                headers = ["Date", "Category", "Sender", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
                 rowMapper = (row) => [
                     row.date,
                     row.title,
+                    row.merchant || "-",
                     row.note || "-",
                     row.report || "-",
                     row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
@@ -607,16 +608,18 @@ export default function IncomeExpense() {
                     getInvoiceUrls(row.invoice)
                 ];
             } else {
-                headers = ["Date", "Category", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "Branch", "Status", "Invoice"];
+                headers = ["Date", "Category", "Sender", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "GST", "Branch", "Status", "Invoice"];
                 rowMapper = (row) => [
                     row.date,
                     row.title,
+                    row.merchant || "-",
                     row.description || "-",
                     row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
                     row.transaction_from || "-",
                     row.transaction_to || "-",
                     row.spendMode || "-",
                     row.amount.replace("₹", "").trim(),
+                    row.gst || "No",
                     row.report || "-",
                     row.status,
                     getInvoiceUrls(row.invoice)
@@ -682,10 +685,10 @@ export default function IncomeExpense() {
 
     const isApprovalTab = activeTab === "approval";
     const gridStyle = ((userRole === "admin" || userRole === "superadmin") && activeTab === "expense")
-        ? { gridTemplateColumns: "50px 215px 1.5fr 160px 140px 100px 130px 130px 90px" }
-        : { gridTemplateColumns: "50px 240px 1.8fr 1fr 1fr 1fr 120px 120px 110px" };
+        ? { gridTemplateColumns: "55px 240px 1.5fr 160px 160px 120px 80px 130px 120px 100px" }
+        : { gridTemplateColumns: "55px 240px 1.5fr 160px 160px 120px 80px 130px 120px" };
     const approvalGridStyle = {
-        gridTemplateColumns: "50px 215px 1.5fr 160px 140px 100px 130px 130px 90px"
+        gridTemplateColumns: "55px 240px 1.5fr 140px 120px 80px 130px 120px 100px"
     };
 
     return (
@@ -835,7 +838,7 @@ export default function IncomeExpense() {
                                         style={isApprovalTab ? approvalGridStyle : gridStyle}
                                     >
                                         <div className="sno-col" style={{ fontWeight: 700 }}>S.NO</div>
-                                        <div style={{ width: "100%", textAlign: "center" }}>DETAILS</div>
+                                        <div>DETAILS</div>
                                         {isApprovalTab ? (
                                             <>
                                                 <div>DESCRIPTION</div>
@@ -853,6 +856,7 @@ export default function IncomeExpense() {
                                                 <div>TRANSACTION</div>
 
                                                 <div>AMOUNT</div>
+                                                <div>GST</div>
                                                 <div>BRANCH</div>
                                                 <div>STATUS</div>
                                                 {(userRole === "admin" || userRole === "superadmin") && <div>ACTION</div>}
@@ -890,7 +894,7 @@ export default function IncomeExpense() {
                                                             display: "flex",
                                                             alignItems: "center",
                                                             justifyContent: "center",
-                                                            minWidth: 40, // Prevent shrink
+                                                            minWidth: 40,
                                                         }}
                                                     >
                                                         {row.icon}
@@ -898,6 +902,7 @@ export default function IncomeExpense() {
                                                     <div className="details-text">
                                                         <span className="date">{row.date}</span>
                                                         <span className="title" style={{ fontWeight: 700, fontSize: 13 }}>{row.title}</span>
+                                                        <span className="sender-name-inline" style={{ fontSize: '12px', color: '#666', fontWeight: 500 }}>{row.merchant}</span>
                                                         {/* Invoice Button */}
                                                         {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" && (
                                                             <button
@@ -1044,6 +1049,7 @@ export default function IncomeExpense() {
                                                             ) : "-"}
                                                         </div>
                                                         <div style={{ fontWeight: 600 }}>{row.amount}</div>
+                                                        <div>{row.gst === 'Yes' ? <span className="status-badge" style={{ background: '#d4377f', color: 'white' }}>GST</span> : '-'}</div>
                                                         <div>{row.report}</div>
                                                         <div>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>

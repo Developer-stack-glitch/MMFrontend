@@ -287,6 +287,8 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         {
             title: "Action",
             key: "action",
+            fixed: 'right',
+            width: 150,
             render: (_, record) => (
                 <Button
                     type="primary"
