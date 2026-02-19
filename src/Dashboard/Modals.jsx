@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Upload } from "lucide-react";
 import { Dropdown, Menu, Button, Space, DatePicker, Checkbox, Radio, Select, Modal } from "antd";
-import { addExpenseApi, addApprovalApi, addIncomeApi, editExpenseApi, safeGetLocalStorage, getUsersApi, getVendorsApi, addVendorApi } from "../../Api/action";
+import { addExpenseApi, addApprovalApi, addIncomeApi, editExpenseApi, editIncomeApi, safeGetLocalStorage, getUsersApi, getVendorsApi, addVendorApi } from "../../Api/action";
 import { DownOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { CommonToaster } from "../../Common/CommonToaster";
@@ -305,6 +305,29 @@ export default function Modals({
 
                 const res = await editExpenseApi(editFormData);
                 CommonToaster(res.data?.message || "Updated successfully!", "success");
+            } else if (activeModalTab === "edit-income" && isEdit && editData) {
+                // EDIT INCOME FLOW
+                const updates = {
+                    total,
+                    branch,
+                    date,
+                    mainCategory,
+                    description,
+                    existingInvoices: JSON.stringify(invoices.filter(inv => typeof inv === 'string' || inv.preview?.startsWith('/uploads')))
+                };
+
+                const editFormData = new FormData();
+                editFormData.append("income_id", editData.id);
+                editFormData.append("user_id", currentUser?.id);
+                editFormData.append("updates", JSON.stringify(updates));
+
+                // Append new files for edit
+                invoiceFiles.forEach((file) => {
+                    editFormData.append("invoices", file);
+                });
+
+                const res = await editIncomeApi(editFormData);
+                CommonToaster(res.data?.message || "Income updated successfully!", "success");
             } else if (isExpenseOrApproval) {
                 // ADD EXPENSE or APPROVAL FLOW
                 if (activeModalTab === "approval") {
@@ -410,7 +433,11 @@ export default function Modals({
     const isIncome = activeModalTab === "income";
 
     const getTitle = () => {
-        if (isEdit) return (activeModalTab === "approval" || activeModalTab === "edit-approval") ? "Edit Approval" : "Edit Expense";
+        if (isEdit) {
+            if (activeModalTab === "approval" || activeModalTab === "edit-approval") return "Edit Approval";
+            if (activeModalTab === "expense") return "Edit Expense";
+            if (activeModalTab === "income" || activeModalTab === "edit-income") return "Edit Income";
+        }
         if (isApproval) return "New Approval";
         if (isExpense) return "New Expense";
         return "New Income";

@@ -21,9 +21,11 @@ import {
     PieChart,
     CreditCard,
     Wallet,
-    Receipt,
+    Edit,
+    Trash2,
 } from "lucide-react";
 import "../css/Dashboard.css";
+import { Popconfirm } from "antd";
 import "../css/Calendar.css";
 import AmountDetails from "./AmountDetails";
 import Filters from "../Filters/Filters";
@@ -34,7 +36,8 @@ import {
     getExpensesApi,
     getAllWalletTransactionsApi,
     safeGetLocalStorage,
-    getIncomeCategoriesApi
+    getIncomeCategoriesApi,
+    deleteIncomeApi
 } from "../../Api/action";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
@@ -83,6 +86,8 @@ export default function Income() {
         compareMode: false,
         value: dayjs(),
     });
+    const [isEdit, setIsEdit] = useState(false);
+    const [editData, setEditData] = useState(null);
     const user = safeGetLocalStorage("loginDetails", {});
 
     // -------------------------
@@ -237,8 +242,8 @@ export default function Income() {
             // Admin: Use filtered income from API
             latestIncomeOrWallet = [...filteredIncome]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 5)
                 .map((i) => ({
+                    ...i,
                     type: "Income",
                     date: i.date,
                     amount: Number(i.total),
@@ -253,8 +258,8 @@ export default function Income() {
             // User: Use filtered income from API
             latestIncomeOrWallet = [...filteredIncome]
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 5)
                 .map((w) => ({
+                    ...w,
                     type: "Income",
                     date: w.date,
                     amount: Number(w.total),
@@ -349,6 +354,27 @@ export default function Income() {
     // -------------------------
     // Small helper for "no data" box
     // -------------------------
+    const handleEditIncome = (income) => {
+        setEditData(income);
+        setBranch(income.branch);
+        setDate(dayjs(income.date).format("YYYY-MM-DD"));
+        setTotal(income.total);
+        setMainCategory(income.category);
+        setDescription(income.description);
+        setIsEdit(true);
+        setOpenModal("edit-income");
+    };
+
+    const handleDeleteIncome = async (id) => {
+        try {
+            await deleteIncomeApi(id);
+            CommonToaster("Income deleted successfully", "success");
+            fetchOriginalData();
+        } catch (err) {
+            CommonToaster(err.message || "Failed to delete income", "error");
+        }
+    };
+
     const NoDataBox = ({ title = "No Data Found", subtitle = "" }) => (
         <div className="no-data-box">
             <img
@@ -445,7 +471,11 @@ export default function Income() {
                             <Modals
                                 open={openModal}
                                 type={openModal}
-                                onClose={() => setOpenModal(null)}
+                                onClose={() => {
+                                    setOpenModal(null);
+                                    setIsEdit(false);
+                                    setEditData(null);
+                                }}
                                 branch={branch}
                                 setBranch={setBranch}
                                 date={date}
@@ -466,6 +496,8 @@ export default function Income() {
                                 setVendorNumber={setVendorNumber}
                                 endDate={endDate}
                                 setEndDate={setEndDate}
+                                isEdit={isEdit}
+                                editData={editData}
                             />
                         </AnimatePresence>
 
@@ -516,7 +548,7 @@ export default function Income() {
                         <div className="transactions-header">
                             <h3>
                                 <CreditCard size={18} style={{ marginRight: 8, color: "#d4af37" }} />
-                                Recent Income Transactions
+                                Income Transactions
                             </h3>
                         </div>
 
@@ -530,6 +562,7 @@ export default function Income() {
                                         <th>Name</th>
                                         <th>Amount</th>
                                         <th>Invoice</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -555,6 +588,28 @@ export default function Income() {
                                                     ) : (
                                                         <span className="no-invoice">No Invoice</span>
                                                     )}
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: "flex", gap: "8px" }}>
+                                                        <button
+                                                            className="edit-btn"
+                                                            onClick={() => handleEditIncome(t)}
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+
+                                                        <Popconfirm
+                                                            title="Delete this approved item?"
+                                                            description="This action will delete the associated income entry."
+                                                            onConfirm={() => handleDeleteIncome(t.id)}
+                                                            okText="Yes"
+                                                            cancelText="No"
+                                                        >
+                                                            <button className="edit-btn" style={{ color: '#ff4d4f' }}>
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </Popconfirm>
+                                                    </div>
                                                 </td>
                                             </motion.tr>
                                         ))

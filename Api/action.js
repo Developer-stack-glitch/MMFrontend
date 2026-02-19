@@ -409,6 +409,23 @@ export const deleteExpenseApi = async (id) => {
     }
 };
 
+export const editIncomeApi = async (payload) => {
+    const config = {};
+    if (payload instanceof FormData) {
+        config.headers = { 'Content-Type': 'multipart/form-data' };
+    }
+    return await api.post("/api/transactions/edit-income", payload, config);
+};
+
+export const deleteIncomeApi = async (id) => {
+    try {
+        const res = await api.delete(`/api/transactions/delete-income/${id}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
 export const getUserAllExpensesApi = async (page = 1, limit = 10, filters = {}) => {
     let query = `/api/transactions/user-all-expenses?page=${page}&limit=${limit}`;
     if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
