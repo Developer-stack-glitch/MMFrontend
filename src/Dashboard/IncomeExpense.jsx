@@ -105,6 +105,7 @@ export default function IncomeExpense() {
     const [filterCategory, setFilterCategory] = useState("All");
     const [filterName, setFilterName] = useState("All");
     const [filterBranch, setFilterBranch] = useState("All");
+    const [filterTransaction, setFilterTransaction] = useState("All");
     const [filterAmount, setFilterAmount] = useState("");
     const [searchText, setSearchText] = useState("");
     const [filters, setFilters] = useState({
@@ -252,9 +253,6 @@ export default function IncomeExpense() {
     // -------------------------------------
     // Load Income + Expense + Approval
     // -------------------------------------
-    // -------------------------------------
-    // Load Income + Expense + Approval
-    // -------------------------------------
     useEffect(() => {
         async function loadData() {
             setLoading(true);
@@ -268,13 +266,20 @@ export default function IncomeExpense() {
             const res = await getUserAllExpensesApi(page, pageSize, {
                 name: filterName,
                 branch: filterBranch,
+                transaction: filterTransaction,
                 startDate,
                 endDate
             });
 
             let pendingResults = { data: [], total: 0 };
             try {
-                pendingResults = await getApprovalsApi(page, pageSize, { startDate, endDate });
+                pendingResults = await getApprovalsApi(page, pageSize, {
+                    startDate,
+                    endDate,
+                    name: filterName,
+                    branch: filterBranch,
+                    transaction: filterTransaction
+                });
                 // Handle legacy response if it was just an array
                 if (Array.isArray(pendingResults)) {
                     pendingResults = { data: pendingResults, total: pendingResults.length };
@@ -315,12 +320,12 @@ export default function IncomeExpense() {
         }
 
         loadData();
-    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, pageSize, filters]);
+    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, filterTransaction, pageSize, filters]);
 
     // Reset to page 1 when filters change (except page change itself)
     useEffect(() => {
         setPage(1);
-    }, [filterName, filterBranch, filters, activeTab]);
+    }, [filterName, filterBranch, filterTransaction, filters, activeTab]);
 
     useEffect(() => {
         const reload = () => {
@@ -419,6 +424,7 @@ export default function IncomeExpense() {
                     vendorName: item.vendor_name,
                     vendorNumber: item.vendor_number,
                     transaction_to: item.transaction_to,
+                    transaction_from: item.transaction_from,
                     end_date: item.end_date ? dayjs(item.end_date).format("DD/MM/YYYY") : "-",
                     originalItem: { ...item, id: item.id },
                     is_edit: item.is_edit
@@ -434,6 +440,7 @@ export default function IncomeExpense() {
     // -------------------------------------
     const allNames = globalFilterOptions?.names?.length ? globalFilterOptions.names : [...new Set(baseRows.map(r => r.merchant))].filter(Boolean);
     const allBranches = globalFilterOptions?.branches?.length ? globalFilterOptions.branches : [...new Set(baseRows.map(r => r.report))].filter(Boolean);
+    const allTransactionSources = globalFilterOptions?.transactionSources?.length ? globalFilterOptions.transactionSources : [...new Set(baseRows.map(r => r.transaction_from))].filter(Boolean);
     let filteredRows = [...baseRows];
 
     if (searchText.trim()) {
@@ -458,6 +465,10 @@ export default function IncomeExpense() {
         filteredRows = filteredRows.filter(r => r.report === filterBranch);
     }
 
+    if (filterTransaction !== "All") {
+        filteredRows = filteredRows.filter(r => r.transaction_from === filterTransaction);
+    }
+
     if (filterAmount === "low") {
         filteredRows.sort((a, b) => parseInt(a.amount.replace(/\D/g, "")) - parseInt(b.amount.replace(/\D/g, "")));
     } else if (filterAmount === "high") {
@@ -479,6 +490,7 @@ export default function IncomeExpense() {
         setSearchText("");
         setFilterName("All");
         setFilterBranch("All");
+        setFilterTransaction("All");
         setPage(1);
     };
 
@@ -489,7 +501,7 @@ export default function IncomeExpense() {
             const LARGE_LIMIT = 10000;
 
             if (activeTab === "expense") {
-                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch });
+                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch, transaction: filterTransaction });
                 const rawExpenses = applyFilters(res.expenses || []);
                 allExportItems = rawExpenses.map((item) => {
                     const DynamicIcon = Icons[item.icon] || Icons.Circle;
@@ -512,7 +524,7 @@ export default function IncomeExpense() {
                     };
                 });
             } else {
-                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch });
+                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch, transaction: filterTransaction });
                 let pendingResults = { data: [] };
                 try {
                     pendingResults = await getApprovalsApi(1, LARGE_LIMIT);
@@ -815,7 +827,22 @@ export default function IncomeExpense() {
                                     />
                                 </div>
 
-                                {(filterCategory !== "All" || filterAmount !== "" || filterName !== "All" || filterBranch !== "All" || searchText) && (
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterTransaction}
+                                        onChange={(v) => { setFilterTransaction(v); setPage(1); }}
+                                        style={{ width: 150 }}
+                                        placeholder="Transaction"
+                                        showSearch
+                                        suffixIcon={<Icons.Wallet size={14} />}
+                                        options={[
+                                            { value: "All", label: "Transaction: All" },
+                                            ...allTransactionSources.map(s => ({ value: s, label: s }))
+                                        ]}
+                                    />
+                                </div>
+
+                                {(filterCategory !== "All" || filterAmount !== "" || filterName !== "All" || filterBranch !== "All" || filterTransaction !== "All" || searchText) && (
                                     <button className="clear-filter-btn" onClick={clearAllFilters}>
                                         <Icons.X size={14} /> Clear
                                     </button>
@@ -1151,16 +1178,19 @@ export default function IncomeExpense() {
                         )}
 
                     </motion.div >
-                </div>
-            )}
+                </div >
+            )
+            }
 
-            {showInvoiceModal && currentInvoices.length > 0 && (
-                <InvoicePreviewModal
-                    open={showInvoiceModal}
-                    onClose={() => setShowInvoiceModal(false)}
-                    invoices={currentInvoices}
-                />
-            )}
+            {
+                showInvoiceModal && currentInvoices.length > 0 && (
+                    <InvoicePreviewModal
+                        open={showInvoiceModal}
+                        onClose={() => setShowInvoiceModal(false)}
+                        invoices={currentInvoices}
+                    />
+                )
+            }
 
             {/* Vendor Stats Modal */}
             <AnimatePresence>

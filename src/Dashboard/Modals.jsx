@@ -53,9 +53,10 @@ export default function Modals({
     const [newVendorEmail, setNewVendorEmail] = useState("");
     const [newVendorAddress, setNewVendorAddress] = useState("");
 
-    // Add Category Modal State
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
     const [addCategoryInitialMain, setAddCategoryInitialMain] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isVendorSubmitting, setIsVendorSubmitting] = useState(false);
 
     const currentUser = safeGetLocalStorage("loginDetails", {});
 
@@ -169,6 +170,7 @@ export default function Modals({
         if (!newVendorCompany) return CommonToaster("Company name is required", "error");
         if (!newVendorGst) return CommonToaster("GST number is required", "error");
         if (!newVendorNumber) return CommonToaster("Vendor number is required", "error");
+        setIsVendorSubmitting(true);
         try {
             await addVendorApi({
                 name: newVendorName,
@@ -191,6 +193,8 @@ export default function Modals({
             setNewVendorAddress("");
         } catch (err) {
             CommonToaster("Failed to add vendor", "error");
+        } finally {
+            setIsVendorSubmitting(false);
         }
     };
 
@@ -224,6 +228,7 @@ export default function Modals({
             if (!endDate) return CommonToaster("Select End Date", "error");
         }
 
+        setIsSubmitting(true);
         try {
             const formData = new FormData();
 
@@ -362,6 +367,8 @@ export default function Modals({
             }, 50);
         } catch (err) {
             CommonToaster(err?.message || "Server Error", "error");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -369,7 +376,9 @@ export default function Modals({
         <Menu
             onClick={(e) => setBranch(e.key)}
             items={[
-                { key: "Overall", label: "Overall" }, // Added Option
+                { key: "Overall", label: "Overall" },
+                { key: "Personal", label: "Personal" },
+                { key: "Linkplux", label: "Linkplux" },
                 {
                     type: 'group',
                     label: 'CHENNAI',
@@ -723,7 +732,8 @@ export default function Modals({
                                                 "ACTE SBI",
                                                 "ACTE HDFC",
                                                 "ACTE RBL",
-                                                "ACTE AXIS"
+                                                "ACTE AXIS",
+                                                "LEARNOVITA SBI"
                                             ].map(opt => ({ value: opt, label: opt }))}
                                         />
                                     </div>
@@ -993,10 +1003,14 @@ export default function Modals({
                     </div>
                 </div>
 
-                {/* FOOTER */}
                 <div className="modal-footer">
-                    <button className="btn-draft" onClick={handleSubmit}>
-                        {isEdit ? "Update" : "Submit"}
+                    <button
+                        className="btn-draft"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? "not-allowed" : "pointer" }}
+                    >
+                        {isSubmitting ? "Submitting..." : (isEdit ? "Update" : "Submit")}
                     </button>
                 </div>
 
@@ -1006,6 +1020,7 @@ export default function Modals({
                     open={isAddVendorOpen}
                     onCancel={() => setIsAddVendorOpen(false)}
                     onOk={handleSaveNewVendor}
+                    confirmLoading={isVendorSubmitting}
                     centered
                 >
                     <div style={{ marginBottom: 15 }}>

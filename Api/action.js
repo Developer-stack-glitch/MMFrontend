@@ -287,6 +287,9 @@ export const getApprovalsApi = async (page = 1, limit = 10, filters = {}) => {
     let query = `/api/transactions/approvals?page=${page}&limit=${limit}`;
     if (filters.startDate) query += `&startDate=${filters.startDate}`;
     if (filters.endDate) query += `&endDate=${filters.endDate}`;
+    if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
+    if (filters.branch && filters.branch !== 'All') query += `&branch=${encodeURIComponent(filters.branch)}`;
+    if (filters.transaction && filters.transaction !== 'All') query += `&transaction=${encodeURIComponent(filters.transaction)}`;
 
     const res = await api.get(query);
     return res.data;
@@ -430,6 +433,7 @@ export const getUserAllExpensesApi = async (page = 1, limit = 10, filters = {}) 
     let query = `/api/transactions/user-all-expenses?page=${page}&limit=${limit}`;
     if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
     if (filters.branch && filters.branch !== 'All') query += `&branch=${encodeURIComponent(filters.branch)}`;
+    if (filters.transaction && filters.transaction !== 'All') query += `&transaction=${encodeURIComponent(filters.transaction)}`;
     if (filters.startDate) query += `&startDate=${filters.startDate}`;
     if (filters.endDate) query += `&endDate=${filters.endDate}`;
 
