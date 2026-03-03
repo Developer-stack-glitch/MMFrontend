@@ -1214,13 +1214,10 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  /* Softer, larger shadow */
   background: #ffffff;
   border: 1px solid rgba(212, 175, 55, 0.2);
-  /* Subtle gold border */
   margin-top: 20px;
   padding-bottom: 0px;
-  /* Remove padding to flush with border */
 }
 
 
@@ -1228,9 +1225,7 @@ body {
 /* Base Row Style */
 .expense-row {
   display: grid;
-  /* Columns are handled inline in JSX */
   padding: 16px 20px;
-  /* Comfortable padding */
   align-items: center;
   border-bottom: 1px solid #f0f0f0;
   justify-items: start;
@@ -1248,7 +1243,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 1px;
   border-bottom: 2px solid #d4af37;
-  /* Gold accent line */
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1257,7 +1251,7 @@ body {
 /* Sticky Action Column for Grid Tables */
 .expense-row>div:last-child {
   position: sticky;
-  right: 15px;
+  right: 0px;
   z-index: 5;
   display: flex;
   background-color: #fff;
@@ -1268,7 +1262,6 @@ body {
 
 .expense-header-row>div:last-child {
   background: #1c2431 !important;
-  /* Matches header background */
   z-index: 11 !important;
 }
 
@@ -1281,12 +1274,9 @@ body {
 /* Row Hover */
 .expense-row:not(.expense-header-row):hover {
   background-color: #fff9e6;
-  /* Very subtle gold tint on hover */
   transform: scale(1.002);
-  /* Micro-interaction */
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   z-index: 1;
-  /* Bring above for shadow visibility */
 }
 
 .expense-row:last-child {
@@ -1418,7 +1408,6 @@ body {
 }
 
 .expense-row input[type="checkbox"] {
-  /* remove default style */
   appearance: none;
   -webkit-appearance: none;
 
@@ -1493,7 +1482,6 @@ body {
 
 .search-wrapper input {
   padding: 10px 14px 10px 36px;
-  /* Space for icon */
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
@@ -1558,7 +1546,6 @@ body {
   justify-content: center;
   padding: 0 10px;
   margin-left: auto;
-  /* Push to right */
   line-height: 1.2;
 }
 
@@ -1577,12 +1564,10 @@ body {
 
 .total-stat-box.is-approved .total-amount {
   color: #10b981;
-  /* Green */
 }
 
 .total-stat-box.is-expense .total-amount {
   color: #ef4444;
-  /* Red */
 }
 
 @media (max-width: 900px) {
@@ -1703,22 +1688,17 @@ body {
 .approvals-table-wrapper {
   border-radius: 16px;
   overflow-x: auto;
-  /* Allow scrolling */
   overflow-y: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  /* Softer, larger shadow */
   background: #ffffff;
   border: 1px solid rgba(212, 175, 55, 0.2);
-  /* Subtle gold border */
   margin-top: 20px;
 }
 
 .approvals-table.real-table {
   width: 100%;
   min-width: 1000px;
-  /* Ensure horizontal scroll on small screens */
   border-collapse: separate;
-  /* Use separate to allow border-radius on rows/cells */
   border-spacing: 0;
   background: #fff;
 }
@@ -1726,21 +1706,18 @@ body {
 /* Header */
 .real-table thead tr {
   background: #1c2431;
-  /* Dark header */
 }
 
 .real-table th {
   background: #1c2431;
   color: #fff;
   padding: 16px 20px;
-  /* Increased padding */
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
   text-align: left;
   border-bottom: 2px solid #d4af37;
-  /* Gold accent line */
 }
 
 /* Sticky Action Column for Standard Tables */
@@ -1766,7 +1743,6 @@ body {
 /* Body */
 .real-table td {
   padding: 16px 13px;
-  /* Comfortable padding */
   border-bottom: 1px solid #f0f0f0;
   font-size: 14px;
   color: #333;
@@ -1780,9 +1756,7 @@ body {
 
 .real-table tbody tr:hover {
   background-color: #fff9e6;
-  /* Very subtle gold tint on hover */
   transform: scale(1.002);
-  /* Micro-interaction */
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 

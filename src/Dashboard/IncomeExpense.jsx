@@ -12,7 +12,8 @@ import {
     safeGetLocalStorage,
     deleteExpenseApi,
     getVendorsApi,
-    getTransactionFilterOptionsApi
+    getTransactionFilterOptionsApi,
+    getExpensesTotalStatsApi
 } from "../../Api/action";
 
 import * as Icons from "lucide-react";
@@ -122,6 +123,7 @@ export default function IncomeExpense() {
     const [incomeCategories, setIncomeCategories] = useState([]);
     const [expenseData, setExpenseData] = useState([]);
     const [incomeData, setIncomeData] = useState([]);
+    const [totalStats, setTotalStats] = useState({ totalExpense: 0, totalApproved: 0 });
     const [loading, setLoading] = useState(true);
     const [refreshKey, setRefreshKey] = useState(0);
 
@@ -188,8 +190,13 @@ export default function IncomeExpense() {
         let start, end;
 
         if (!f.compareMode) {
-            start = dayjs(f.value).startOf(type).format("YYYY-MM-DD");
-            end = dayjs(f.value).endOf(type).format("YYYY-MM-DD");
+            if (type === "month") {
+                start = dayjs(f.value).subtract(1, "month").date(26).format("YYYY-MM-DD");
+                end = dayjs(f.value).date(25).format("YYYY-MM-DD");
+            } else {
+                start = dayjs(f.value).startOf(type).format("YYYY-MM-DD");
+                end = dayjs(f.value).endOf(type).format("YYYY-MM-DD");
+            }
         } else {
             if (!Array.isArray(f.value) || f.value.length !== 2)
                 return { startDate: null, endDate: null };
@@ -210,7 +217,11 @@ export default function IncomeExpense() {
                 const d = dayjs(item.date);
                 if (type === "date") return d.isSame(filters.value, "day");
                 if (type === "week") return d.isSame(filters.value, "week");
-                if (type === "month") return d.isSame(filters.value, "month");
+                if (type === "month") {
+                    const start = dayjs(filters.value).subtract(1, "month").date(26).startOf("day");
+                    const end = dayjs(filters.value).date(25).endOf("day");
+                    return d.isBetween(start, end, "day", "[]");
+                }
                 if (type === "year") return d.isSame(filters.value, "year");
                 return true;
             });
@@ -306,6 +317,20 @@ export default function IncomeExpense() {
             }
 
             income = { data: combinedApprovals, total: combinedTotal };
+
+            // Fetch Total Stats independently of pagination
+            try {
+                const stats = await getExpensesTotalStatsApi({
+                    name: filterName,
+                    branch: filterBranch,
+                    transaction: filterTransaction,
+                    startDate,
+                    endDate
+                });
+                setTotalStats(stats);
+            } catch (e) {
+                console.error("Failed to load total stats", e);
+            }
 
             setExpenseData(expenses.data || []);
             setIncomeData(income.data || []);
@@ -475,14 +500,8 @@ export default function IncomeExpense() {
         filteredRows.sort((a, b) => parseInt(b.amount.replace(/\D/g, "")) - parseInt(a.amount.replace(/\D/g, "")));
     }
 
-    // Calculate Total Approved Value
-    const totalApproved = filteredRows.reduce((acc, row) => {
-        if (String(row.status).toLowerCase() === "approved") {
-            const val = parseFloat(String(row.amount).replace(/[^0-9.-]+/g, "")) || 0;
-            return acc + val;
-        }
-        return acc;
-    }, 0);
+    // Display Total from API Stats
+    const totalToDisplay = activeTab === "expense" ? totalStats.totalExpense : totalStats.totalApproved;
 
     const clearAllFilters = () => {
         setFilterCategory("All");
@@ -852,7 +871,7 @@ export default function IncomeExpense() {
                             {/* TOTAL STAT */}
                             <div className={`total-stat-box ${activeTab === "expense" ? "is-expense" : "is-approved"}`}>
                                 <span>{activeTab === "expense" ? "Total Expense" : "Total Approved"}</span>
-                                <strong className="total-amount">{fmtAmt(totalApproved)}</strong>
+                                <strong className="total-amount">{fmtAmt(totalToDisplay)}</strong>
                             </div>
                         </div>
 

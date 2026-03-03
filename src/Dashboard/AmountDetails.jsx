@@ -67,8 +67,11 @@ export default function AmountDetails({
                 return d.isSame(filters.value, "day");
             if (filters.filterType === "week")
                 return d.isSame(filters.value, "week");
-            if (filters.filterType === "month")
-                return d.isSame(filters.value, "month");
+            if (filters.filterType === "month") {
+                const start = dayjs(filters.value).subtract(1, "month").date(26).startOf("day");
+                const end = dayjs(filters.value).date(25).endOf("day");
+                return d.isBetween(start, end, "day", "[]");
+            }
             if (filters.filterType === "year")
                 return d.isSame(filters.value, "year");
         }
@@ -115,8 +118,8 @@ export default function AmountDetails({
             prevStart = selected.subtract(1, "week").startOf("week");
             prevEnd = selected.subtract(1, "week").endOf("week");
         } else if (type === "month") {
-            prevStart = selected.subtract(1, "month").startOf("month");
-            prevEnd = selected.subtract(1, "month").endOf("month");
+            prevStart = selected.subtract(2, "month").date(26).startOf("day");
+            prevEnd = selected.subtract(1, "month").date(25).endOf("day");
         } else if (type === "year") {
             prevStart = selected.subtract(1, "year").startOf("year");
             prevEnd = selected.subtract(1, "year").endOf("year");
@@ -179,7 +182,9 @@ export default function AmountDetails({
         } else if (type === "week") {
             return ` (${selected.startOf("week").format("MMM DD")} - ${selected.endOf("week").format("MMM DD")})`;
         } else if (type === "month") {
-            return ` (${selected.format("MMMM YYYY")})`;
+            const startStr = selected.subtract(1, "month").date(26).format("MMM DD");
+            const endStr = selected.date(25).format("MMM DD");
+            return ` (${startStr} - ${endStr}, ${selected.format("YYYY")})`;
         } else if (type === "year") {
             return ` (${selected.format("YYYY")})`;
         }

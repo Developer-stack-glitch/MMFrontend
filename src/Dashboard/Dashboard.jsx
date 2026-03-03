@@ -199,7 +199,11 @@ export default function Dashboard() {
                     const d = dayjs(item.date);
                     if (type === "date") return d.isSame(filters.value, "day");
                     if (type === "week") return d.isSame(filters.value, "week");
-                    if (type === "month") return d.isSame(filters.value, "month");
+                    if (type === "month") {
+                        const start = dayjs(filters.value).subtract(1, "month").date(26).startOf("day");
+                        const end = dayjs(filters.value).date(25).endOf("day");
+                        return d.isBetween(start, end, "day", "[]");
+                    }
                     if (type === "year") return d.isSame(filters.value, "year");
                     return true;
                 });
