@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Upload } from "lucide-react";
+import { X, Upload, Loader2 } from "lucide-react";
 import { Dropdown, Menu, Button, Space, DatePicker, Checkbox, Radio, Select, Modal } from "antd";
 import { addExpenseApi, addApprovalApi, addIncomeApi, editExpenseApi, editIncomeApi, safeGetLocalStorage, getUsersApi, getVendorsApi, addVendorApi } from "../../Api/action";
 import { DownOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { CommonToaster } from "../../Common/CommonToaster";
 import AddCategoryModal from "./AddCategoryModal";
+import imageCompression from "browser-image-compression";
 
 export default function Modals({
     open,
@@ -57,6 +58,7 @@ export default function Modals({
     const [addCategoryInitialMain, setAddCategoryInitialMain] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isVendorSubmitting, setIsVendorSubmitting] = useState(false);
+    const [isCompressing, setIsCompressing] = useState(false);
 
     const currentUser = safeGetLocalStorage("loginDetails", {});
 
@@ -134,30 +136,50 @@ export default function Modals({
 
 
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
 
-        // Store actual File objects
-        setInvoiceFiles((prev) => [...prev, ...files]);
+        const options = {
+            maxSizeMB: 0.83, // 850KB / 1024
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+        };
 
-        // Create preview URLs for display
-        const previewPromises = files.map((file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve({ preview: reader.result, type: file.type, name: file.name });
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        });
+        setIsCompressing(true);
+        try {
+            const processedFiles = await Promise.all(
+                files.map(async (file) => {
+                    if (file.type.startsWith("image/") && file.size > 850 * 1024) {
+                        try {
+                            const compressedFile = await imageCompression(file, options);
+                            return compressedFile;
+                        } catch (error) {
+                            console.error("Compression failed:", error);
+                            return file;
+                        }
+                    }
+                    return file;
+                })
+            );
 
-        Promise.all(previewPromises)
-            .then((previews) => {
-                setInvoices((prev) => [...prev, ...previews]);
-            })
-            .catch(() => {
-                CommonToaster("Error reading files", "error");
+            setInvoiceFiles((prev) => [...prev, ...processedFiles]);
+
+            const previewPromises = processedFiles.map((file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () =>
+                        resolve({ preview: reader.result, type: file.type, name: file.name });
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
             });
+
+            const previews = await Promise.all(previewPromises);
+            setInvoices((prev) => [...prev, ...previews]);
+        } finally {
+            setIsCompressing(false);
+        }
     };
 
     const removeInvoice = (index) => {
@@ -467,6 +489,35 @@ export default function Modals({
                 exit={{ scale: 0.9, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* FULL SCREEN BLUR LOAD */}
+                <AnimatePresence>
+                    {isCompressing && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: "100%",
+                                background: "rgba(53, 53, 53, 0.7)",
+                                backdropFilter: "blur(10px)",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                zIndex: 9999,
+                            }}
+                        >
+                            <Loader2 className="animate-spin" size={64} strokeWidth={1.5} color="#d4af37" />
+                            <h3 style={{ marginTop: 10, marginBottom: 0, color: "#d4af37", fontWeight: 700, fontSize: 22 }}>Optimizing Image...</h3>
+                            <p style={{ color: "#fff", marginTop: 8 }}>Finalizing your high-quality compression</p>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* HEADER */}
                 <div className="modal-header">
                     <h2>{getTitle()}</h2>
@@ -902,7 +953,7 @@ export default function Modals({
 
                     {/* UPLOAD */}
                     <div className="upload-section" style={{ marginTop: 20 }}>
-                        <div className="upload-box">
+                        <div className="upload-box" style={{ position: "relative" }}>
                             <Upload size={40} strokeWidth={1.5} />
                             <p>Upload invoices <span style={{ color: "red" }}>*</span></p>
 

@@ -30,30 +30,50 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
     const [expandingRows, setExpandingRows] = useState({});
     const [filterParams, setFilterParams] = useState(null);
 
+    const [expandedPages, setExpandedPages] = useState({});
+
+    const getDatesFromFilter = (params) => {
+        if (!params || !params.value) return { startDate: null, endDate: null };
+        const { filterType, compareMode, value } = params;
+        let start, end;
+
+        if (compareMode && Array.isArray(value) && value.length === 2) {
+            start = value[0].startOf('day');
+            end = value[1].endOf('day');
+        } else {
+            const selected = dayjs(value);
+            if (filterType === "date") {
+                start = selected.startOf("day");
+                end = selected.endOf("day");
+            } else if (filterType === "week") {
+                start = selected.startOf("week");
+                end = selected.endOf("week");
+            } else if (filterType === "month") {
+                // Billing cycle: 26th of previous month to 25th of current month
+                start = selected.subtract(1, "month").date(26).startOf("day");
+                end = selected.date(25).endOf("day");
+            } else if (filterType === "year") {
+                start = selected.startOf("year");
+                end = selected.endOf("year");
+            }
+        }
+        return {
+            startDate: start ? start.format("YYYY-MM-DD") : null,
+            endDate: end ? end.format("YYYY-MM-DD") : null
+        };
+    };
+
     // Load Wallet Details
     useEffect(() => {
         async function loadWalletDetails() {
             try {
                 setLoading(true);
+                const { startDate, endDate } = getDatesFromFilter(filterParams);
+
                 let filters = {};
-
-                if (filterParams && filterParams.value) {
-                    const { filterType, compareMode, value } = filterParams;
-                    let start, end;
-
-                    if (compareMode && Array.isArray(value) && value.length === 2) {
-                        start = value[0];
-                        end = value[1];
-                    } else if (!compareMode && value) {
-                        const unit = filterType === 'date' ? 'day' : filterType;
-                        start = dayjs(value).startOf(unit);
-                        end = dayjs(value).endOf(unit);
-                    }
-
-                    if (start && end) {
-                        filters.start_date = start.format("YYYY-MM-DD");
-                        filters.end_date = end.format("YYYY-MM-DD");
-                    }
+                if (startDate && endDate) {
+                    filters.start_date = startDate;
+                    filters.end_date = endDate;
                 }
 
                 const walletData = await getAllWalletDetailsApi(filters);
@@ -66,6 +86,10 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             }
         }
         loadWalletDetails();
+
+        // Clear expanded data cache when period changes so it re-fetches for the new period
+        setExpandedData({});
+        setExpandedPages({});
     }, [reloadTrigger, filterParams]);
 
     // Apply Filters (ONLY SEARCH)
@@ -81,12 +105,21 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         setFilteredUsers(data);
     }, [searchText, users]);
 
-    const handleExpand = async (expanded, record) => {
-        if (expanded && !expandedData[record.id]) {
+    const handleExpand = async (expanded, record, page = 1) => {
+        const currentPage = page || expandedPages[record.id] || 1;
+        if (expanded) {
             setExpandingRows(prev => ({ ...prev, [record.id]: true }));
             try {
-                const data = await getWalletEntriesApi(record.id);
+                const { startDate, endDate } = getDatesFromFilter(filterParams);
+                let filters = {};
+                if (startDate && endDate) {
+                    filters.startDate = startDate;
+                    filters.endDate = endDate;
+                }
+
+                const data = await getWalletEntriesApi(record.id, currentPage, 10, filters);
                 setExpandedData(prev => ({ ...prev, [record.id]: data }));
+                setExpandedPages(prev => ({ ...prev, [record.id]: currentPage }));
             } catch (err) {
                 console.error("Error fetching wallet entries:", err);
             } finally {
@@ -98,40 +131,13 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
     const expandedRowRender = (record) => {
         const fullData = expandedData[record.id];
         const isExpanding = expandingRows[record.id];
+        const currentPage = expandedPages[record.id] || 1;
 
         if (isExpanding) {
             return <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}><Spin /></div>;
         }
 
         let entries = fullData?.entries || [];
-
-        // Apply Filters
-        if (filterParams && entries.length > 0) {
-            const { filterType, compareMode, value } = filterParams;
-            if (value) {
-                entries = entries.filter((item) => {
-                    const itemDate = dayjs(item.date);
-                    if (compareMode && Array.isArray(value) && value.length === 2) {
-                        const start = value[0].startOf('day');
-                        const end = value[1].endOf('day');
-                        return itemDate.isBetween(start, end, null, '[]');
-                    } else if (!compareMode && value) {
-                        if (filterType === "date") return itemDate.isSame(value, 'day');
-                        if (filterType === "week") return itemDate.isSame(value, 'week');
-                        if (filterType === "month") return itemDate.isSame(value, 'month');
-                        if (filterType === "year") return itemDate.isSame(value, 'year');
-                    }
-                    return true;
-                });
-            }
-        }
-
-        // Filter out expenses as per user request
-        entries = entries.filter(e => e.type.toLowerCase() !== 'expense');
-
-        const filteredIncome = entries
-            .filter(e => e.type.toLowerCase() === 'income')
-            .reduce((sum, e) => sum + Number(e.amount), 0);
 
         if (!entries || entries.length === 0) {
             return <Empty description="No transaction history for selected period" />;
@@ -154,7 +160,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                         color: type.toLowerCase() === 'income' ? 'green' : 'red',
                         fontWeight: 500
                     }}>
-                        Recieved
+                        {type.toLowerCase() === 'income' ? 'Received' : 'Spent'}
                     </span>
                 ),
             },
@@ -186,22 +192,17 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
 
         return (
             <div style={{ margin: 0, background: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
-                <h4 style={{ marginBottom: '0px', marginTop: '0px', color: '#555' }}>Transaction History</h4>
-                <div style={{ display: 'flex', gap: '20px', marginBottom: '8px' }}>
-                    {/* <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
-                        <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Total Income</span>
-                        <span style={{ color: 'green', fontWeight: 'bold', fontSize: '16px' }}>₹{filteredIncome.toLocaleString()}</span>
-                    </div>
-
-                    <div style={{ background: 'white', padding: '10px 15px', borderRadius: '6px', border: '1px solid #eee' }}>
-                        <span style={{ color: '#888', display: 'block', fontSize: '12px' }}>Wallet Balance</span>
-                        <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>₹{Number(fullData.wallet).toLocaleString()}</span>
-                    </div> */}
-                </div>
+                <h4 style={{ marginBottom: '10px', marginTop: '0px', color: '#555' }}>Transaction History</h4>
                 <Table
                     columns={historyColumns}
                     dataSource={entries}
-                    pagination={{ pageSize: 5 }}
+                    pagination={{
+                        current: currentPage,
+                        pageSize: 10,
+                        total: fullData?.total || 0,
+                        onChange: (page) => handleExpand(true, record, page),
+                        showSizeChanger: false
+                    }}
                     rowKey="id"
                     size="small"
                     bordered
@@ -332,7 +333,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                     columns={columns}
                     dataSource={filteredUsers}
                     rowKey={(record) => record.id}
-                    pagination={{ pageSize: 8 }}
+                    pagination={{ pageSize: 10 }}
                     expandable={{
                         expandedRowRender,
                         onExpand: handleExpand,

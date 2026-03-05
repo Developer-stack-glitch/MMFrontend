@@ -55,6 +55,12 @@ import Modals from "../Dashboard/Modals";
 import dayjs from "dayjs";
 import WalletPage from "../Dashboard/Wallet";
 import CalendarPage from "../Dashboard/Calendar";
+import {
+    initiateSocketConnection,
+    disconnectSocket,
+    subscribeToNotifications,
+    subscribeToApprovalUpdates
+} from "../socket";
 const { Sider, Content, Header } = Layout;
 
 export default function SideBarLayout() {
@@ -120,23 +126,42 @@ export default function SideBarLayout() {
         }
     }, [user]);
 
+    // Initialize WebSockets for new approvals instead of 20sec polling
     useEffect(() => {
+        if (!user) return;
+
+        initiateSocketConnection();
+
+        // 1. Listen for NEW approval requests (for admins)
+        subscribeToNotifications((err, data) => {
+            if (err) return;
+            console.log("WebSocket: New approval request received", data);
+            // Re-fetch pending count for badge
+            loadPendingApprovals();
+        });
+
+        // 2. Listen for status changes on my approvals (for users)
+        subscribeToApprovalUpdates((err, data) => {
+            if (err) return;
+            // Only notify if it belongs to this user
+            if (data.user_id && data.user_id === user.id) {
+                CommonToaster(`Your approval request has been ${data.status}!`, data.status === 'approved' ? 'success' : 'error');
+                // Refresh summary in dashboard
+                window.dispatchEvent(new Event("summaryUpdated"));
+            }
+        });
+
+        // Listen for internal updates to refresh count too
         const update = () => loadPendingApprovals();
         window.addEventListener("incomeExpenseUpdated", update);
+        window.addEventListener("newApprovalsReceived", update);
 
-        return () => window.removeEventListener("incomeExpenseUpdated", update);
-    }, [user]);
-
-    // Poll for new approvals every 20 seconds
-    useEffect(() => {
-        if (!user) return; // Don't start polling until user is loaded
-
-        const pollInterval = setInterval(() => {
-            loadPendingApprovals();
-        }, 20000); // Check every 20 seconds
-
-        return () => clearInterval(pollInterval);
-    }, [user]);
+        return () => {
+            disconnectSocket();
+            window.removeEventListener("incomeExpenseUpdated", update);
+            window.removeEventListener("newApprovalsReceived", update);
+        };
+    }, [user, user.id]);
 
     useEffect(() => {
         loadAlerts();

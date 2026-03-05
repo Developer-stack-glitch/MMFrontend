@@ -266,8 +266,12 @@ export const getExpensesApi = async (page = 1, limit = 10) => {
     return res.data;
 };
 
-export const getIncomeApi = async (page = 1, limit = 10) => {
-    const res = await api.get(`/api/transactions/income-transactions?page=${page}&limit=${limit}`);
+export const getIncomeApi = async (page = 1, limit = 10, filters = {}) => {
+    let query = `/api/transactions/income-transactions?page=${page}&limit=${limit}`;
+    if (filters.startDate) query += `&startDate=${filters.startDate}`;
+    if (filters.endDate) query += `&endDate=${filters.endDate}`;
+
+    const res = await api.get(query);
     return res.data;
 };
 
@@ -361,8 +365,12 @@ export const deleteVendorApi = async (id) => {
     return res.data;
 };
 
-export const getWalletEntriesApi = async (userId) => {
-    const res = await api.get(`/api/wallet/wallet/${userId}`);
+export const getWalletEntriesApi = async (userId, page = 1, limit = 10, filters = {}) => {
+    let query = `/api/wallet/wallet/${userId}?page=${page}&limit=${limit}`;
+    if (filters.startDate) query += `&startDate=${filters.startDate}`;
+    if (filters.endDate) query += `&endDate=${filters.endDate}`;
+
+    const res = await api.get(query);
     return res.data;
 };
 
@@ -438,6 +446,31 @@ export const getUserAllExpensesApi = async (page = 1, limit = 10, filters = {}) 
     if (filters.endDate) query += `&endDate=${filters.endDate}`;
 
     const res = await api.get(query);
+    return res.data;
+};
+
+export const getDashboardStatsApi = async (filters = {}) => {
+    let query = `/api/transactions/dashboard-stats?`;
+    if (filters.startDate) query += `&startDate=${filters.startDate}`;
+    if (filters.endDate) query += `&endDate=${filters.endDate}`;
+    if (filters.prevStartDate) query += `&prevStartDate=${filters.prevStartDate}`;
+    if (filters.prevEndDate) query += `&prevEndDate=${filters.prevEndDate}`;
+
+    const res = await api.get(query);
+    return res.data;
+};
+
+export const getDashboardChartsApi = async (filters = {}) => {
+    let query = `/api/transactions/dashboard-charts?`;
+    if (filters.startDate) query += `&startDate=${filters.startDate}`;
+    if (filters.endDate) query += `&endDate=${filters.endDate}`;
+
+    const res = await api.get(query);
+    return res.data;
+};
+
+export const getRecentTransactionsApi = async () => {
+    const res = await api.get("/api/transactions/recent-transactions");
     return res.data;
 };
 
