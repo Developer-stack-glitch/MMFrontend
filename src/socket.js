@@ -6,8 +6,9 @@ let socket;
 
 export const initiateSocketConnection = () => {
     socket = io(SOCKET_URL, {
+        path: "/socket.io",
         withCredentials: true,
-        transports: ['websocket', 'polling']
+        transports: ["websocket", "polling"]
     });
     console.log(`Connecting socket...`);
 };
