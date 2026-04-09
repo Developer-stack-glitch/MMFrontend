@@ -344,6 +344,24 @@ export const addWalletApi = async (payload) => {
     }
 };
 
+export const editWalletApi = async (id, payload) => {
+    try {
+        const res = await api.put(`/api/wallet/edit-wallet/${id}`, payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const deleteWalletApi = async (id) => {
+    try {
+        const res = await api.delete(`/api/wallet/delete-wallet/${id}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
 // ====================== VENDORS ======================
 export const getVendorsApi = async () => {
     const res = await api.get("/api/wallet/vendors");

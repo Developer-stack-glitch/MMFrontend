@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Input, Spin, Empty } from "antd";
-import { getAllWalletDetailsApi, getWalletEntriesApi, getAllWalletTransactionsApi } from "../../Api/action";
-import { Wallet2, Plus, Download } from "lucide-react";
+import { Table, Button, Input, Spin, Empty, Popconfirm, message, Modal, DatePicker } from "antd";
+import { getAllWalletDetailsApi, getWalletEntriesApi, getAllWalletTransactionsApi, editWalletApi, deleteWalletApi, safeGetLocalStorage } from "../../Api/action";
+import { Wallet2, Plus, Download, Edit, Trash2 } from "lucide-react";
 import WalletSkeleton, { WalletTableSkeleton } from "./WalletSkeleton";
 
 
@@ -30,8 +30,56 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
     const [expandingRows, setExpandingRows] = useState({});
     const [filterParams, setFilterParams] = useState(null);
     const [exportLoading, setExportLoading] = useState(false);
+    const [localReload, setLocalReload] = useState(0);
 
     const [expandedPages, setExpandedPages] = useState({});
+
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState(null);
+    const [editAmount, setEditAmount] = useState("");
+    const [editDate, setEditDate] = useState(null);
+    const [editNote, setEditNote] = useState("");
+
+    const currentUser = safeGetLocalStorage("loginDetails");
+    const isAdminOrSuperAdmin = currentUser?.role === "admin" || currentUser?.role === "superadmin";
+
+    const handleEditClick = (item) => {
+        setEditingTransaction(item);
+        setEditAmount(item.amount);
+        setEditDate(dayjs(item.date));
+        setEditNote(item.note || "");
+        setIsEditModalOpen(true);
+    };
+
+    const handleEditSubmit = async () => {
+        if (!editAmount || !editDate) {
+            return message.error("Amount and Date are required");
+        }
+        try {
+            await editWalletApi(editingTransaction.id, {
+                amount: editAmount,
+                date: editDate.format("YYYY-MM-DD"),
+                note: editNote,
+            });
+            message.success("Transaction updated successfully!");
+            setIsEditModalOpen(false);
+            setLocalReload(prev => prev + 1);
+            handleExpand(true, { id: editingTransaction.user_id }, expandedPages[editingTransaction.user_id]);
+        } catch (err) {
+            message.error(err?.message || "Failed to update transaction");
+        }
+    };
+
+    const handleDelete = async (id, userId) => {
+        try {
+            await deleteWalletApi(id);
+            message.success("Transaction deleted successfully!");
+            setLocalReload(prev => prev + 1);
+            handleExpand(true, { id: userId }, expandedPages[userId]);
+        } catch (err) {
+            message.error(err?.message || "Failed to delete transaction");
+        }
+    };
 
     const getDatesFromFilter = (params) => {
         if (!params || !params.value) return { startDate: null, endDate: null };
@@ -91,7 +139,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         // Clear expanded data cache when period changes so it re-fetches for the new period
         setExpandedData({});
         setExpandedPages({});
-    }, [reloadTrigger, filterParams]);
+    }, [reloadTrigger, filterParams, localReload]);
 
     // Apply Filters (ONLY SEARCH)
     useEffect(() => {
@@ -251,6 +299,31 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
             },
         ];
 
+        if (isAdminOrSuperAdmin) {
+            historyColumns.push({
+                title: "Action",
+                key: "action",
+                render: (_, item) => (
+                    <div style={{ display: "flex", gap: "10px" }}>
+                        <Button
+                            type="text"
+                            icon={<Edit size={16} color="#007bff" />}
+                            onClick={() => handleEditClick(item)}
+                        />
+                        <Popconfirm
+                            title="Delete transaction?"
+                            description="Are you sure you want to delete this transaction?"
+                            onConfirm={() => handleDelete(item.id, item.user_id)}
+                            okText="Yes"
+                            cancelText="No"
+                        >
+                            <Button type="text" danger icon={<Trash2 size={16} />} />
+                        </Popconfirm>
+                    </div>
+                ),
+            });
+        }
+
         return (
             <div style={{ margin: 0, background: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -376,7 +449,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                 </Button>
             ),
         },
-    ];
+    ].filter(col => isAdminOrSuperAdmin || col.key !== 'action');
 
     const handleGlobalExport = async () => {
         try {
@@ -454,15 +527,17 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                 <h2 className="wallet-table-title" style={{ margin: 0 }}>
                     <Wallet2 size={24} color="#d4af37" /> User Wallet List
                 </h2>
-                <Button
-                    type="primary"
-                    icon={<Download size={16} />}
-                    onClick={handleGlobalExport}
-                    loading={exportLoading}
-                    style={{ background: '#d4af37', borderColor: '#d4af37' }}
-                >
-                    Export Overall Received History
-                </Button>
+                {isAdminOrSuperAdmin && (
+                    <Button
+                        type="primary"
+                        icon={<Download size={16} />}
+                        onClick={handleGlobalExport}
+                        loading={exportLoading}
+                        style={{ background: '#d4af37', borderColor: '#d4af37' }}
+                    >
+                        Export Overall Received History
+                    </Button>
+                )}
             </div>
             <div style={{ marginBottom: 20 }}>
                 <Filters onFilterChange={setFilterParams} style={{ background: "transparent", padding: 0 }} />
@@ -492,6 +567,44 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
                     }}
                 />
             )}
+
+            <Modal
+                title="Edit Wallet Transaction"
+                open={isEditModalOpen}
+                onCancel={() => setIsEditModalOpen(false)}
+                onOk={handleEditSubmit}
+                okText="Save Changes"
+                centered
+            >
+                <div style={{ display: "flex", flexDirection: "column", gap: "15px", marginTop: "20px" }}>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "5px", fontWeight: 500 }}>Amount *</label>
+                        <Input
+                            type="number"
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                            prefix="₹"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "5px", fontWeight: 500 }}>Date *</label>
+                        <DatePicker
+                            style={{ width: "100%" }}
+                            value={editDate}
+                            onChange={(date) => setEditDate(date)}
+                            format="DD MMM YYYY"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "5px", fontWeight: 500 }}>Note</label>
+                        <Input.TextArea
+                            rows={3}
+                            value={editNote}
+                            onChange={(e) => setEditNote(e.target.value)}
+                        />
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
