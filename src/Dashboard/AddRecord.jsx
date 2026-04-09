@@ -18,6 +18,8 @@ import {
     Wallet,
     Plane,
     TrendingUp,
+    Upload,
+    Download,
 } from "lucide-react";
 import {
     BarChart,
@@ -35,8 +37,11 @@ import {
     getExpenseCategoriesApi,
     getExpensesApi,
     getIncomeApi,
+    bulkUploadExpensesApi,
+    downloadExpenseTemplateApi
 } from "../../Api/action";
 import { FullPageLoader } from "../../Common/FullPageLoader";
+import { CommonToaster } from "../../Common/CommonToaster";
 ChartJS.register(ArcElement, RadialLinearScale, ChartTooltip, Legend);
 
 export default function AddRecord() {
@@ -114,6 +119,38 @@ export default function AddRecord() {
         }
         loadInitial();
     }, []);
+
+    const handleBulkUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append("files", file);
+        });
+
+        try {
+            setLoading(true);
+            const res = await bulkUploadExpensesApi(formData);
+            CommonToaster(res.message, "success");
+            const expenseRes = await getExpensesApi();
+            setOriginalExpenses(expenseRes);
+        } catch (err) {
+            CommonToaster(err.message || "Bulk upload failed", "error");
+        } finally {
+            setLoading(false);
+            e.target.value = ""; // Reset input
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            await downloadExpenseTemplateApi();
+            CommonToaster("Template downloaded", "success");
+        } catch (err) {
+            CommonToaster("Failed to download template", "error");
+        }
+    };
 
     useEffect(() => {
         if (loading) return;
@@ -208,6 +245,18 @@ export default function AddRecord() {
                                     },
                                     { icon: <FileText size={18} />, label: "+ Create report", bg: "#392f89" },
                                     { icon: <Plane size={18} />, label: "+ Create trip", bg: "#8b1e2d" },
+                                    {
+                                        icon: <Upload size={18} />,
+                                        label: "Bulk Upload",
+                                        bg: "#d4af37",
+                                        action: () => document.getElementById("bulk-upload-input").click()
+                                    },
+                                    {
+                                        icon: <Download size={18} />,
+                                        label: "Download Template",
+                                        bg: "#555",
+                                        action: handleDownloadTemplate
+                                    },
                                 ].map((item, i) => (
                                     <div key={i} className="quick-access-item" onClick={item.action}>
                                         <div className="quick-access-icon" style={{ background: item.bg }}>
@@ -217,6 +266,14 @@ export default function AddRecord() {
                                     </div>
                                 ))}
                             </div>
+                            <input
+                                type="file"
+                                id="bulk-upload-input"
+                                style={{ display: "none" }}
+                                accept=".csv, .xlsx, .xls, image/*"
+                                multiple
+                                onChange={handleBulkUpload}
+                            />
                         </motion.div>
 
                         <AmountDetails

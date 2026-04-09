@@ -26,7 +26,9 @@ import {
     Wallet,
     Receipt,
     MoreHorizontal,
-    Minimize2
+    Minimize2,
+    Upload,
+    Download
 } from "lucide-react";
 import "../css/Dashboard.css";
 import "../css/Calendar.css";
@@ -41,7 +43,9 @@ import {
     getIncomeCategoriesApi,
     getDashboardStatsApi,
     getDashboardChartsApi,
-    getRecentTransactionsApi
+    getRecentTransactionsApi,
+    bulkUploadExpensesApi,
+    downloadExpenseTemplateApi
 } from "../../Api/action";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
@@ -51,6 +55,7 @@ import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 dayjs.extend(isBetween);
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, ChartTooltip, Legend);
 import DashboardSkeleton from "./DashboardSkeleton";
+import { CommonToaster } from "../../Common/CommonToaster";
 
 const fmtAmt = (n) => {
     const val = Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
@@ -192,6 +197,37 @@ export default function Dashboard() {
             console.error("refreshDashboard error:", err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleBulkUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append("files", file); // Use "files" to match backend router
+        });
+
+        try {
+            setLoading(true);
+            const res = await bulkUploadExpensesApi(formData);
+            CommonToaster(res.message, "success");
+            refreshDashboard();
+        } catch (err) {
+            CommonToaster(err.message || "Bulk upload failed", "error");
+        } finally {
+            setLoading(false);
+            e.target.value = ""; // Reset input
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            await downloadExpenseTemplateApi();
+            CommonToaster("Template downloaded", "success");
+        } catch (err) {
+            CommonToaster("Failed to download template", "error");
         }
     };
 
@@ -362,7 +398,37 @@ export default function Dashboard() {
                                 </div>
                                 <span>+ New Expense</span>
                             </div>
+
+                            <div
+                                className="quick-access-item"
+                                onClick={() => document.getElementById("bulk-upload-input-dash").click()}
+                                style={{ border: "1.5px dashed #d4af37" }}
+                            >
+                                <div className="quick-access-icon" style={{ background: "#d4af37" }}>
+                                    <Upload size={18} />
+                                </div>
+                                <span>Bulk Upload</span>
+                            </div>
+
+                            <div
+                                className="quick-access-item"
+                                onClick={handleDownloadTemplate}
+                                style={{ border: "1.5px dashed #555" }}
+                            >
+                                <div className="quick-access-icon" style={{ background: "#555" }}>
+                                    <Download size={18} />
+                                </div>
+                                <span>Download Template</span>
+                            </div>
                         </div>
+                        <input
+                            type="file"
+                            id="bulk-upload-input-dash"
+                            style={{ display: "none" }}
+                            accept=".csv, .xlsx, .xls, image/*"
+                            multiple
+                            onChange={handleBulkUpload}
+                        />
                     </motion.div>
 
                     {/* CHARTS SECTION */}

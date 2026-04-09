@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Table, Button, Input, Spin, Empty } from "antd";
-import { getAllWalletDetailsApi, getWalletEntriesApi } from "../../Api/action";
-import { Wallet2, Plus } from "lucide-react";
+import { getAllWalletDetailsApi, getWalletEntriesApi, getAllWalletTransactionsApi } from "../../Api/action";
+import { Wallet2, Plus, Download } from "lucide-react";
 import WalletSkeleton, { WalletTableSkeleton } from "./WalletSkeleton";
 
 
@@ -29,6 +29,7 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
     const [expandedData, setExpandedData] = useState({});
     const [expandingRows, setExpandingRows] = useState({});
     const [filterParams, setFilterParams] = useState(null);
+    const [exportLoading, setExportLoading] = useState(false);
 
     const [expandedPages, setExpandedPages] = useState({});
 
@@ -128,6 +129,66 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         }
     };
 
+    const handleExport = async (record) => {
+        try {
+            setExportLoading(true);
+            const { startDate, endDate } = getDatesFromFilter(filterParams);
+            let filters = {};
+            if (startDate && endDate) {
+                filters.startDate = startDate;
+                filters.endDate = endDate;
+            }
+
+            // Fetch ALL entries for export (using a large limit)
+            const data = await getWalletEntriesApi(record.id, 1, 10000, filters);
+            const entries = data?.entries || [];
+
+            if (entries.length === 0) {
+                alert("No transactions found to export.");
+                return;
+            }
+
+            // Define CSV Headers
+            const headers = ["Date", "Type", "Category", "Description", "Amount"];
+
+            // Map entries to CSV Rows
+            const csvRows = entries.map(entry => {
+                const date = dayjs(entry.date).format("DD MMM, YYYY");
+                const type = entry.type.toLowerCase() === 'income' ? 'Received' : 'Spent';
+                const category = entry.main_category || entry.category || "-";
+                const amount = entry.type.toLowerCase() === 'expense' ? `-${entry.amount}` : `+${entry.amount}`;
+
+                return [
+                    `"${date}"`,
+                    `"${type}"`,
+                    `"${category.replace(/"/g, '""')}"`,
+                    `"${(entry.note || "").replace(/"/g, '""')}"`,
+                    `"${amount}"`
+                ].join(",");
+            });
+
+            // Combine Headers and Rows
+            const csvString = [headers.join(","), ...csvRows].join("\n");
+
+            // Create and trigger download
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `transaction_history_${record.name.replace(/\s+/g, '_')}_${dayjs().format("YYYY-MM-DD")}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+        } catch (err) {
+            console.error("Export error:", err);
+            alert("Failed to export history.");
+        } finally {
+            setExportLoading(false);
+        }
+    };
+
     const expandedRowRender = (record) => {
         const fullData = expandedData[record.id];
         const isExpanding = expandingRows[record.id];
@@ -192,7 +253,18 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
 
         return (
             <div style={{ margin: 0, background: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
-                <h4 style={{ marginBottom: '10px', marginTop: '0px', color: '#555' }}>Transaction History</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ margin: 0, color: '#555' }}>Transaction History</h4>
+                    <Button
+                        icon={<Download size={14} />}
+                        size="small"
+                        onClick={() => handleExport(record)}
+                        loading={exportLoading}
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+                    >
+                        Export History
+                    </Button>
+                </div>
                 <Table
                     columns={historyColumns}
                     dataSource={entries}
@@ -306,13 +378,92 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
         },
     ];
 
+    const handleGlobalExport = async () => {
+        try {
+            setExportLoading(true);
+            const { startDate, endDate } = getDatesFromFilter(filterParams);
+
+            // Fetch all transactions
+            const res = await getAllWalletTransactionsApi();
+            let entries = res?.entries || [];
+
+            // Filter for income only
+            entries = entries.filter(e => e.type.toLowerCase() === 'income');
+
+            // Apply date filters if active
+            if (startDate && endDate) {
+                const start = dayjs(startDate);
+                const end = dayjs(endDate);
+                entries = entries.filter(e => {
+                    const d = dayjs(e.date);
+                    return d.isBetween(start, end, 'day', '[]');
+                });
+            }
+
+            if (entries.length === 0) {
+                alert("No income transactions found to export.");
+                return;
+            }
+
+            // Define CSV Headers
+            const headers = ["User", "Date", "Category", "Description", "Amount", "Branch"];
+
+            // Map entries to CSV Rows
+            const csvRows = entries.map(entry => {
+                const user = entry.name || "-";
+                const date = dayjs(entry.date).format("DD MMM, YYYY");
+                const category = entry.main_category || entry.category || "-";
+                const amount = entry.amount;
+
+                return [
+                    `"${user.replace(/"/g, '""')}"`,
+                    `"${date}"`,
+                    `"${category.replace(/"/g, '""')}"`,
+                    `"${(entry.note || "").replace(/"/g, '""')}"`,
+                    `"${amount}"`,
+                    `"${(entry.branch || "").replace(/"/g, '""')}"`
+                ].join(",");
+            });
+
+            // Combine Headers and Rows
+            const csvString = [headers.join(","), ...csvRows].join("\n");
+
+            // Create and trigger download
+            const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `overall_income_history_${dayjs().format("YYYY-MM-DD")}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+        } catch (err) {
+            console.error("Global Export error:", err);
+            alert("Failed to export overall history.");
+        } finally {
+            setExportLoading(false);
+        }
+    };
 
     return (
 
         <div className="wallet-table-container">
-            <h2 className="wallet-table-title">
-                <Wallet2 size={24} color="#d4af37" /> User Wallet List
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 className="wallet-table-title" style={{ margin: 0 }}>
+                    <Wallet2 size={24} color="#d4af37" /> User Wallet List
+                </h2>
+                <Button
+                    type="primary"
+                    icon={<Download size={16} />}
+                    onClick={handleGlobalExport}
+                    loading={exportLoading}
+                    style={{ background: '#d4af37', borderColor: '#d4af37' }}
+                >
+                    Export Overall Received History
+                </Button>
+            </div>
             <div style={{ marginBottom: 20 }}>
                 <Filters onFilterChange={setFilterParams} style={{ background: "transparent", padding: 0 }} />
             </div>

@@ -605,91 +605,51 @@ export default function Modals({
                                 >
                                     <label>Main Category (Expense) <span style={{ color: "red" }}>*</span></label>
                                     <div style={{ marginTop: "8px", marginBottom: "8px" }}>
-                                        <Dropdown
-                                            overlay={
-                                                <Menu
-                                                    onClick={(e) => {
-                                                        if (e.key === "ADD_NEW_MAIN") {
-                                                            setAddCategoryInitialMain("");
-                                                            setIsAddCategoryOpen(true);
-                                                        } else {
-                                                            setMainCategory(e.key);
-                                                            setSubCategory("Select Category");
-                                                        }
-                                                    }}
-                                                    items={[
-                                                        ...Object.keys(expenseCategories).map((cat) => ({
-                                                            key: cat,
-                                                            label: cat,
-                                                        })),
-                                                        ...(currentUser?.role === "admin" || currentUser?.role === "superadmin" ? [
-                                                            {
-                                                                type: 'divider',
-                                                            },
-                                                            {
-                                                                key: "ADD_NEW_MAIN",
-                                                                label: (
-                                                                    <span style={{ color: "#d4af37", fontWeight: 600 }}>
-                                                                        + Add New Main Category
-                                                                    </span>
-                                                                ),
-                                                            }
-                                                        ] : [])
-                                                    ]}
-                                                />
-                                            }
-                                            trigger={["click"]}
-                                        >
-                                            <Button style={{ width: "100%", height: 40 }}>
-                                                <Space>{mainCategory}<DownOutlined /></Space>
-                                            </Button>
-                                        </Dropdown>
+                                        <Select
+                                            showSearch
+                                            style={{ width: "100%", height: 40 }}
+                                            placeholder="Select Main Category"
+                                            value={mainCategory === "Select Main Category" ? undefined : mainCategory}
+                                            onSearch={(val) => {
+                                                if (val) setMainCategory(val);
+                                            }}
+                                            onSelect={(val) => {
+                                                setMainCategory(val);
+                                                setSubCategory("Select Category");
+                                            }}
+                                            options={[
+                                                ...Object.keys(expenseCategories).map((cat) => ({
+                                                    value: cat,
+                                                    label: cat,
+                                                })),
+                                            ]}
+                                        />
                                     </div>
 
                                     {mainCategory !== "Select Main Category" && (
                                         <>
                                             <label>Sub Category <span style={{ color: "red" }}>*</span></label>
                                             <div style={{ marginTop: "8px" }}>
-                                                <Dropdown
-                                                    overlay={
-                                                        <Menu
-                                                            onClick={(e) => {
-                                                                if (e.key === "ADD_NEW_SUB") {
-                                                                    setAddCategoryInitialMain(mainCategory);
-                                                                    setIsAddCategoryOpen(true);
-                                                                } else {
-                                                                    setSubCategory(e.key);
-                                                                }
-                                                            }}
-                                                            items={[
-                                                                ...(Array.isArray(expenseCategories[mainCategory])
-                                                                    ? expenseCategories[mainCategory].map((sub) => ({
-                                                                        key: sub,
-                                                                        label: sub,
-                                                                    }))
-                                                                    : []),
-                                                                ...(currentUser?.role === "admin" || currentUser?.role === "superadmin" ? [
-                                                                    {
-                                                                        type: 'divider',
-                                                                    },
-                                                                    {
-                                                                        key: "ADD_NEW_SUB",
-                                                                        label: (
-                                                                            <span style={{ color: "#d4af37", fontWeight: 600 }}>
-                                                                                + Add New Sub Category
-                                                                            </span>
-                                                                        ),
-                                                                    }
-                                                                ] : [])
-                                                            ]}
-                                                        />
-                                                    }
-                                                    trigger={["click"]}
-                                                >
-                                                    <Button style={{ width: "100%", height: 40 }}>
-                                                        <Space>{subCategory}<DownOutlined /></Space>
-                                                    </Button>
-                                                </Dropdown>
+                                                <Select
+                                                    showSearch
+                                                    style={{ width: "100%", height: 40 }}
+                                                    placeholder="Select Sub Category"
+                                                    value={subCategory === "Select Category" ? undefined : subCategory}
+                                                    onSearch={(val) => {
+                                                        if (val) setSubCategory(val);
+                                                    }}
+                                                    onSelect={(val) => {
+                                                        setSubCategory(val);
+                                                    }}
+                                                    options={[
+                                                        ...(Array.isArray(expenseCategories[mainCategory])
+                                                            ? expenseCategories[mainCategory].map((sub) => ({
+                                                                value: sub,
+                                                                label: sub,
+                                                            }))
+                                                            : []),
+                                                    ]}
+                                                />
                                             </div>
                                         </>
                                     )}
@@ -898,25 +858,25 @@ export default function Modals({
                                 >
                                     <label>Income Category <span style={{ color: "red" }}>*</span></label>
                                     <div style={{ marginTop: "8px" }}>
-                                        <Dropdown
-                                            overlay={
-                                                <Menu
-                                                    onClick={(e) => setMainCategory(e.key)}
-                                                    items={incomeCategories.map((cat) => {
-                                                        const label = cat.name || cat.category || cat;
-                                                        return {
-                                                            key: label,
-                                                            label: label,
-                                                        };
-                                                    })}
-                                                />
-                                            }
-                                            trigger={["click"]}
-                                        >
-                                            <Button style={{ width: "100%", height: 40 }}>
-                                                <Space>{mainCategory}<DownOutlined /></Space>
-                                            </Button>
-                                        </Dropdown>
+                                        <Select
+                                            showSearch
+                                            style={{ width: "100%", height: 40 }}
+                                            placeholder="Select Income Category"
+                                            value={mainCategory === "Select Main Category" ? undefined : mainCategory}
+                                            onSearch={(val) => {
+                                                if (val) setMainCategory(val);
+                                            }}
+                                            onSelect={(val) => {
+                                                setMainCategory(val);
+                                            }}
+                                            options={incomeCategories.map((cat) => {
+                                                const label = cat.name || cat.category || cat;
+                                                return {
+                                                    value: label,
+                                                    label: label,
+                                                };
+                                            })}
+                                        />
                                     </div>
 
                                 </motion.div>

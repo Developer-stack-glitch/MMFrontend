@@ -626,3 +626,34 @@ export const markEventCompletedApi = async (eventId) => {
         throw err?.response?.data || err;
     }
 };
+
+// ✅ BULK UPLOAD EXPENSES
+export const bulkUploadExpensesApi = async (payload) => {
+    try {
+        const config = {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        };
+        const res = await api.post("/api/transactions/bulk-upload-expenses", payload, config);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ DOWNLOAD EXPENSE TEMPLATE
+export const downloadExpenseTemplateApi = async () => {
+    try {
+        const res = await api.get("/api/transactions/download-expense-template", {
+            responseType: "blob"
+        });
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "expense_template.csv");
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};

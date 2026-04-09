@@ -521,7 +521,7 @@ export default function SideBarLayout() {
                         </Button>
                     )}
 
-                    <h2 className="header-title">Hello, {user.name}</h2>
+                    <h2 className="header-title">Hello, {user.name} <span className="online-indicator"></span></h2>
                     <div className="header-right">
                         {isElevated ? (
                             <>
