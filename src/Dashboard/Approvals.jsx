@@ -49,7 +49,7 @@ export default function Approvals() {
             window.removeEventListener("summaryUpdated", loadApprovals);
             window.removeEventListener("newApprovalsReceived", loadApprovals);
         };
-    }, [page, pageSize, filters]);
+    }, [page, pageSize, filters, filterCategory]);
 
     useEffect(() => {
         setPage(1);
@@ -58,7 +58,7 @@ export default function Approvals() {
     const loadApprovals = async () => {
         setLoading(true)
         const { startDate, endDate } = getDateRange(filters);
-        const response = await getApprovalsApi(page, pageSize, { startDate, endDate });
+        const response = await getApprovalsApi(page, pageSize, { startDate, endDate, category: filterCategory });
         if (response && response.data && Array.isArray(response.data)) {
             setRequests(response.data);
             setTotal(response.total || 0);

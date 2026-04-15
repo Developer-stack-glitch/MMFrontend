@@ -1460,7 +1460,7 @@ body {
 
 .filter-left {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
   flex: 1;
@@ -1486,7 +1486,7 @@ body {
   border-radius: 8px;
   font-size: 14px;
   outline: none;
-  width: 260px;
+  width: 190px;
   background: #f9fafb;
   transition: all 0.2s ease;
   color: #1c2431;
@@ -2845,5 +2845,17 @@ body {
   border-color: #d4af37 !important;
   box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.1) !important;
 }
-.animate-spin { animation: spin 1s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

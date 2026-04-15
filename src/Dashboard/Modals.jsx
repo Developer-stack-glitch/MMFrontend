@@ -480,7 +480,6 @@ export default function Modals({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
         >
             <motion.div
                 className="expense-modal"
@@ -744,6 +743,9 @@ export default function Modals({
                                                 "ACTE HDFC",
                                                 "ACTE RBL",
                                                 "ACTE AXIS",
+                                                "ACTE BANDHAN (BLR)",
+                                                "ACTE BANDHAN (CHE)",
+                                                "ACTE KOTAK (BLR)",
                                                 "LEARNOVITA SBI"
                                             ].map(opt => ({ value: opt, label: opt }))}
                                         />

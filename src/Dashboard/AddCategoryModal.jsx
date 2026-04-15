@@ -79,6 +79,7 @@ export default function AddCategoryModal({
         <Modal
             open={open}
             onCancel={onClose}
+            maskClosable={false}
             footer={null}
             width={480}
             centered

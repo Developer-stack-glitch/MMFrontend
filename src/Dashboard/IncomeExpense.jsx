@@ -56,7 +56,7 @@ export default function IncomeExpense() {
     const [showDescriptionModal, setShowDescriptionModal] = useState(false);
     const [selectedDescription, setSelectedDescription] = useState("");
 
-    const [globalFilterOptions, setGlobalFilterOptions] = useState({ names: [], branches: [] });
+    const [globalFilterOptions, setGlobalFilterOptions] = useState({ names: [], branches: [], transactionSources: [], categories: [] });
 
     useEffect(() => {
         getVendorsApi().then((res) => {
@@ -64,7 +64,7 @@ export default function IncomeExpense() {
         }).catch(err => console.error("Failed to load vendors", err));
 
         getTransactionFilterOptionsApi().then((res) => {
-            setGlobalFilterOptions(res || { names: [], branches: [] });
+            setGlobalFilterOptions(res || { names: [], branches: [], transactionSources: [], categories: [] });
         }).catch(err => console.error("Failed to load filter options", err));
     }, []);
 
@@ -273,11 +273,23 @@ export default function IncomeExpense() {
 
             const { startDate, endDate } = getDateRange(filters);
 
+            // Get Total Stats with filters
+            const stats = await getExpensesTotalStatsApi({
+                name: filterName,
+                branch: filterBranch,
+                transaction: filterTransaction,
+                category: filterCategory,
+                startDate,
+                endDate
+            });
+            setTotalStats(stats);
+
             // Pass page and limit, plus filters
             const res = await getUserAllExpensesApi(page, pageSize, {
                 name: filterName,
                 branch: filterBranch,
                 transaction: filterTransaction,
+                category: filterCategory,
                 startDate,
                 endDate
             });
@@ -289,7 +301,8 @@ export default function IncomeExpense() {
                     endDate,
                     name: filterName,
                     branch: filterBranch,
-                    transaction: filterTransaction
+                    transaction: filterTransaction,
+                    category: filterCategory
                 });
                 // Handle legacy response if it was just an array
                 if (Array.isArray(pendingResults)) {
@@ -324,6 +337,7 @@ export default function IncomeExpense() {
                     name: filterName,
                     branch: filterBranch,
                     transaction: filterTransaction,
+                    category: filterCategory,
                     startDate,
                     endDate
                 });
@@ -345,12 +359,12 @@ export default function IncomeExpense() {
         }
 
         loadData();
-    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, filterTransaction, pageSize, filters]);
+    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, filterTransaction, filterCategory, pageSize, filters]);
 
     // Reset to page 1 when filters change (except page change itself)
     useEffect(() => {
         setPage(1);
-    }, [filterName, filterBranch, filterTransaction, filters, activeTab]);
+    }, [filterName, filterBranch, filterTransaction, filterCategory, filters, activeTab]);
 
     useEffect(() => {
         const reload = () => {
@@ -466,6 +480,7 @@ export default function IncomeExpense() {
     const allNames = globalFilterOptions?.names?.length ? globalFilterOptions.names : [...new Set(baseRows.map(r => r.merchant))].filter(Boolean);
     const allBranches = globalFilterOptions?.branches?.length ? globalFilterOptions.branches : [...new Set(baseRows.map(r => r.report))].filter(Boolean);
     const allTransactionSources = globalFilterOptions?.transactionSources?.length ? globalFilterOptions.transactionSources : [...new Set(baseRows.map(r => r.transaction_from))].filter(Boolean);
+    const allCategories = globalFilterOptions?.categories?.length ? globalFilterOptions.categories : [...new Set(baseRows.map(r => r.title))].filter(Boolean);
     let filteredRows = [...baseRows];
 
     if (searchText.trim()) {
@@ -520,7 +535,12 @@ export default function IncomeExpense() {
             const LARGE_LIMIT = 10000;
 
             if (activeTab === "expense") {
-                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch, transaction: filterTransaction });
+                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { 
+                    name: filterName, 
+                    branch: filterBranch, 
+                    transaction: filterTransaction,
+                    category: filterCategory 
+                });
                 const rawExpenses = applyFilters(res.expenses || []);
                 allExportItems = rawExpenses.map((item) => {
                     const DynamicIcon = Icons[item.icon] || Icons.Circle;
@@ -543,10 +563,15 @@ export default function IncomeExpense() {
                     };
                 });
             } else {
-                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { name: filterName, branch: filterBranch, transaction: filterTransaction });
+                const res = await getUserAllExpensesApi(1, LARGE_LIMIT, { 
+                    name: filterName, 
+                    branch: filterBranch, 
+                    transaction: filterTransaction,
+                    category: filterCategory 
+                });
                 let pendingResults = { data: [] };
                 try {
-                    pendingResults = await getApprovalsApi(1, LARGE_LIMIT);
+                    pendingResults = await getApprovalsApi(1, LARGE_LIMIT, { category: filterCategory });
                 } catch (e) { }
 
                 let combinedApprovals = [...(res.approvals || []), ...(Array.isArray(pendingResults) ? pendingResults : (pendingResults.data || []))];
@@ -798,6 +823,21 @@ export default function IncomeExpense() {
                                         value={searchText}
                                         onChange={(e) => setSearchText(e.target.value)}
                                         placeholder="Search by name, branch, etc..."
+                                    />
+                                </div>
+
+                                <div className="select-wrapper">
+                                    <Select
+                                        value={filterCategory}
+                                        onChange={(v) => { setFilterCategory(v); setPage(1); }}
+                                        style={{ width: 160 }}
+                                        placeholder="Category"
+                                        showSearch
+                                        suffixIcon={<Icons.LayoutGrid size={14} />}
+                                        options={[
+                                            { value: "All", label: "Category: All" },
+                                            ...allCategories.map(c => ({ value: c, label: c }))
+                                        ]}
                                     />
                                 </div>
 
