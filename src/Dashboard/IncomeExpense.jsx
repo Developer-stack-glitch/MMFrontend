@@ -113,6 +113,10 @@ export default function IncomeExpense() {
     const [filterVendor, setFilterVendor] = useState([]);
     const [filterGST, setFilterGST] = useState([]);
     const [filterAmount, setFilterAmount] = useState("");
+    const [minAmount, setMinAmount] = useState("");
+    const [maxAmount, setMaxAmount] = useState("");
+    const [tempMin, setTempMin] = useState("");
+    const [tempMax, setTempMax] = useState("");
     const [searchText, setSearchText] = useState("");
     const [filters, setFilters] = useState({
         filterType: "year",
@@ -278,6 +282,8 @@ export default function IncomeExpense() {
                 main_category: filterMainCategory,
                 vendor: filterVendor,
                 gst: filterGST,
+                minAmount,
+                maxAmount,
                 startDate,
                 endDate
             });
@@ -292,6 +298,8 @@ export default function IncomeExpense() {
                 main_category: filterMainCategory,
                 vendor: filterVendor,
                 gst: filterGST,
+                minAmount,
+                maxAmount,
                 startDate,
                 endDate
             });
@@ -307,7 +315,9 @@ export default function IncomeExpense() {
                     category: filterCategory,
                     main_category: filterMainCategory,
                     vendor: filterVendor,
-                    gst: filterGST
+                    gst: filterGST,
+                    minAmount,
+                    maxAmount
                 });
                 // Handle legacy response if it was just an array
                 if (Array.isArray(pendingResults)) {
@@ -343,6 +353,8 @@ export default function IncomeExpense() {
                     branch: filterBranch,
                     transaction: filterTransaction,
                     category: filterCategory,
+                    minAmount,
+                    maxAmount,
                     startDate,
                     endDate
                 });
@@ -364,12 +376,12 @@ export default function IncomeExpense() {
         }
 
         loadData();
-    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, filterTransaction, filterCategory, filterMainCategory, filterVendor, filterGST, pageSize, filters]);
+    }, [page, activeTab, userRole, refreshKey, filterName, filterBranch, filterTransaction, filterCategory, filterMainCategory, filterVendor, filterGST, minAmount, maxAmount, pageSize, filters]);
 
     // Reset to page 1 when filters change (except page change itself)
     useEffect(() => {
         setPage(1);
-    }, [filterName, filterBranch, filterTransaction, filterCategory, filterMainCategory, filterVendor, filterGST, filters, activeTab]);
+    }, [filterName, filterBranch, filterTransaction, filterCategory, filterMainCategory, filterVendor, filterGST, minAmount, maxAmount, filters, activeTab]);
 
     useEffect(() => {
         const reload = () => {
@@ -528,6 +540,19 @@ export default function IncomeExpense() {
         filteredRows = filteredRows.filter(r => filterGST.includes(r.gst));
     }
 
+    if (minAmount) {
+        filteredRows = filteredRows.filter(r => {
+            const val = parseFloat(String(r.amount).replace(/[^0-9.-]+/g, "")) || 0;
+            return val >= parseFloat(minAmount);
+        });
+    }
+    if (maxAmount) {
+        filteredRows = filteredRows.filter(r => {
+            const val = parseFloat(String(r.amount).replace(/[^0-9.-]+/g, "")) || 0;
+            return val <= parseFloat(maxAmount);
+        });
+    }
+
 
     if (filterAmount === "low") {
         filteredRows.sort((a, b) => parseInt(a.amount.replace(/\D/g, "")) - parseInt(b.amount.replace(/\D/g, "")));
@@ -548,6 +573,10 @@ export default function IncomeExpense() {
         setFilterTransaction([]);
         setFilterVendor([]);
         setFilterGST([]);
+        setMinAmount("");
+        setMaxAmount("");
+        setTempMin("");
+        setTempMax("");
         setPage(1);
     };
 
@@ -926,9 +955,52 @@ export default function IncomeExpense() {
                                         selectedValue={filterAmount}
                                         onFilterChange={setFilterAmount}
                                         icon={Icons.ArrowUpDown}
+                                        footer={
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                                <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Amount Range</span>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: "6px" }}>
+                                                    <Icons.IndianRupee size={12} style={{ color: "#94a3b8" }} />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Min"
+                                                        value={tempMin}
+                                                        onChange={(e) => setTempMin(e.target.value)}
+                                                        style={{ width: "100%", border: "none", background: "transparent", fontSize: "12px", outline: "none" }}
+                                                    />
+                                                    <span style={{ color: "#cbd5e1" }}>-</span>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Max"
+                                                        value={tempMax}
+                                                        onChange={(e) => setTempMax(e.target.value)}
+                                                        style={{ width: "100%", border: "none", background: "transparent", fontSize: "12px", outline: "none" }}
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        setMinAmount(tempMin);
+                                                        setMaxAmount(tempMax);
+                                                    }}
+                                                    style={{
+                                                        width: "100%",
+                                                        padding: "6px",
+                                                        backgroundColor: "#1c2431",
+                                                        color: "#fff",
+                                                        border: "none",
+                                                        borderRadius: "6px",
+                                                        fontSize: "12px",
+                                                        fontWeight: 600,
+                                                        cursor: "pointer",
+                                                        transition: "all 0.2s"
+                                                    }}
+                                                >
+                                                    Search
+                                                </button>
+                                            </div>
+                                        }
                                     />
 
-                                    {(filterCategory.length > 0 || filterMainCategory.length > 0 || filterName.length > 0 || filterBranch.length > 0 || filterTransaction.length > 0 || filterVendor.length > 0 || filterGST.length > 0 || filterAmount !== "" || searchText) && (
+                                    {(filterCategory.length > 0 || filterMainCategory.length > 0 || filterName.length > 0 || filterBranch.length > 0 || filterTransaction.length > 0 || filterVendor.length > 0 || filterGST.length > 0 || filterAmount !== "" || minAmount || maxAmount || searchText) && (
                                         <button className="clear-filter-btn" onClick={clearAllFilters}>
                                             <Icons.X size={14} /> Clear Filter
                                         </button>

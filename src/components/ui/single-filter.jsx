@@ -21,6 +21,7 @@ export function DataTableSingleFilter({
   selectedValue,
   onFilterChange,
   icon: Icon,
+  footer,
 }) {
   const selectedOption = options.find(o => o.value === selectedValue)
   const displayLabel = selectedOption ? selectedOption.label : title
@@ -33,7 +34,7 @@ export function DataTableSingleFilter({
           {displayLabel}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[160px] p-0" align="start">
+      <PopoverContent className="w-[200px] p-0" align="start">
         <Command>
           <CommandList>
             <CommandGroup>
@@ -64,6 +65,11 @@ export function DataTableSingleFilter({
                 )
               })}
             </CommandGroup>
+            {footer && (
+              <div className="p-2 border-t border-slate-100">
+                {footer}
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

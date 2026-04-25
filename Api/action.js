@@ -32,14 +32,23 @@ const showExpiredModal = () => {
 
     isModalVisible = true;
 
-    modalInstance = Modal.warning({
+    modalInstance = Modal.error({
         title: "Session Expired",
         centered: true,
-        content: "Your session has expired. Please log in again.",
-        okText: "Login Again",
+        content: "Your session has expired for security reasons. Please login again to continue accessing your dashboard.",
+        okText: "Login Now",
         onOk: () => {
             handleModalClose();
+            clearAuthData();
             window.location.href = "/login";
+        },
+        okButtonProps: {
+            style: {
+                backgroundColor: "#1c2431",
+                borderColor: "#1c2431",
+                borderRadius: "6px",
+                fontWeight: 600
+            }
         },
         maskClosable: false,
         closable: false,
