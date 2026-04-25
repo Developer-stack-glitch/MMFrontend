@@ -131,7 +131,7 @@ body {
 /* Collapse Button */
 .collapse-btn-container {
   position: absolute;
-  bottom: 18px;
+  bottom: 70px;
   left: 0;
   width: 100%;
   text-align: center;
@@ -175,8 +175,8 @@ body {
   padding: 10px 25px;
   height: 64px;
   border-bottom: 1px solid #dcdcdc;
-  position: sticky;
-  top: 0;
+  /* position: sticky;
+  top: 0; */
   z-index: 99;
 }
 
@@ -272,10 +272,16 @@ body {
   right: -8px;
   background: #ff3b3b;
   color: white;
-  padding: 2px 6px;
-  font-size: 13px;
-  border-radius: 50%;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+  border-radius: 20px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .icon-btn:hover {

@@ -83,28 +83,17 @@ export default function WalletBalanceTable({ onAddWallet, reloadTrigger }) {
 
     const getDatesFromFilter = (params) => {
         if (!params || !params.value) return { startDate: null, endDate: null };
-        const { filterType, compareMode, value } = params;
+        const { filterType, value } = params;
         let start, end;
 
-        if (compareMode && Array.isArray(value) && value.length === 2) {
-            start = value[0].startOf('day');
-            end = value[1].endOf('day');
+        if (Array.isArray(value) && value.length === 2) {
+            start = dayjs(value[0]).startOf('day');
+            end = dayjs(value[1]).endOf('day');
         } else {
             const selected = dayjs(value);
-            if (filterType === "date") {
-                start = selected.startOf("day");
-                end = selected.endOf("day");
-            } else if (filterType === "week") {
-                start = selected.startOf("week");
-                end = selected.endOf("week");
-            } else if (filterType === "month") {
-                // Billing cycle: 26th of previous month to 25th of current month
-                start = selected.subtract(1, "month").date(26).startOf("day");
-                end = selected.date(25).endOf("day");
-            } else if (filterType === "year") {
-                start = selected.startOf("year");
-                end = selected.endOf("year");
-            }
+            const type = filterType || "day";
+            start = selected.startOf(type);
+            end = selected.endOf(type);
         }
         return {
             startDate: start ? start.format("YYYY-MM-DD") : null,

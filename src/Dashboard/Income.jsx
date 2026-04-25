@@ -130,34 +130,22 @@ export default function Income() {
         try {
             let startDate, endDate, prevStartDate, prevEndDate;
 
-            if (filters.compareMode && Array.isArray(filters.value)) {
-                startDate = filters.value[0].format("YYYY-MM-DD");
-                endDate = filters.value[1].format("YYYY-MM-DD");
+            if (Array.isArray(filters.value) && filters.value.length === 2) {
+                const [start, end] = filters.value;
+                startDate = start.format("YYYY-MM-DD");
+                endDate = end.format("YYYY-MM-DD");
+
+                // Calculate previous period
+                const diff = end.diff(start, "day") + 1;
+                prevStartDate = start.subtract(diff, "day").format("YYYY-MM-DD");
+                prevEndDate = end.subtract(diff, "day").format("YYYY-MM-DD");
             } else {
                 const selected = dayjs(filters.value);
-                const type = filters.filterType;
-
-                if (type === "date") {
-                    startDate = selected.format("YYYY-MM-DD");
-                    endDate = selected.format("YYYY-MM-DD");
-                    prevStartDate = selected.subtract(1, "day").format("YYYY-MM-DD");
-                    prevEndDate = selected.subtract(1, "day").format("YYYY-MM-DD");
-                } else if (type === "week") {
-                    startDate = selected.startOf("week").format("YYYY-MM-DD");
-                    endDate = selected.endOf("week").format("YYYY-MM-DD");
-                    prevStartDate = selected.subtract(1, "week").startOf("week").format("YYYY-MM-DD");
-                    prevEndDate = selected.subtract(1, "week").endOf("week").format("YYYY-MM-DD");
-                } else if (type === "month") {
-                    startDate = selected.subtract(1, "month").date(26).format("YYYY-MM-DD");
-                    endDate = selected.date(25).format("YYYY-MM-DD");
-                    prevStartDate = selected.subtract(2, "month").date(26).format("YYYY-MM-DD");
-                    prevEndDate = selected.subtract(1, "month").date(25).format("YYYY-MM-DD");
-                } else if (type === "year") {
-                    startDate = selected.startOf("year").format("YYYY-MM-DD");
-                    endDate = selected.endOf("year").format("YYYY-MM-DD");
-                    prevStartDate = selected.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
-                    prevEndDate = selected.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
-                }
+                const type = filters.filterType || "date";
+                startDate = selected.startOf(type).format("YYYY-MM-DD");
+                endDate = selected.endOf(type).format("YYYY-MM-DD");
+                prevStartDate = selected.subtract(1, type).startOf(type).format("YYYY-MM-DD");
+                prevEndDate = selected.subtract(1, type).endOf(type).format("YYYY-MM-DD");
             }
 
             const queryFilters = { startDate, endDate, prevStartDate, prevEndDate };

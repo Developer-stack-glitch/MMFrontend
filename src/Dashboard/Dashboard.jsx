@@ -101,34 +101,24 @@ export default function Dashboard() {
     // -------------------------
     const getDateRanges = (f) => {
         if (!f.value) return {};
-        const type = f.filterType;
         let start, end, pStart, pEnd;
 
-        if (!f.compareMode) {
+        if (Array.isArray(f.value) && f.value.length === 2) {
+            start = dayjs(f.value[0]).startOf("day");
+            end = dayjs(f.value[1]).endOf("day");
+            
+            // Calculate previous period by duration
+            const diff = end.diff(start, "day") + 1;
+            pStart = start.subtract(diff, "day");
+            pEnd = end.subtract(diff, "day");
+        } else {
+            // Fallback for single value
             const selected = dayjs(f.value);
-            if (type === "date") {
-                start = selected.startOf("day");
-                end = selected.endOf("day");
-                pStart = selected.subtract(1, "day").startOf("day");
-                pEnd = selected.subtract(1, "day").endOf("day");
-            } else if (type === "week") {
-                start = selected.startOf("week");
-                end = selected.endOf("week");
-                pStart = selected.subtract(1, "week").startOf("week");
-                pEnd = selected.subtract(1, "week").endOf("week");
-            } else if (type === "month") {
-                start = selected.subtract(1, "month").date(26).startOf("day");
-                end = selected.date(25).endOf("day");
-                pStart = selected.subtract(2, "month").date(26).startOf("day");
-                pEnd = selected.subtract(1, "month").date(25).endOf("day");
-            } else if (type === "year") {
-                start = selected.startOf("year");
-                end = selected.endOf("year");
-                pStart = selected.subtract(1, "year").startOf("year");
-                pEnd = selected.subtract(1, "year").endOf("year");
-            }
-        } else if (Array.isArray(f.value)) {
-            [start, end] = f.value;
+            const type = f.filterType || "date";
+            start = selected.startOf(type);
+            end = selected.endOf(type);
+            pStart = selected.subtract(1, type).startOf(type);
+            pEnd = selected.subtract(1, type).endOf(type);
         }
 
         return {

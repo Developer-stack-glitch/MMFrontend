@@ -13,12 +13,11 @@ export default function Filters({ onFilterChange, style }) {
                 const parsed = JSON.parse(saved);
                 return {
                     filterType: parsed.filterType || "year",
-                    compareMode: parsed.compareMode || false,
                     selectedValue: parsed.selectedValue
                         ? (Array.isArray(parsed.selectedValue)
                             ? parsed.selectedValue.map(d => dayjs(d))
-                            : dayjs(parsed.selectedValue))
-                        : dayjs()
+                            : [dayjs(parsed.selectedValue).startOf(parsed.filterType || "year"), dayjs(parsed.selectedValue).endOf(parsed.filterType || "year")])
+                        : [dayjs().startOf("year"), dayjs().endOf("year")]
                 };
             }
         } catch (e) {
@@ -26,14 +25,12 @@ export default function Filters({ onFilterChange, style }) {
         }
         return {
             filterType: "year",
-            compareMode: false,
-            selectedValue: dayjs()
+            selectedValue: [dayjs().startOf("year"), dayjs().endOf("year")]
         };
     };
 
     const initialState = getInitialState();
     const [filterType, setFilterType] = useState(initialState.filterType);
-    const [compareMode, setCompareMode] = useState(initialState.compareMode);
     const [selectedValue, setSelectedValue] = useState(initialState.selectedValue);
 
     // ✅ Save to sessionStorage whenever filters change
@@ -41,7 +38,6 @@ export default function Filters({ onFilterChange, style }) {
         try {
             const stateToSave = {
                 filterType,
-                compareMode,
                 selectedValue: Array.isArray(selectedValue)
                     ? selectedValue.map(d => d?.format?.("YYYY-MM-DD"))
                     : selectedValue?.format?.("YYYY-MM-DD")
@@ -50,18 +46,18 @@ export default function Filters({ onFilterChange, style }) {
         } catch (e) {
             console.error("Error saving filter state:", e);
         }
-    }, [filterType, compareMode, selectedValue]);
+    }, [filterType, selectedValue]);
 
     // Notify parent component
     useEffect(() => {
         if (onFilterChange) {
             onFilterChange({
                 filterType,
-                compareMode,
+                compareMode: false,
                 value: selectedValue,
             });
         }
-    }, [filterType, compareMode, selectedValue]);
+    }, [filterType, selectedValue]);
 
     return (
         <div className="filters-premium-container" style={style}>
@@ -75,11 +71,17 @@ export default function Filters({ onFilterChange, style }) {
                         onClick={() => {
                             setFilterType(type);
 
-                            // ✅ AUTO SELECT CURRENT PERIOD
-                            if (type === "date") setSelectedValue(dayjs());            // today
-                            if (type === "week") setSelectedValue(dayjs());            // this week
-                            if (type === "month") setSelectedValue(dayjs());           // this month
-                            if (type === "year") setSelectedValue(dayjs());            // this year
+                            // ✅ AUTO SELECT CURRENT PERIOD RANGE
+                            let start, end;
+                            if (type === "month") {
+                                // Custom Business Month: 26th of prev to 25th of current
+                                start = dayjs().subtract(1, "month").date(26).startOf("day");
+                                end = dayjs().date(25).endOf("day");
+                            } else {
+                                start = dayjs().startOf(type);
+                                end = dayjs().endOf(type);
+                            }
+                            setSelectedValue([start, end]);
                         }}
                     >
                         {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -87,100 +89,41 @@ export default function Filters({ onFilterChange, style }) {
                 ))}
             </div>
 
-            {/* MAIN PICKER — hidden in compare mode */}
-            {!compareMode && (
-                <>
-                    {filterType === "date" && (
-                        <DatePicker
-                            className="filters-picker-premium"
-                            format="DD MMM YYYY"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-
-                    {filterType === "week" && (
-                        <DatePicker
-                            picker="week"
-                            className="filters-picker-premium"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-
-                    {filterType === "month" && (
-                        <DatePicker
-                            picker="month"
-                            className="filters-picker-premium"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-
-                    {filterType === "year" && (
-                        <DatePicker
-                            picker="year"
-                            className="filters-picker-premium"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-                </>
+            {/* MAIN PICKER */}
+            {filterType === "date" && (
+                <RangePicker
+                    className="filters-picker-premium"
+                    format="DD MMM YYYY"
+                    value={selectedValue}
+                    onChange={setSelectedValue}
+                />
             )}
 
-            {/* COMPARE TOGGLE */}
-            <div className="compare-premium-toggle">
-                <input
-                    type="checkbox"
-                    id="compare_toggle"
-                    checked={compareMode}
-                    onChange={(e) => {
-                        setCompareMode(e.target.checked);
-                        setSelectedValue(null);
-                    }}
+            {filterType === "week" && (
+                <RangePicker
+                    picker="week"
+                    className="filters-picker-premium"
+                    value={selectedValue}
+                    onChange={setSelectedValue}
                 />
-                <label htmlFor="compare_toggle">Compare</label>
-            </div>
+            )}
 
-            {/* COMPARE MODE */}
-            {compareMode && (
-                <>
-                    {filterType === "date" && (
-                        <RangePicker
-                            className="filters-picker-premium"
-                            format="DD MMM YYYY"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
+            {filterType === "month" && (
+                <RangePicker
+                    picker="month"
+                    className="filters-picker-premium"
+                    value={selectedValue}
+                    onChange={setSelectedValue}
+                />
+            )}
 
-                    {filterType === "week" && (
-                        <RangePicker
-                            picker="week"
-                            className="filters-picker-premium"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-
-                    {filterType === "month" && (
-                        <RangePicker
-                            picker="month"
-                            className="filters-picker-premium"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-
-                    {filterType === "year" && (
-                        <RangePicker
-                            picker="year"
-                            className="filters-picker-premium"
-                            value={selectedValue}
-                            onChange={setSelectedValue}
-                        />
-                    )}
-                </>
+            {filterType === "year" && (
+                <RangePicker
+                    picker="year"
+                    className="filters-picker-premium"
+                    value={selectedValue}
+                    onChange={setSelectedValue}
+                />
             )}
 
         </div>

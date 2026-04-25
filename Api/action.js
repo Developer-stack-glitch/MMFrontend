@@ -36,7 +36,13 @@ const showExpiredModal = () => {
         title: "Session Expired",
         centered: true,
         content: "Your session has expired. Please log in again.",
-        onOk: handleModalClose,
+        okText: "Login Again",
+        onOk: () => {
+            handleModalClose();
+            window.location.href = "/login";
+        },
+        maskClosable: false,
+        closable: false,
     });
 };
 
@@ -288,16 +294,19 @@ export const getLastMonthSummaryApi = async (date) => {
 };
 
 export const getApprovalsApi = async (page = 1, limit = 10, filters = {}) => {
-    let query = `/api/transactions/approvals?page=${page}&limit=${limit}`;
-    if (filters.startDate) query += `&startDate=${filters.startDate}`;
-    if (filters.endDate) query += `&endDate=${filters.endDate}`;
-    if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
-    if (filters.branch && filters.branch !== 'All') query += `&branch=${encodeURIComponent(filters.branch)}`;
-    if (filters.transaction && filters.transaction !== 'All') query += `&transaction=${encodeURIComponent(filters.transaction)}`;
-    if (filters.category && filters.category !== 'All') query += `&category=${encodeURIComponent(filters.category)}`;
-
-    const res = await api.get(query);
-    return res.data;
+    try {
+        const response = await api.get("/api/transactions/approvals", {
+            params: {
+                page,
+                limit,
+                ...filters
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching approvals:", error);
+        return { data: [], total: 0 };
+    }
 };
 
 
@@ -457,16 +466,19 @@ export const deleteIncomeApi = async (id) => {
 };
 
 export const getUserAllExpensesApi = async (page = 1, limit = 10, filters = {}) => {
-    let query = `/api/transactions/user-all-expenses?page=${page}&limit=${limit}`;
-    if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
-    if (filters.branch && filters.branch !== 'All') query += `&branch=${encodeURIComponent(filters.branch)}`;
-    if (filters.transaction && filters.transaction !== 'All') query += `&transaction=${encodeURIComponent(filters.transaction)}`;
-    if (filters.startDate) query += `&startDate=${filters.startDate}`;
-    if (filters.endDate) query += `&endDate=${filters.endDate}`;
-    if (filters.category && filters.category !== 'All') query += `&category=${encodeURIComponent(filters.category)}`;
-
-    const res = await api.get(query);
-    return res.data;
+    try {
+        const response = await api.get("/api/transactions/user-all-expenses", {
+            params: {
+                page,
+                limit,
+                ...filters
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching all expenses:", error);
+        return { approvals: [], expenses: [], approvalsTotal: 0, expensesTotal: 0 };
+    }
 };
 
 export const getDashboardStatsApi = async (filters = {}) => {
@@ -495,21 +507,25 @@ export const getRecentTransactionsApi = async () => {
 };
 
 export const getExpensesTotalStatsApi = async (filters = {}) => {
-    let query = `/api/transactions/expense-stats?`;
-    if (filters.name && filters.name !== 'All') query += `&name=${encodeURIComponent(filters.name)}`;
-    if (filters.branch && filters.branch !== 'All') query += `&branch=${encodeURIComponent(filters.branch)}`;
-    if (filters.transaction && filters.transaction !== 'All') query += `&transaction=${encodeURIComponent(filters.transaction)}`;
-    if (filters.startDate) query += `&startDate=${filters.startDate}`;
-    if (filters.endDate) query += `&endDate=${filters.endDate}`;
-    if (filters.category && filters.category !== 'All') query += `&category=${encodeURIComponent(filters.category)}`;
-
-    const res = await api.get(query);
-    return res.data;
+    try {
+        const response = await api.get("/api/transactions/expense-stats", {
+            params: filters
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching expense stats:", error);
+        return { totalExpense: 0, totalApproved: 0 };
+    }
 };
 
 export const getTransactionFilterOptionsApi = async () => {
-    const res = await api.get("/api/transactions/filter-options");
-    return res.data;
+    try {
+        const response = await api.get("/api/transactions/filter-options");
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching filter options:", error);
+        return { names: [], branches: [], transactionSources: [], categories: [], mainCategories: [], vendors: [], gstOptions: [] };
+    }
 };
 
 

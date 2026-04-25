@@ -41,49 +41,32 @@ export default function AmountDetails({
         if (!filters.value) return "";
         if (current === previous) return "No Change";
 
-        const type = filters.filterType;
-        const selected = dayjs(filters.value);
-        let prevPeriod = "";
-
-        if (type === "date") {
-            prevPeriod = selected.subtract(1, "day").format("MMMM");
-        } else if (type === "week") {
-            prevPeriod = selected.subtract(1, "week").format("MMMM");
-        } else if (type === "month") {
-            prevPeriod = selected.subtract(1, "month").format("MMMM");
-        } else if (type === "year") {
-            prevPeriod = selected.subtract(1, "year").format("YYYY");
-        }
-
         const diff = current - previous;
-        const periodText = prevPeriod ? ` (${prevPeriod})` : "";
-
         return diff > 0
-            ? `+ ${fmtAmt(diff)} compared to previous period${periodText}`
-            : `- ${fmtAmt(Math.abs(diff))} compared to previous period${periodText}`;
+            ? `+ ${fmtAmt(diff)} compared to previous period`
+            : `- ${fmtAmt(Math.abs(diff))} compared to previous period`;
     };
 
     const getPeriodText = () => {
         if (!filters.value) return "";
-        const selected = dayjs(filters.value);
         const type = filters.filterType;
 
-        if (filters.compareMode && Array.isArray(filters.value)) {
+        if (Array.isArray(filters.value) && filters.value.length === 2) {
             const [start, end] = filters.value;
-            return ` (${dayjs(start).format("MMM DD")} - ${dayjs(end).format("MMM DD")})`;
+            const s = dayjs(start);
+            const e = dayjs(end);
+
+            if (type === "date" && s.isSame(e, "day")) return ` (${s.format("MMM DD, YYYY")})`;
+            if (type === "year" && s.isSame(e, "year") && s.date() === 1 && s.month() === 0) return ` (${s.format("YYYY")})`;
+            
+            return ` (${s.format("MMM DD")} - ${e.format("MMM DD")}, ${e.format("YYYY")})`;
         }
 
-        if (type === "date") {
-            return ` (${selected.format("MMM DD, YYYY")})`;
-        } else if (type === "week") {
-            return ` (${selected.startOf("week").format("MMM DD")} - ${selected.endOf("week").format("MMM DD")})`;
-        } else if (type === "month") {
-            const startStr = selected.subtract(1, "month").date(26).format("MMM DD");
-            const endStr = selected.date(25).format("MMM DD");
-            return ` (${startStr} - ${endStr}, ${selected.format("YYYY")})`;
-        } else if (type === "year") {
-            return ` (${selected.format("YYYY")})`;
-        }
+        const selected = dayjs(filters.value);
+        if (type === "date") return ` (${selected.format("MMM DD, YYYY")})`;
+        if (type === "week") return ` (${selected.startOf("week").format("MMM DD")} - ${selected.endOf("week").format("MMM DD")})`;
+        if (type === "month") return ` (${selected.format("MMMM YYYY")})`;
+        if (type === "year") return ` (${selected.format("YYYY")})`;
         return "";
     };
 

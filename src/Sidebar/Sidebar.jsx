@@ -447,7 +447,7 @@ export default function SideBarLayout() {
                 trigger={null}
                 collapsible
                 collapsed={collapsed}
-                width={240}
+                width={220}
                 className={`premium-sider ${collapsed ? "collapsed" : ""}`}
             >
                 <div onClick={() => {

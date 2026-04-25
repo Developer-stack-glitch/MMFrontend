@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Eye, Check, X } from "lucide-react";
+import { Eye, Check, X, Search, LayoutGrid, ArrowUpDown, Building2, User, Layers, Wallet, Store, Receipt, Download, MoreVertical, Edit, Trash2 } from "lucide-react";
 import * as Icons from "lucide-react";
-import { motion } from "framer-motion";
-import { Select, Button, Modal, Popconfirm, Tooltip, Pagination } from "antd";
+import { motion, AnimatePresence } from "framer-motion";
+import { Select, Button, Modal, Popconfirm, Tooltip, Pagination, Dropdown } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
@@ -15,6 +15,8 @@ import { CommonToaster } from "../../Common/CommonToaster";
 import Filters from "../Filters/Filters";
 import InvoicePreviewModal from "../Common/InvoicePreviewModal";
 import ApprovalsSkeleton from "./ApprovalsSkeleton";
+import { DataTableFacetedFilter } from "@/components/ui/faceted-filter";
+import { DataTableSingleFilter } from "@/components/ui/single-filter";
 
 
 export default function Approvals() {
@@ -23,7 +25,7 @@ export default function Approvals() {
         compareMode: false,
         value: dayjs(),
     });
-    const [filterCategory, setFilterCategory] = useState("All");
+    const [filterCategory, setFilterCategory] = useState([]);
     const [filterAmount, setFilterAmount] = useState("");
     const [searchText, setSearchText] = useState("");
     const [loading, setLoading] = useState(true)
@@ -118,65 +120,55 @@ export default function Approvals() {
 
     const getDateRange = (f) => {
         if (!f.value) return { startDate: null, endDate: null };
-        const type = f.filterType;
         let start, end;
 
-        if (!f.compareMode) {
-            if (type === "month") {
-                start = dayjs(f.value).subtract(1, "month").date(26).format("YYYY-MM-DD");
-                end = dayjs(f.value).date(25).format("YYYY-MM-DD");
-            } else {
-                start = dayjs(f.value).startOf(type).format("YYYY-MM-DD");
-                end = dayjs(f.value).endOf(type).format("YYYY-MM-DD");
-            }
-        } else {
-            if (!Array.isArray(f.value) || f.value.length !== 2)
-                return { startDate: null, endDate: null };
+        if (Array.isArray(f.value) && f.value.length === 2) {
             start = dayjs(f.value[0]).startOf('day').format("YYYY-MM-DD");
             end = dayjs(f.value[1]).endOf('day').format("YYYY-MM-DD");
+        } else {
+            // Fallback for single value
+            const type = f.filterType || "day";
+            start = dayjs(f.value).startOf(type).format("YYYY-MM-DD");
+            end = dayjs(f.value).endOf(type).format("YYYY-MM-DD");
         }
         return { startDate: start, endDate: end };
     };
 
     // ✅ Extract categories from Requests
-    const categoryOptions = useMemo(() => {
+    const allCategories = useMemo(() => {
         const set = new Set();
-        requests.forEach((r) => r?.sub_category && set.add(r.sub_category));
-        return ["All", ...Array.from(set)];
+        requests.forEach((r) => {
+            if (r?.sub_category) set.add(r.sub_category);
+            else if (r?.category) set.add(r.category);
+        });
+        return Array.from(set);
     }, [requests]);
 
 
-    // ✅ ✅ ✅ APPLY DATE FILTER (From Dashboard)
+    // ✅ ✅ ✅ APPLY DATE FILTER
     const applyFilters = (items) => {
         if (!filters.value) return items;
-        const type = filters.filterType;
-        if (!filters.compareMode) {
+
+        if (Array.isArray(filters.value) && filters.value.length === 2) {
+            const [start, end] = filters.value;
+            const s = dayjs(start).startOf("day");
+            const e = dayjs(end).endOf("day");
+
             return items.filter((item) => {
                 const d = dayjs(item.date);
-
-                if (type === "date") return d.isSame(filters.value, "day");
-                if (type === "week") return d.isSame(filters.value, "week");
-                if (type === "month") {
-                    const start = dayjs(filters.value).subtract(1, "month").date(26).startOf("day");
-                    const end = dayjs(filters.value).date(25).endOf("day");
-                    return d.isBetween(start, end, "day", "[]");
-                }
-                if (type === "year") return d.isSame(filters.value, "year");
-
-                return true;
+                return d.isBetween(s, e, "day", "[]");
             });
         }
 
-        // ✅ Compare Mode
-        if (!Array.isArray(filters.value) || filters.value.length !== 2)
-            return items;
-        const [start, end] = filters.value;
+        // Fallback for single value
+        const selected = dayjs(filters.value);
+        const type = filters.filterType;
         return items.filter((item) => {
             const d = dayjs(item.date);
-            if (type === "date") return d.isBetween(start, end, "day", "[]");
-            if (type === "week") return d.isBetween(start, end, "week", "[]");
-            if (type === "month") return d.isBetween(start, end, "month", "[]");
-            if (type === "year") return d.isBetween(start, end, "year", "[]");
+            if (type === "date") return d.isSame(selected, "day");
+            if (type === "week") return d.isSame(selected, "week");
+            if (type === "month") return d.isSame(selected, "month");
+            if (type === "year") return d.isSame(selected, "year");
             return true;
         });
     };
@@ -237,8 +229,8 @@ export default function Approvals() {
                 .includes(searchText.toLowerCase())
         );
     }
-    if (filterCategory !== "All") {
-        filteredRows = filteredRows.filter((r) => r.sub_category === filterCategory);
+    if (filterCategory?.length > 0) {
+        filteredRows = filteredRows.filter((r) => filterCategory.includes(r.sub_category || r.category));
     }
     const parseAmt = (n) =>
         Number(String(n ?? 0).replace(/[^0-9.-]+/g, "")) || 0;
@@ -250,33 +242,43 @@ export default function Approvals() {
     }
 
     const clearAllFilters = () => {
-        setFilterCategory("All");
+        setFilterCategory([]);
         setFilterAmount("");
         setSearchText("");
     };
 
-    const renderIcon = (iconVal) => {
-        const MaybeIcon = Icons[iconVal];
-        if (MaybeIcon) return <MaybeIcon size={20} color="#fff" />;
-        return <img src={iconVal} style={{ width: 20, height: 20, objectFit: 'contain' }} alt="" />;
+    const truncateWords = (text, count) => {
+        if (!text) return "-";
+        const words = String(text).split(/\s+/);
+        if (words.length <= count) return text;
+        return words.slice(0, count).join(" ") + "...";
     };
 
     const totalFilteredAmount = filteredRows.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+
+    const unifiedGridStyle = {
+        gridTemplateColumns: "40px 100px 120px 140px 160px 110px 120px 150px 120px 60px minmax(200px, 0.9fr) 90px 100px"
+    };
 
     return (
         <>
             <Filters onFilterChange={setFilters} />
             {loading ? (<ApprovalsSkeleton />) : (
-                <div className="approvals-container">
-                    <div className="approvals-header-top">
-                        <h1 className="approvals-title">Approvals</h1>
+                <div className="expense-container">
+                    <div className="expense-header" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <h1 style={{ margin: 0, fontSize: "28px", fontWeight: 700, color: "#1c2431" }}>
+                                Approvals
+                            </h1>
+                            <span style={{ color: "#64748b", fontSize: "14px" }}>Review and manage pending spend requests</span>
+                        </div>
                     </div>
 
                     {/* FILTER UI */}
                     <div className="filter-card">
-                        <div className="filter-left">
+                        <div className="filter-left" style={{ flexWrap: "wrap", gap: "10px" }}>
                             <div className="search-wrapper">
-                                <Icons.Search size={16} className="search-icon" />
+                                <Search size={16} className="search-icon" />
                                 <input
                                     type="text"
                                     value={searchText}
@@ -285,40 +287,33 @@ export default function Approvals() {
                                 />
                             </div>
 
-                            <div className="select-wrapper">
-                                <Select
-                                    value={filterCategory}
-                                    onChange={setFilterCategory}
-                                    style={{ width: 160 }}
-                                    placeholder="Category"
-                                    suffixIcon={<Icons.LayoutGrid size={14} />}
-                                    options={categoryOptions.map((c) => ({
-                                        value: c,
-                                        label: c === "All" ? "Category: All" : c,
-                                    }))}
+                            <div className="flex flex-wrap gap-4 items-center">
+                                <DataTableFacetedFilter
+                                    title="Category"
+                                    options={allCategories.map(c => ({ label: c, value: c, icon: LayoutGrid }))}
+                                    selectedValues={filterCategory}
+                                    onFilterChange={setFilterCategory}
+                                    icon={LayoutGrid}
                                 />
-                            </div>
 
-                            <div className="select-wrapper">
-                                <Select
-                                    value={filterAmount}
-                                    onChange={setFilterAmount}
-                                    style={{ width: 150 }}
-                                    placeholder="Amount"
-                                    suffixIcon={<Icons.ArrowUpDown size={14} />}
+                                <DataTableSingleFilter
+                                    title="Amount: All"
                                     options={[
                                         { value: "", label: "Amount: All" },
                                         { value: "low", label: "Low → High" },
                                         { value: "high", label: "High → Low" },
                                     ]}
+                                    selectedValue={filterAmount}
+                                    onFilterChange={setFilterAmount}
+                                    icon={ArrowUpDown}
                                 />
-                            </div>
 
-                            {(filterCategory !== "All" || filterAmount !== "" || searchText) && (
-                                <button className="clear-filter-btn" onClick={clearAllFilters}>
-                                    <Icons.X size={14} /> Clear
-                                </button>
-                            )}
+                                {(filterCategory.length > 0 || filterAmount !== "" || searchText) && (
+                                    <button className="clear-filter-btn" onClick={clearAllFilters}>
+                                        <X size={14} /> Clear Filter
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* TOTAL STAT */}
@@ -328,162 +323,161 @@ export default function Approvals() {
                         </div>
                     </div>
 
-                    {/* ✅ TABLE */}
-                    <div className="approvals-table-wrapper">
-                        <motion.table
-                            initial="hidden"
-                            animate="visible"
-                            className="approvals-table real-table"
-                        >
-                            {/* HEADER */}
-                            <thead>
-                                <tr className="table-header">
-                                    <th>SPENDER NAME</th>
-                                    <th>CATEGORY</th>
-                                    <th>DESCRIPTION</th>
-                                    <th>AMOUNT</th>
-                                    <th>INVOICE</th>
-                                    <th>REQUEST DATE</th>
-                                    <th>END DATE</th>
-                                    <th>ACTION</th>
-                                </tr>
-                            </thead>
+                    {/* TABLE */}
+                    <div className="table-scroll-wrapper" style={{ overflowX: "auto", width: "100%", borderRadius: "8px" }}>
+                        <div className="expense-table-wrapper" style={{ minWidth: "1600px" }}>
+                            <div className="expense-table">
+                                <div
+                                    className="expense-row expense-header-row"
+                                    style={unifiedGridStyle}
+                                >
+                                    <div className="sno-col" style={{ fontWeight: 700 }}>S.NO</div>
+                                    <div>DATE</div>
+                                    <div>SPENDER</div>
+                                    <div>CATEGORY</div>
+                                    <div>SUBCATEGORY</div>
+                                    <div>BRANCH</div>
+                                    <div>TRANSACTION</div>
+                                    <div>VENDOR</div>
+                                    <div>AMOUNT</div>
+                                    <div>GST</div>
+                                    <div>DESCRIPTION</div>
+                                    <div>INVOICE</div>
+                                    <div style={{ textAlign: "center" }}>ACTION</div>
+                                </div>
 
-                            {/* BODY */}
-                            <tbody>
                                 {filteredRows.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="9">
-                                            <div className="no-data-box" style={{ textAlign: "center", padding: "40px 0" }}>
-                                                <img
-                                                    src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
-                                                    alt="no data"
-                                                    className="no-data-img"
-                                                />
-                                                <h3>No Data Found</h3>
-                                                <p>No approval requests available.</p>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <div className="no-data-box" style={{ textAlign: "center", padding: "40px 0" }}>
+                                        <img
+                                            src="https://cdn-icons-png.flaticon.com/512/4076/4076503.png"
+                                            alt="no data"
+                                            className="no-data-img"
+                                        />
+                                        <h3>No Data Found</h3>
+                                        <p>No approval requests available.</p>
+                                    </div>
                                 ) : (
-                                    filteredRows.map((row) => (
-                                        <tr key={row.id} className="table-row">
-                                            {/* 1️⃣ SPENDER NAME */}
-                                            <td>
-                                                <div className="owner-cell">
-                                                    <div
-                                                        className="icon-circles"
-                                                        style={{
-                                                            backgroundColor: row.categoryColor || row.color || "#d4af37",
-                                                            width: 40,
-                                                            height: 40,
-                                                            borderRadius: "50%",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            minWidth: 40,
-                                                        }}
-                                                    >
-                                                        {renderIcon(row.icon)}
-                                                    </div>
-                                                    <div>
-                                                        <h4>{row.name}</h4>
-                                                        <p style={{ textTransform: 'uppercase', fontSize: '12px', color: "#2a2a2a" }}>{row.branch}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            {/* 2️⃣ CATEGORY */}
-                                            <td>
-                                                <div>
-                                                    <span
-                                                        className="category-pill"
-                                                        style={{
-                                                            backgroundColor: row.categoryColor || row.color,
-                                                        }}
-                                                    >
-                                                        {row.sub_category}
-                                                    </span>
-                                                </div>
-                                            </td>
+                                    filteredRows.map((row, i) => (
+                                        <div
+                                            key={row.id}
+                                            className="expense-row"
+                                            style={unifiedGridStyle}
+                                        >
+                                            <div className="sno-cell">
+                                                {(page - 1) * pageSize + i + 1}.
+                                            </div>
 
-                                            {/* 3️⃣ DESCRIPTION */}
-                                            <td>
-                                                <div className="description-cell">
-                                                    {row.description || row.role || "-"}
+                                            {/* DATE */}
+                                            <div style={{ whiteSpace: "nowrap" }}>{fmtDate(row.date)}</div>
+
+                                            {/* PERSON */}
+                                            <Tooltip title={row.name}>
+                                                <div style={{ fontWeight: 500, color: "#444" }}>{row.name}</div>
+                                            </Tooltip>
+
+                                            {/* CATEGORY */}
+                                            <Tooltip title={row.main_category || "-"}>
+                                                <div style={{ fontWeight: 600, color: "#1c2431", textTransform: "uppercase", fontSize: "12px" }}>
+                                                    {row.main_category || "-"}
                                                 </div>
-                                            </td>
-                                            {/* 4️⃣ AMOUNT */}
-                                            <td>
-                                                {fmtAmt(row.amount)}<br></br>
-                                                {Boolean(row.original_expense_id || row.is_edit) && (
-                                                    <span className="editable-pill">
-                                                        Editable
-                                                    </span>
-                                                )}
-                                            </td>
-                                            {/* 5️⃣ INVOICE */}
-                                            <td>
+                                            </Tooltip>
+
+                                            {/* SUBCATEGORY */}
+                                            <Tooltip title={row.sub_category || row.category}>
+                                                <div style={{ color: "#555" }}>{row.sub_category || row.category}</div>
+                                            </Tooltip>
+
+                                            {/* BRANCH */}
+                                            <Tooltip title={row.branch || "-"}>
+                                                <div>{row.branch || "-"}</div>
+                                            </Tooltip>
+
+                                            {/* TRANSACTION */}
+                                            <Tooltip title={row.transaction_from || "-"}>
+                                                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                                                    <div style={{ fontSize: "12px", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>{row.transaction_from || "-"}</div>
+                                                </div>
+                                            </Tooltip>
+
+                                            {/* VENDOR */}
+                                            <Tooltip title={row.vendor_name || row.transaction_to || "-"}>
+                                                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                                                    <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>{row.vendor_name || row.transaction_to || "-"}</div>
+                                                    {row.vendor_number && <div style={{ fontSize: "10px", color: "#888", overflow: "hidden", textOverflow: "ellipsis" }}>{row.vendor_number}</div>}
+                                                </div>
+                                            </Tooltip>
+
+                                            {/* AMOUNT */}
+                                            <div className="amount-cell">
+                                                {fmtAmt(row.amount)}
+                                                {Boolean(row.original_expense_id || row.is_edit) && <span style={{ fontSize: "9px", color: "#d4af37", display: "block" }}>Edit</span>}
+                                            </div>
+
+                                            {/* GST */}
+                                            <div>{row.gst === 'Yes' ? <span className="status-badge" style={{ background: '#d4377f', padding: "2px 6px" }}>GST</span> : '-'}</div>
+
+                                            {/* DESCRIPTION */}
+                                            <Tooltip title={row.description || row.role}>
+                                                <div className="text-truncate-single">
+                                                    {truncateWords(row.description || row.role, 6)}
+                                                </div>
+                                            </Tooltip>
+
+                                            {/* INVOICE */}
+                                            <div style={{ display: 'flex', justifyContent: 'center' }}>
                                                 {row.invoice && String(row.invoice).trim() !== "" && String(row.invoice).trim() !== "[]" ? (
                                                     <button
                                                         className="view-invoice-btn"
-                                                        onClick={() =>
-                                                            handleViewInvoice(row.invoice)
-                                                        }
+                                                        onClick={() => handleViewInvoice(row.invoice)}
+                                                        style={{ padding: "3px 8px", fontSize: "10px", marginTop: 0 }}
                                                     >
                                                         View
                                                     </button>
-                                                ) : (
-                                                    <span className="no-invoice">No Invoice</span>
-                                                )}
-                                            </td>
-                                            {/* 5️⃣ Request DATE */}
-                                            <td>{fmtDate(row.date)}</td>
-                                            {/* 6️⃣ END DATE */}
-                                            <td>{fmtDate(row.end_date)}</td>
-                                            {/* 7️⃣ ACTION */}
-                                            <td>
-                                                <div className="action-cell">
-                                                    <Tooltip title="View">
-                                                        <Eye
-                                                            size={19}
-                                                            className="icon view"
-                                                            onClick={() => openDetails(row)}
-                                                        />
+                                                ) : "-"}
+                                            </div>
+
+                                            {/* ACTION */}
+                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                <Tooltip title="Details">
+                                                    <button className="action-more-btn" onClick={() => openDetails(row)}>
+                                                        <Eye size={18} />
+                                                    </button>
+                                                </Tooltip>
+                                                <Popconfirm
+                                                    title="Approve this request?"
+                                                    okText="Yes"
+                                                    cancelText="No"
+                                                    onConfirm={() => doApprove(row)}
+                                                >
+                                                    <Tooltip title="Approve">
+                                                        <button className="action-more-btn" style={{ color: '#2c9b00' }}>
+                                                            <Check size={18} />
+                                                        </button>
                                                     </Tooltip>
-
-                                                    <Popconfirm
-                                                        title="Approve this request?"
-                                                        okText="Yes"
-                                                        cancelText="No"
-                                                        onConfirm={() => doApprove(row)}
-                                                    >
-                                                        <Tooltip title="Approve">
-                                                            <Check size={20} className="icon approve" />
-                                                        </Tooltip>
-                                                    </Popconfirm>
-
-                                                    <Popconfirm
-                                                        title="Reject this request?"
-                                                        okText="Yes"
-                                                        cancelText="No"
-                                                        onConfirm={() => doReject(row)}
-                                                    >
-                                                        <Tooltip title="Reject">
-                                                            <X size={20} className="icon reject" />
-                                                        </Tooltip>
-                                                    </Popconfirm>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                </Popconfirm>
+                                                <Popconfirm
+                                                    title="Reject this request?"
+                                                    okText="Yes"
+                                                    cancelText="No"
+                                                    onConfirm={() => doReject(row)}
+                                                >
+                                                    <Tooltip title="Reject">
+                                                        <button className="action-more-btn" style={{ color: '#ff4d4f' }}>
+                                                            <X size={18} />
+                                                        </button>
+                                                    </Tooltip>
+                                                </Popconfirm>
+                                            </div>
+                                        </div>
                                     ))
                                 )}
-                            </tbody>
-                        </motion.table>
+                            </div>
+                        </div>
                     </div>
 
                     {/* PAGINATION */}
                     {total > 0 && (
-                        <div className="pagination-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 0', alignItems: 'center', gap: '20px' }}>
+                        <div className="count-pagination" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', alignItems: 'center', gap: '20px' }}>
                             <div className="rows-per-page-container">
                                 Rows per page:
                                 <Select
@@ -525,9 +519,9 @@ export default function Approvals() {
                         {selected && (
                             <div className="details-grid" style={{ display: "grid", gap: 10 }}>
                                 <div><b>Spender Name:</b> {selected.name}</div>
-                                <div className="text-truncate11"><b>Description:</b> {selected.role || "-"}</div>
+                                <div className="text-truncate11"><b>Description:</b> {selected.role || selected.description || "-"}</div>
                                 <div><b>Branch:</b> {selected.branch || "-"}</div>
-                                <div><b>Category:</b> {selected.sub_category}</div>
+                                <div><b>Category:</b> {selected.sub_category || selected.category}</div>
                                 <div><b>Amount:</b> {fmtAmt(selected.amount)}</div>
                                 <div><b>Request Date:</b> {fmtDate(selected.date)}</div>
                                 <div><b>End Date:</b> {fmtDate(selected.end_date)}</div>
@@ -568,3 +562,4 @@ export default function Approvals() {
         </>
     );
 }
+
