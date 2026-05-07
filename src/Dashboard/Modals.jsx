@@ -746,7 +746,8 @@ export default function Modals({
                                                 "ACTE BANDHAN (BLR)",
                                                 "ACTE BANDHAN (CHE)",
                                                 "ACTE KOTAK (BLR)",
-                                                "LEARNOVITA SBI"
+                                                "LEARNOVITA SBI",
+                                                "CASH IN HAND",
                                             ].map(opt => ({ value: opt, label: opt }))}
                                         />
                                     </div>

@@ -112,7 +112,7 @@ export default function IncomeExpense() {
     const [filterTransaction, setFilterTransaction] = useState([]); // Transaction Source
     const [filterVendor, setFilterVendor] = useState([]);
     const [filterGST, setFilterGST] = useState([]);
-    const [filterAmount, setFilterAmount] = useState("");
+    const [filterDateSort, setFilterDateSort] = useState("newest"); // Default to newest
     const [minAmount, setMinAmount] = useState("");
     const [maxAmount, setMaxAmount] = useState("");
     const [tempMin, setTempMin] = useState("");
@@ -554,10 +554,10 @@ export default function IncomeExpense() {
     }
 
 
-    if (filterAmount === "low") {
-        filteredRows.sort((a, b) => parseInt(a.amount.replace(/\D/g, "")) - parseInt(b.amount.replace(/\D/g, "")));
-    } else if (filterAmount === "high") {
-        filteredRows.sort((a, b) => parseInt(b.amount.replace(/\D/g, "")) - parseInt(a.amount.replace(/\D/g, "")));
+    if (filterDateSort === "newest") {
+        filteredRows.sort((a, b) => dayjs(b.originalItem.date).unix() - dayjs(a.originalItem.date).unix());
+    } else if (filterDateSort === "oldest") {
+        filteredRows.sort((a, b) => dayjs(a.originalItem.date).unix() - dayjs(b.originalItem.date).unix());
     }
 
     // Display Total from API Stats
@@ -566,7 +566,7 @@ export default function IncomeExpense() {
     const clearAllFilters = () => {
         setFilterMainCategory([]);
         setFilterCategory([]);
-        setFilterAmount("");
+        setFilterDateSort("newest");
         setSearchText("");
         setFilterName([]);
         setFilterBranch([]);
@@ -598,7 +598,8 @@ export default function IncomeExpense() {
                     const DynamicIcon = Icons[item.icon] || Icons.Circle;
                     return {
                         date: dayjs(item.date).format("DD/MM/YYYY"),
-                        title: item.sub_category,
+                        mainCategory: item.main_category,
+                        subCategory: item.sub_category,
                         description: item.description,
                         merchant: item.user_name,
                         amount: `₹${item.total}`,
@@ -638,7 +639,8 @@ export default function IncomeExpense() {
                     const DynamicIcon = Icons[item.icon] || Icons.Circle;
                     return {
                         date: dayjs(item.date).format("DD/MM/YYYY"),
-                        title: item.sub_category || item.category,
+                        mainCategory: item.main_category || item.category,
+                        subCategory: item.sub_category || item.category,
                         note: item.role || item.description || "-",
                         merchant: item.user_name || userDetails.name || "You",
                         amount: `₹${item.total || item.amount}`,
@@ -658,7 +660,7 @@ export default function IncomeExpense() {
             // Apply Search filter client-side if active
             if (searchText.trim()) {
                 allExportItems = allExportItems.filter((r) =>
-                    `${r.title} ${r.merchant} ${r.date} ${r.report}`
+                    `${r.mainCategory} ${r.subCategory} ${r.merchant} ${r.date} ${r.report}`
                         .toLowerCase()
                         .includes(searchText.toLowerCase())
                 );
@@ -701,10 +703,11 @@ export default function IncomeExpense() {
             let rowMapper = (row) => [];
 
             if (activeTab === "approval") {
-                headers = ["Date", "Category", "Sender", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
+                headers = ["Date", "Category", "Subcategory", "Sender", "Description", "Branch", "Vendor", "Amount", "GST", "End Date", "Status", "Invoice"];
                 rowMapper = (row) => [
                     row.date,
-                    row.title,
+                    row.mainCategory || "-",
+                    row.subCategory || "-",
                     row.merchant || "-",
                     row.note || "-",
                     row.report || "-",
@@ -716,10 +719,11 @@ export default function IncomeExpense() {
                     getInvoiceUrls(row.invoice)
                 ];
             } else {
-                headers = ["Date", "Category", "Sender", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "GST", "Branch", "Status", "Invoice"];
+                headers = ["Date", "Category", "Subcategory", "Sender", "Description", "Vendor", "Transaction From", "Transaction To", "Mode", "Amount", "GST", "Branch", "Status", "Invoice"];
                 rowMapper = (row) => [
                     row.date,
-                    row.title,
+                    row.mainCategory || "-",
+                    row.subCategory || "-",
                     row.merchant || "-",
                     row.description || "-",
                     row.vendorName ? `${row.vendorName} ${row.vendorNumber ? `(${row.vendorNumber})` : ""}` : (row.transaction_to || "-"),
@@ -734,16 +738,61 @@ export default function IncomeExpense() {
                 ];
             }
 
-            const csvContent = "\uFEFF" + [
-                headers.join(","),
-                ...allExportItems.map(row => rowMapper(row).map(e => `"${String(e).replace(/"/g, '""')}"`).join(","))
-            ].join("\n");
+            const escapeHTML = (str) => {
+                if (str === null || str === undefined) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            };
 
-            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const headersHtml = headers.map(h => `<th style="background-color: #1c2431; color: #ffffff; border: 1px solid #1c2431; padding: 12px; font-weight: bold; text-align: left;">${escapeHTML(h)}</th>`).join('');
+            const rowsHtml = allExportItems.map(row => {
+                const cells = rowMapper(row).map(c => `<td style="border: 1px solid #e2e8f0; padding: 8px; vertical-align: top;">${escapeHTML(c)}</td>`).join('');
+                return `<tr>${cells}</tr>`;
+            }).join('');
+
+            const excelTemplate = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                <head>
+                    <meta charset="utf-8">
+                    <!--[if gte mso 9]>
+                    <xml>
+                        <x:ExcelWorkbook>
+                            <x:ExcelWorksheets>
+                                <x:ExcelWorksheet>
+                                    <x:Name>${activeTab}</x:Name>
+                                    <x:WorksheetOptions>
+                                        <x:DisplayGridlines/>
+                                    </x:WorksheetOptions>
+                                </x:ExcelWorksheet>
+                            </x:ExcelWorksheets>
+                        </x:ExcelWorkbook>
+                    </xml>
+                    <![endif]-->
+                </head>
+                <body>
+                    <table border="1" style="border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                ${headersHtml}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob([excelTemplate], { type: "application/vnd.ms-excel" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.setAttribute("href", url);
-            link.setAttribute("download", `${activeTab}_export_${dayjs().format("YYYY-MM-DD")}.csv`);
+            link.setAttribute("download", `${activeTab}_export_${dayjs().format("YYYY-MM-DD")}.xls`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -829,48 +878,58 @@ export default function IncomeExpense() {
                                 </h1>
                                 <span style={{ color: "#64748b", fontSize: "14px" }}>Manage and track your financial records</span>
                             </div>
-                            <div className="expense-actions">
-                                <button
-                                    onClick={handleExportCSV}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                        padding: "10px 18px",
-                                        backgroundColor: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "10px",
-                                        cursor: "pointer",
-                                        fontSize: "14px",
-                                        fontWeight: 600,
-                                        transition: "all 0.2s",
-                                        marginRight: "10px",
-                                        color: "#475569",
-                                        boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                                    }}
-                                >
-                                    <Icons.Download size={18} /> Export CSV
-                                </button>
-                                {!((userRole === "admin" || userRole === "superadmin") && activeTab === "approval") && (
+                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px' }}>
+                                {/* TOTAL STAT MOVED HERE */}
+                                <div className={`total-stat-box ${activeTab === "expense" ? "is-expense" : "is-approved"}`}>
+                                    <span>{activeTab === "expense" ? "Total Expense" : "Total Approved"}</span>
+                                    <strong className="total-amount">{fmtAmt(totalToDisplay)}</strong>
+                                </div>
+
+                                <div className="expense-actions">
                                     <button
-                                        className="btn-primary"
-                                        onClick={() => {
-                                            setOpenModal(activeTab);
-                                            resetForm();
-                                            setEditData(null);
-                                        }}
+                                        onClick={handleExportCSV}
                                         style={{
-                                            padding: "10px 20px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                            padding: "10px 18px",
+                                            backgroundColor: "#fff",
+                                            border: "1px solid #e2e8f0",
                                             borderRadius: "10px",
+                                            cursor: "pointer",
+                                            fontSize: "14px",
                                             fontWeight: 600,
-                                            boxShadow: "0 4px 12px rgba(212, 175, 55, 0.3)"
+                                            transition: "all 0.2s",
+                                            marginRight: "0px",
+                                            color: "#475569",
+                                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
                                         }}
                                     >
-                                        <Plus size={18} /> New {activeTab === "approval" ? "Approval" : "Expense"}
+                                        <Icons.Download size={18} /> Export Excel
                                     </button>
-                                )}
+                                    {!((userRole === "admin" || userRole === "superadmin") && activeTab === "approval") && (
+                                        <button
+                                            className="btn-primary"
+                                            onClick={() => {
+                                                setOpenModal(activeTab);
+                                                resetForm();
+                                                setEditData(null);
+                                            }}
+                                            style={{
+                                                padding: "10px 20px",
+                                                borderRadius: "10px",
+                                                fontWeight: 600,
+                                                boxShadow: "0 4px 12px rgba(212, 175, 55, 0.3)"
+                                            }}
+                                        >
+                                            <Plus size={18} /> New {activeTab === "approval" ? "Approval" : "Expense"}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
+
+
 
                         {/* FILTER UI */}
                         <div className="filter-card">
@@ -886,6 +945,16 @@ export default function IncomeExpense() {
                                 </div>
 
                                 <div className="flex flex-wrap gap-3 items-center">
+                                    <DataTableSingleFilter
+                                        title="Sort Date"
+                                        options={[
+                                            { value: "newest", label: "Date first" },
+                                            { value: "oldest", label: "Date last" },
+                                        ]}
+                                        selectedValue={filterDateSort}
+                                        onFilterChange={setFilterDateSort}
+                                        icon={Icons.Calendar}
+                                    />
                                     <DataTableFacetedFilter
                                         title="Person"
                                         options={allNames.map(n => ({ label: n, value: n, icon: Icons.User }))}
@@ -946,15 +1015,11 @@ export default function IncomeExpense() {
                                     />
 
                                     <DataTableSingleFilter
-                                        title="Amount: All"
-                                        options={[
-                                            { value: "", label: "Amount: All" },
-                                            { value: "low", label: "Low → High" },
-                                            { value: "high", label: "High → Low" },
-                                        ]}
-                                        selectedValue={filterAmount}
-                                        onFilterChange={setFilterAmount}
-                                        icon={Icons.ArrowUpDown}
+                                        title="Amount Range"
+                                        options={[]}
+                                        selectedValue={null}
+                                        onFilterChange={() => { }}
+                                        icon={Icons.IndianRupee}
                                         footer={
                                             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                                                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Amount Range</span>
@@ -1000,18 +1065,12 @@ export default function IncomeExpense() {
                                         }
                                     />
 
-                                    {(filterCategory.length > 0 || filterMainCategory.length > 0 || filterName.length > 0 || filterBranch.length > 0 || filterTransaction.length > 0 || filterVendor.length > 0 || filterGST.length > 0 || filterAmount !== "" || minAmount || maxAmount || searchText) && (
+                                    {(filterCategory.length > 0 || filterMainCategory.length > 0 || filterName.length > 0 || filterBranch.length > 0 || filterTransaction.length > 0 || filterVendor.length > 0 || filterGST.length > 0 || filterDateSort !== "newest" || minAmount || maxAmount || searchText) && (
                                         <button className="clear-filter-btn" onClick={clearAllFilters}>
                                             <Icons.X size={14} /> Clear Filter
                                         </button>
                                     )}
                                 </div>
-                            </div>
-
-                            {/* TOTAL STAT */}
-                            <div className={`total-stat-box ${activeTab === "expense" ? "is-expense" : "is-approved"}`}>
-                                <span>{activeTab === "expense" ? "Total Expense" : "Total Approved"}</span>
-                                <strong className="total-amount">{fmtAmt(totalToDisplay)}</strong>
                             </div>
                         </div>
 
