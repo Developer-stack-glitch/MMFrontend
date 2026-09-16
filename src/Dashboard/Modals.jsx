@@ -421,6 +421,7 @@ export default function Modals({
                         { key: "BTM Layout", label: "BTM Layout" },
                         { key: "Marathahalli", label: "Marathahalli" },
                         { key: "Rajaji Nagar", label: "Rajaji Nagar" },
+                        { key: "Kalyan Nagar", label: "Kalyan Nagar" },
                     ]
                 },
                 {
