@@ -807,6 +807,7 @@ export const downloadBranchReportApi = async (filters) => {
         if (filters.category) params.append('category', filters.category);
         if (filters.sub_category) params.append('sub_category', filters.sub_category);
         if (filters.transaction_type) params.append('transaction_type', filters.transaction_type);
+        if (filters.branches) params.append('branches', filters.branches);
 
         const res = await api.get(`/api/reports/branch/download?${params.toString()}`, {
             responseType: "blob"
@@ -832,6 +833,7 @@ export const downloadMonthReportApi = async (filters) => {
         if (filters.category) params.append('category', filters.category);
         if (filters.sub_category) params.append('sub_category', filters.sub_category);
         if (filters.transaction_type) params.append('transaction_type', filters.transaction_type);
+        if (filters.branches) params.append('branches', filters.branches);
 
         const res = await api.get(`/api/reports/month/download?${params.toString()}`, {
             responseType: "blob"
@@ -857,6 +859,7 @@ export const downloadOverallReportApi = async (filters) => {
         if (filters.category) params.append('category', filters.category);
         if (filters.sub_category) params.append('sub_category', filters.sub_category);
         if (filters.transaction_type) params.append('transaction_type', filters.transaction_type);
+        if (filters.branches) params.append('branches', filters.branches);
 
         const res = await api.get(`/api/reports/overall/download?${params.toString()}`, {
             responseType: "blob"
