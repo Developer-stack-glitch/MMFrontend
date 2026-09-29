@@ -2324,10 +2324,10 @@ body {
 .filters-premium-container {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 18px;
-  padding: 0px 18px;
-  padding-top: 24px;
-  background: #261d011a;
+  padding: 15px 15px;
+  background: transparent;
 }
 
 .filter-type-tabs {
@@ -2429,10 +2429,36 @@ body {
   height: 40px !important;
   border-radius: 10px !important;
   border: 1px solid #00000042;
+  background: #fff;
+  width: 300px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  color: #555555;
 }
 
 .filters-picker-premium:hover {
   border: 1px solid #d4af37;
+}
+
+.filter-start-date,
+.filter-end-date {
+  white-space: nowrap;
+}
+
+.filter-arrow {
+  font-size: 14px;
+
+  margin: 0 8px;
+}
+
+
+.filter-dropdown-arrow {
+  font-size: 9px;
+  color: #bfbfbf;
+
+  margin-left: 10px;
 }
 
 .ant-picker-range .ant-picker-active-bar {

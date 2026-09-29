@@ -1,0 +1,125 @@
+.reports-page-container {
+    padding: 24px 32px;
+    background: #261d011a;
+    min-height: 100vh;
+}
+
+.reports-premium-card {
+    border-radius: 16px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05) !important;
+    padding: 16px !important;
+}
+
+.reports-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.reports-title {
+    margin: 0 !important;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1e293b !important;
+    font-weight: 700 !important;
+}
+
+.reports-subtitle {
+    font-size: 14px !important;
+    margin-left: 38px !important;
+    display: block !important;
+    margin-top: 4px !important;
+}
+
+.reports-filter-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    padding: 4px;
+}
+
+.reports-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reports-input-label {
+    color: #334155 !important;
+    font-size: 14px !important;
+}
+
+.reports-btn-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 40px;
+}
+
+.reports-page-container .filters-premium-container {
+    justify-content: flex-start !important;
+    padding: 0px;
+}
+
+.reports-download-btn {
+    background: linear-gradient(135deg, rgb(210, 175, 66) 0%, rgb(173, 138, 42) 100%) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 0 32px !important;
+    height: 44px !important;
+    box-shadow: 0 4px 14px 0 rgba(210, 175, 66, 0.39) !important;
+    transition: all 0.3s ease !important;
+    color: white !important;
+}
+
+.reports-download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px 0 rgba(210, 175, 66, 0.5) !important;
+}
+
+/* Premium Select Styling for Reports */
+.reports-premium-select .ant-select-selector {
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+    transition: all 0.3s ease !important;
+}
+
+.reports-premium-select:hover .ant-select-selector,
+.reports-premium-select.ant-select-focused .ant-select-selector {
+    border-color: #d4af37 !important;
+    box-shadow: 0 0 0 2px rgba(210, 175, 66, 0.1) !important;
+}
+
+.reports-premium-select.ant-select-multiple .ant-select-selection-item {
+    font-weight: 500 !important;
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    padding: 0 8px !important;
+    height: 28px !important;
+    line-height: 26px !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.reports-premium-select.ant-select-multiple .ant-select-selection-item-remove {
+    color: #64748b !important;
+}
+
+.reports-premium-select.ant-select-multiple .ant-select-selection-item-remove:hover {
+    color: #d4af37 !important;
+}
+
+.reports-branch-select.ant-select-multiple .ant-select-selection-item {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+}

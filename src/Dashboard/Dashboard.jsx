@@ -134,10 +134,17 @@ export default function Dashboard() {
     // -------------------------
     const fetchStaticData = async () => {
         try {
-            const [expCat, incCat] = await Promise.all([
-                getExpenseCategoriesApi(),
-                getIncomeCategoriesApi()
-            ]).catch(() => [[], []]);
+            const walletPromise = user?.role === "user" 
+                ? getWalletEntriesApi(user.id).catch(() => ({ entries: [] }))
+                : (user?.role === "admin" || user?.role === "superadmin"
+                    ? getAllWalletTransactionsApi().catch(() => ({ entries: [] }))
+                    : Promise.resolve({ entries: [] }));
+
+            const [expCat, incCat, wallets] = await Promise.all([
+                getExpenseCategoriesApi().catch(() => []),
+                getIncomeCategoriesApi().catch(() => []),
+                walletPromise
+            ]);
 
             const grouped = (expCat || []).reduce((acc, item) => {
                 const main = item.main_category;
@@ -148,16 +155,7 @@ export default function Dashboard() {
             }, {});
             setExpenseCategories(grouped);
             setIncomeCategories(incCat || []);
-
-            // Also load wallet entries once for overall context if needed, 
-            // but we'll prioritize the optimized stats for the main view.
-            if (user?.role === "user") {
-                const wallets = await getWalletEntriesApi(user.id).catch(() => ({ entries: [] }));
-                setWalletEntries(wallets.entries || []);
-            } else if (user?.role === "admin" || user?.role === "superadmin") {
-                const allWallets = await getAllWalletTransactionsApi().catch(() => ({ entries: [] }));
-                setWalletEntries(allWallets.entries || []);
-            }
+            setWalletEntries(wallets?.entries || []);
         } catch (err) {
             console.error("fetchStaticData error:", err);
         }

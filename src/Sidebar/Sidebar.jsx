@@ -27,6 +27,8 @@ import {
     TrendingUp,
     TimerResetIcon,
     Volume2,
+    FileText,
+    BarChart2,
 } from "lucide-react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "../css/Sidebar.css";
@@ -38,6 +40,8 @@ import AddCategories from "../Dashboard/AddCategeories";
 import IncomeExpense from "../Dashboard/IncomeExpense";
 import Approvals from "../Dashboard/Approvals";
 import Income from "../Dashboard/Income";
+import Statements from "../Dashboard/Statements";
+import Reports from "../Dashboard/Reports";
 import {
     apiLogout,
     getExpenseCategoriesApi,
@@ -350,6 +354,8 @@ export default function SideBarLayout() {
         "/settings": "8",
         "/calendar": "9",
         "/income": "10",
+        "/statements": "11",
+        "/reports": "12",
     };
 
     const selectedKey = menuKeyMap[location.pathname] || "1";
@@ -366,6 +372,8 @@ export default function SideBarLayout() {
             8: "/settings",
             9: "/calendar",
             10: "/income",
+            11: "/statements",
+            12: "/reports",
         };
 
         navigate(routeMap[e.key]);
@@ -474,6 +482,8 @@ export default function SideBarLayout() {
                                 { key: "4", icon: <TimerResetIcon size={16} />, label: "Pending Approvals" },
                                 { key: "5", icon: <Wallet size={16} />, label: "Wallet" },
                                 { key: "10", icon: <TrendingUp size={16} />, label: "Income" },
+                                { key: "11", icon: <FileText size={16} />, label: "Statements" },
+                                { key: "12", icon: <BarChart2 size={16} />, label: "Reports" },
                             ] : []),
                         ]}
                     />
@@ -582,6 +592,8 @@ export default function SideBarLayout() {
                         <Route path="/settings" element={<SettingPage />} />
                         <Route path="/calendar" element={<CalendarPage />} />
                         <Route path="/income" element={<Income />} />
+                        <Route path="/statements" element={<Statements />} />
+                        <Route path="/reports" element={<Reports />} />
                     </Routes>
                 </Content>
             </Layout>

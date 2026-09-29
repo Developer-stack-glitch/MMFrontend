@@ -8,15 +8,7 @@ export default function ApprovalsSkeleton() {
     };
 
     return (
-        <div className="expense-container">
-            {/* 1. Header */}
-            <div className="expense-header" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <Skeleton.Input active size="large" style={{ width: 200, height: 32 }} />
-                    <Skeleton.Input active size="small" style={{ width: 300, marginTop: 4 }} />
-                </div>
-            </div>
-
+        <>
             {/* 2. Filter Card */}
             <div className="filter-card">
                 <div className="filter-left" style={{ flexWrap: "wrap", gap: "10px" }}>
@@ -76,6 +68,6 @@ export default function ApprovalsSkeleton() {
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }

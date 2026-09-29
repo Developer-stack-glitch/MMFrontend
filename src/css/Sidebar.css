@@ -131,8 +131,8 @@ body {
 /* Collapse Button */
 .collapse-btn-container {
   position: absolute;
-  bottom: 70px;
-  left: 0;
+  bottom: 93%;
+  left: 45%;
   width: 100%;
   text-align: center;
 }

@@ -1,0 +1,274 @@
+.statements-page-container {
+    position: relative;
+    min-height: 100vh;
+    padding: 24px 32px;
+    background: #261d011a;
+}
+
+.statements-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    height: 64px;
+
+    /* Sticky Header */
+    position: sticky;
+    top: 0;
+    /* Offset to match container padding */
+    margin: -24px -32px 32px -32px;
+    padding: 0 32px;
+    background: #f2efe9;
+    /* Solid background to prevent overlap */
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    /* Subtle shadow when scrolling */
+}
+
+.premium-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.premium-card .ant-card-head {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 0 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* Table Styling */
+.statement-table .ant-table-thead>tr>th {
+    background: #1c2431 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    padding: 12px 16px !important;
+    font-size: 13px !important;
+    border-bottom: 2px solid #d4af37 !important;
+}
+
+.statement-table .ant-table-tbody>tr>td {
+    padding: 12px 16px !important;
+    font-size: 13px;
+    color: #475569;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.statement-table .ant-table-tbody>tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.statement-table .ant-table-tbody>tr:hover>td {
+    background: #f1f5f9;
+}
+
+.compact-table .ant-table-thead>tr>th {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+    letter-spacing: 0px !important;
+}
+
+.compact-table .ant-table-tbody>tr>td {
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+}
+
+/* Tabs Styling */
+.bank-tabs .ant-tabs-nav {
+    margin-bottom: 24px;
+}
+
+.bank-tabs .ant-tabs-tab {
+    padding: 12px 24px;
+    font-weight: 500;
+    font-size: 14px;
+    color: #64748b;
+    transition: all 0.3s;
+}
+
+.bank-tabs .ant-tabs-tab-active {
+    background: #eff6ff;
+    border-radius: 8px 8px 0 0;
+}
+
+.bank-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #2563eb !important;
+    font-weight: 600;
+}
+
+.statement-upload-btn {
+    background: #d4af37;
+    border-color: #d4af37;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.statement-upload-btn:hover,
+.statement-upload-btn:focus {
+    background: #c39d2c !important;
+    border-color: #c39d2c !important;
+}
+
+/* Cash Summary Styling */
+.cash-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed #e8e8e8;
+}
+
+.cash-icon {
+    font-size: 24px;
+    color: #d4af37;
+    background: #fff8e1;
+    padding: 12px;
+    border-radius: 50%;
+}
+
+.cash-stats-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cash-stat-box {
+    padding: 16px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cash-stat-box.received {
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+}
+
+.cash-stat-box.spent {
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+}
+
+.cash-stat-box .stat-label {
+    font-size: 14px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.cash-stat-box.received .stat-label {
+    color: #52c41a;
+}
+
+.cash-stat-box.spent .stat-label {
+    color: #ff4d4f;
+}
+
+.cash-stat-box .stat-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.statement-card-2 {
+    position: sticky;
+    top: 24px;
+}
+
+.summary-table-card .ant-card-head {
+    min-height: 40px;
+    padding: 0 12px;
+    background: #0d111b;
+}
+
+.summary-table-card .ant-card-head-title {
+    font-size: 14px;
+    padding: 8px 0;
+    text-align: center;
+    color: #d2af42;
+}
+
+.summary-table-card .ant-card-body {
+    padding: 0;
+}
+
+.summary-table-card .ant-table-thead>tr>th {
+    padding: 8px;
+    font-size: 12px;
+    background: #fff;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.summary-table-card .ant-table-tbody>tr>td {
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+.premium-card .ant-table-tbody>tr>td {
+    font-size: 11px;
+    white-space: nowrap;
+    padding: 8px 8px !important;
+}
+
+.statements-cards-top-row,
+.statements-cards-bottom-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.statements-cards-top-row .statement-single-card,
+.statements-cards-bottom-row .statement-single-card {
+    flex: 1 1 calc(33.333% - 24px);
+    max-width: calc(33.333% - 16px);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    min-width: 300px;
+}
+
+@media (max-width: 1200px) {
+
+    .statements-cards-top-row .statement-single-card,
+    .statements-cards-bottom-row .statement-single-card {
+        flex: 1 1 calc(50% - 24px);
+        max-width: calc(50% - 12px);
+    }
+}
+
+@media (max-width: 768px) {
+
+    .statements-cards-top-row .statement-single-card,
+    .statements-cards-bottom-row .statement-single-card {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+}
+
+/* Bank Tabs Styling to prevent overflow */
+.bank-tabs .ant-tabs-nav-wrap {
+    overflow: visible !important;
+}
+
+.bank-tabs .ant-tabs-nav-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.bank-tabs .ant-tabs-tab {
+    padding: 8px 12px !important;
+    margin: 0 4px 8px 0 !important;
+}
+
+.bank-tabs .ant-tabs-tab-btn {
+    font-size: 13px !important;
+}

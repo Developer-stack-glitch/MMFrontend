@@ -261,19 +261,21 @@ export default function Approvals() {
     };
 
     return (
-        <>
-            <Filters onFilterChange={setFilters} />
-            {loading ? (<ApprovalsSkeleton />) : (
-                <div className="expense-container">
-                    <div className="expense-header" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            <h1 style={{ margin: 0, fontSize: "28px", fontWeight: 700, color: "#1c2431" }}>
-                                Approvals
-                            </h1>
-                            <span style={{ color: "#64748b", fontSize: "14px" }}>Review and manage pending spend requests</span>
-                        </div>
-                    </div>
+        <div className="expense-container">
+            <div className="expense-header" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <h1 style={{ margin: 0, fontSize: "28px", fontWeight: 700, color: "#1c2431" }}>
+                        Approvals
+                    </h1>
+                    <span style={{ color: "#64748b", fontSize: "14px" }}>Review and manage pending spend requests</span>
+                </div>
+                <div>
+                    <Filters onFilterChange={setFilters} />
+                </div>
+            </div>
 
+            {loading ? (<ApprovalsSkeleton />) : (
+                <>
                     {/* FILTER UI */}
                     <div className="filter-card">
                         <div className="filter-left" style={{ flexWrap: "wrap", gap: "10px" }}>
@@ -550,7 +552,7 @@ export default function Approvals() {
                             </div>
                         )}
                     </Modal>
-                </div>
+                </>
             )}
             {showInvoiceModal && currentInvoices.length > 0 && (
                 <InvoicePreviewModal
@@ -559,7 +561,7 @@ export default function Approvals() {
                     invoices={currentInvoices}
                 />
             )}
-        </>
+        </div>
     );
 }
 

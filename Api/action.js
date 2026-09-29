@@ -2,9 +2,10 @@
 import axios from "axios";
 import { Modal } from "antd";
 
-// ====================== AXIOS INSTANCE ======================
+export const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
+    baseURL: API_BASE_URL,
     withCredentials: true,
     headers: {
         "Content-Type": "application/json",
@@ -181,6 +182,18 @@ export const getUser = async () => {
 // ✅ GET expense categories
 export const getExpenseCategoriesApi = async () => {
     const res = await api.get("/api/categories/expense-category");
+    return res.data;
+};
+
+// ✅ GET transaction action categories
+export const getTransactionActionCategoriesApi = async () => {
+    const res = await api.get("/api/categories/transaction-action-category");
+    return res.data;
+};
+
+// ✅ GET branches
+export const getBranchesApi = async () => {
+    const res = await api.get("/api/categories/branches");
     return res.data;
 };
 
@@ -409,6 +422,16 @@ export const getWalletEntriesApi = async (userId, page = 1, limit = 10, filters 
 
     const res = await api.get(query);
     return res.data;
+};
+
+// ====================== BANK STATEMENTS ======================
+export const getBankTransactionsApi = async (bankId) => {
+    try {
+        const res = await api.get(`/api/transactions/bank-statements/${bankId}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
 };
 
 // GET ALL WALLET DETAILS
@@ -699,6 +722,265 @@ export const downloadExpenseTemplateApi = async () => {
         document.body.appendChild(link);
         link.click();
         link.remove();
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ GET BANKS LIST
+export const getBanksApi = async () => {
+    try {
+        const res = await api.get("/api/transactions/banks");
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ✅ GET ALL BANKS SUMMARY
+export const getAllBanksSummaryApi = async (startDate, endDate) => {
+    try {
+        const res = await api.get(`/api/transactions/bank-statements/summary`, {
+            params: { start_date: startDate, end_date: endDate }
+        });
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// ====================== TRANSACTION ACTIONS ======================
+export const addTransactionActionApi = async (payload) => {
+    try {
+        const res = await api.post("/api/transactions/bank-statements/transaction-action", payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const updateTransactionActionApi = async (transactionId, payload) => {
+    try {
+        const res = await api.put(`/api/transactions/bank-statements/transaction-action/${transactionId}`, payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const deleteTransactionActionApi = async (transactionId) => {
+    try {
+        const res = await api.delete(`/api/transactions/bank-statements/transaction-action/${transactionId}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const getTransactionActionApi = async (transactionId) => {
+    try {
+        const res = await api.get(`/api/transactions/bank-statements/transaction-action/${transactionId}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const getReconciliationSummaryApi = async (startDate, endDate) => {
+    try {
+        const res = await api.get(`/api/transactions/bank-statements/reconciliation-summary`, {
+            params: { start_date: startDate, end_date: endDate }
+        });
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// CASH STATEMENT APIs
+
+export const downloadBranchReportApi = async (filters) => {
+    try {
+        const params = new URLSearchParams();
+        if (filters.start_date) params.append('start_date', filters.start_date);
+        if (filters.end_date) params.append('end_date', filters.end_date);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.sub_category) params.append('sub_category', filters.sub_category);
+        if (filters.transaction_type) params.append('transaction_type', filters.transaction_type);
+
+        const res = await api.get(`/api/reports/branch/download?${params.toString()}`, {
+            responseType: "blob"
+        });
+        
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `Branch_Wise_Report_${filters.start_date}_to_${filters.end_date}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const downloadMonthReportApi = async (filters) => {
+    try {
+        const params = new URLSearchParams();
+        if (filters.start_date) params.append('start_date', filters.start_date);
+        if (filters.end_date) params.append('end_date', filters.end_date);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.sub_category) params.append('sub_category', filters.sub_category);
+        if (filters.transaction_type) params.append('transaction_type', filters.transaction_type);
+
+        const res = await api.get(`/api/reports/month/download?${params.toString()}`, {
+            responseType: "blob"
+        });
+        
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `Monthly_Wise_Report_${filters.start_date}_to_${filters.end_date}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const downloadOverallReportApi = async (filters) => {
+    try {
+        const params = new URLSearchParams();
+        if (filters.start_date) params.append('start_date', filters.start_date);
+        if (filters.end_date) params.append('end_date', filters.end_date);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.sub_category) params.append('sub_category', filters.sub_category);
+        if (filters.transaction_type) params.append('transaction_type', filters.transaction_type);
+
+        const res = await api.get(`/api/reports/overall/download?${params.toString()}`, {
+            responseType: "blob"
+        });
+        
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `Overall_Wise_Report_${filters.start_date}_to_${filters.end_date}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+export const uploadCashStatementApi = async (file) => {
+    try {
+        const formData = new FormData();
+
+        formData.append("statement", file);
+
+        const res = await api.post(
+            "/api/transactions/cash-statements/upload",
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
+
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+
+// Get Cash Statements
+export const getCashStatementsApi = async () => {
+    try {
+        const res = await api.get(
+            "/api/transactions/cash-statements"
+        );
+
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// Get Cash Statement Summary Api
+export const getCashStatementSummaryApi = async (startDate, endDate) => {
+    try {
+        const res = await api.get(
+            "/api/transactions/cash-statements/summary",
+            {
+                params: {
+                    start_date: startDate,
+                    end_date: endDate,
+                },
+            }
+        );
+
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+// Create Cash Transaction Action
+export const createCashTransactionActionApi = async (payload) => {
+    try {
+        const res = await api.post(
+            "/api/transactions/cash-statements/transaction-action",
+            payload
+        );
+
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const updateCashTransactionActionApi = async (transactionId, payload) => {
+    try {
+        const res = await api.put(`/api/transactions/cash-statements/transaction-action/${transactionId}`, payload);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const deleteCashTransactionActionApi = async (transactionId) => {
+    try {
+        const res = await api.delete(`/api/transactions/cash-statements/transaction-action/${transactionId}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const getCashTransactionActionApi = async (transactionId) => {
+    try {
+        const res = await api.get(`/api/transactions/cash-statements/transaction-action/${transactionId}`);
+        return res.data;
+    } catch (err) {
+        throw err?.response?.data || err;
+    }
+};
+
+export const getCashReconciliationSummaryApi = async (startDate, endDate) => {
+    try {
+        const res = await api.get(
+            `/api/transactions/cash-statements/reconciliation-summary`,
+            {
+                params: {
+                    start_date: startDate,
+                    end_date: endDate,
+                },
+            }
+        );
+        return res.data;
     } catch (err) {
         throw err?.response?.data || err;
     }
