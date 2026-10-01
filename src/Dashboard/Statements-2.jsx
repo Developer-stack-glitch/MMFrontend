@@ -698,7 +698,7 @@ const Statements = () => {
                     <Col xs={24} md={18} lg={14}>
                         <Card
                             title="Bank Statements"
-                            bordered={false}
+                            variant="borderless"
                             className="statement-card premium-card"
                             style={{ margin: "0 auto" }}
                         >

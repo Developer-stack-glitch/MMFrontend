@@ -211,7 +211,7 @@ export default function SettingPage() {
                                                                 <span>Create New User</span>
                                                             </div>
                                                         }
-                                                        bordered={false}
+                                                        variant="borderless"
                                                         style={{ marginBottom: 30 }}
                                                     >
                                                         <form onSubmit={handleSubmit} className="form-grid">
@@ -279,7 +279,7 @@ export default function SettingPage() {
                                                             <span>System Users</span>
                                                         </div>
                                                     }
-                                                    bordered={false}
+                                                    variant="borderless"
                                                 >
                                                     <div className="table-wrapper">
                                                         <table className="transactions-table">
@@ -372,7 +372,7 @@ export default function SettingPage() {
                                                             <span>Vendor Registration</span>
                                                         </div>
                                                     }
-                                                    bordered={false}
+                                                    variant="borderless"
                                                     extra={
                                                         <Button
                                                             type="primary"

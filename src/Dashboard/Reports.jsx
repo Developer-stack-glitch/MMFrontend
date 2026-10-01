@@ -107,7 +107,7 @@ const Reports = () => {
     return (
         <div className="reports-page-container">
             <Card
-                bordered={false}
+                variant="borderless"
                 className="reports-premium-card"
             >
                 <div className="reports-header-container">
@@ -148,7 +148,7 @@ const Reports = () => {
                                 className="reports-premium-select reports-branch-select"
                                 dropdownRender={(menu) => {
                                     const filteredBranches = branchesList.filter(b => b.name.toLowerCase().includes(branchSearch.toLowerCase()));
-                                    
+
                                     return (
                                         <div style={{ padding: '8px' }}>
                                             <Input
@@ -160,8 +160,8 @@ const Reports = () => {
                                                 onKeyDown={e => e.stopPropagation()}
                                             />
                                             <Space style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                                <Button 
-                                                    type="default" 
+                                                <Button
+                                                    type="default"
                                                     shape="round"
                                                     style={{ color: '#000080', borderColor: '#000080' }}
                                                     onClick={() => {
@@ -171,7 +171,7 @@ const Reports = () => {
                                                 >
                                                     Select All
                                                 </Button>
-                                                <Button 
+                                                <Button
                                                     type="default"
                                                     shape="round"
                                                     style={{ color: '#d4af37', borderColor: '#d4af37' }}
@@ -187,7 +187,7 @@ const Reports = () => {
                                                 {filteredBranches.map(branch => {
                                                     const isSelected = selectedBranches.includes(branch.name);
                                                     return (
-                                                        <div 
+                                                        <div
                                                             key={branch.id}
                                                             style={{
                                                                 padding: '8px 12px',
@@ -258,7 +258,7 @@ const Reports = () => {
                                 dropdownRender={(menu) => {
                                     const allCats = Object.keys(groupedCategories);
                                     const filteredCats = allCats.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
-                                    
+
                                     return (
                                         <div style={{ padding: '8px' }}>
                                             <Input
@@ -270,8 +270,8 @@ const Reports = () => {
                                                 onKeyDown={e => e.stopPropagation()}
                                             />
                                             <Space style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                                <Button 
-                                                    type="default" 
+                                                <Button
+                                                    type="default"
                                                     shape="round"
                                                     style={{ color: '#000080', borderColor: '#000080' }}
                                                     onClick={() => {
@@ -281,7 +281,7 @@ const Reports = () => {
                                                 >
                                                     Select All
                                                 </Button>
-                                                <Button 
+                                                <Button
                                                     type="default"
                                                     shape="round"
                                                     style={{ color: '#d4af37', borderColor: '#d4af37' }}
@@ -297,7 +297,7 @@ const Reports = () => {
                                                 {filteredCats.map((cat, index) => {
                                                     const isSelected = selectedCategory.includes(cat);
                                                     return (
-                                                        <div 
+                                                        <div
                                                             key={index}
                                                             style={{
                                                                 padding: '8px 12px',

@@ -49,7 +49,7 @@ const ActionCheckbox = ({ record, onActionUpdate, isCash = false }) => {
 
     return (
         <>
-            <div 
+            <div
                 style={{ display: 'inline-flex', padding: '4px', cursor: 'pointer', alignItems: 'center', gap: '8px' }}
                 onClick={() => setModalVisible(true)}
             >
@@ -71,7 +71,7 @@ const ActionCheckbox = ({ record, onActionUpdate, isCash = false }) => {
                 )}
             </div>
 
-            <TransactionActionModal 
+            <TransactionActionModal
                 open={modalVisible}
                 onClose={() => setModalVisible(false)}
                 record={record}
@@ -714,7 +714,7 @@ const Statements = () => {
                     <Col xs={24} lg={24}>
                         <Card
                             title="Bank Statements"
-                            bordered={false}
+                            variant="borderless"
                             className="statement-card premium-card"
                             style={{ margin: "0 auto", width: '100%' }}
                         >
@@ -794,19 +794,19 @@ const Statements = () => {
 
                 {/* 5 Summary Tables Grid */}
                 <div className="statements-cards-top-row">
-                    <Card title="Opening Balance" bordered={false} className="statement-single-card summary-table-card">
+                    <Card title="Opening Balance" variant="borderless" className="statement-single-card summary-table-card">
                         <Table size="small" pagination={false} dataSource={combinedSummaryList} loading={summaryLoading} rowKey="bank_id" columns={[
                             { title: 'Bank', dataIndex: 'bank_name' },
                             { title: 'Amount', dataIndex: 'opening_balance', align: 'right', render: (val) => formatCurrency(val) }
                         ]} />
                     </Card>
-                    <Card title="Income" bordered={false} className="statement-single-card summary-table-card">
+                    <Card title="Income" variant="borderless" className="statement-single-card summary-table-card">
                         <Table size="small" pagination={false} dataSource={combinedSummaryList} loading={summaryLoading} rowKey="bank_id" columns={[
                             { title: 'Bank', dataIndex: 'bank_name' },
                             { title: 'Amount', dataIndex: 'income', align: 'right', render: (val) => formatCurrency(val) }
                         ]} />
                     </Card>
-                    <Card title="Expenses" bordered={false} className="statement-single-card summary-table-card">
+                    <Card title="Expenses" variant="borderless" className="statement-single-card summary-table-card">
                         <Table size="small" pagination={false} dataSource={combinedSummaryList} loading={summaryLoading} rowKey="bank_id" columns={[
                             { title: 'Bank', dataIndex: 'bank_name' },
                             { title: 'Amount', dataIndex: 'expenses', align: 'right', render: (val) => formatCurrency(val) }
@@ -814,13 +814,13 @@ const Statements = () => {
                     </Card>
                 </div>
                 <div className="statements-cards-bottom-row">
-                    <Card title="Balance" bordered={false} className="statement-single-card summary-table-card">
+                    <Card title="Balance" variant="borderless" className="statement-single-card summary-table-card">
                         <Table size="small" pagination={false} dataSource={combinedSummaryList} loading={summaryLoading} rowKey="bank_id" columns={[
                             { title: 'Bank', dataIndex: 'bank_name' },
                             { title: 'Amount', dataIndex: 'balance', align: 'right', render: (val) => formatCurrency(val) }
                         ]} />
                     </Card>
-                    <Card title="Not Reconciliation" bordered={false} className="statement-single-card summary-table-card">
+                    <Card title="Not Reconciliation" variant="borderless" className="statement-single-card summary-table-card">
                         <Table size="small" pagination={false} dataSource={formattedReconciliationData} rowKey="key" columns={[
                             { title: 'Bank', dataIndex: 'bankName' },
                             { title: 'Dr', dataIndex: 'dr', align: 'right', render: (val) => formatCurrency(val) },
@@ -830,10 +830,16 @@ const Statements = () => {
                 </div>
 
                 {/* Bank Tabs Transaction Section */}
-                <Card bordered={false} className="premium-card" style={{ marginTop: '24px' }}>
-                    <Tabs defaultActiveKey="1" activeKey={activeTab} onChange={setActiveTab} className="bank-tabs">
-                        {allBanksData.map(bank => (
-                            <Tabs.TabPane tab={bank.bankName} key={bank.key}>
+                <Card variant="borderless" className="premium-card" style={{ marginTop: '24px' }}>
+                    <Tabs
+                        defaultActiveKey="1"
+                        activeKey={activeTab}
+                        onChange={setActiveTab}
+                        className="bank-tabs"
+                        items={allBanksData.map(bank => ({
+                            label: bank.bankName,
+                            key: String(bank.key),
+                            children: (
                                 <Table
                                     columns={bank.bankName?.toUpperCase() === 'CASH' ? cashTransactionColumns : transactionColumns}
                                     dataSource={filteredTransactions.slice((page - 1) * pageSize, page * pageSize)}
@@ -842,9 +848,9 @@ const Statements = () => {
                                     loading={loading}
                                     className={bank.bankName?.toUpperCase() === 'CASH' ? "statement-table compact-table" : "statement-table"}
                                 />
-                            </Tabs.TabPane>
-                        ))}
-                    </Tabs>
+                            )
+                        }))}
+                    />
                 </Card>
             </div>
 
