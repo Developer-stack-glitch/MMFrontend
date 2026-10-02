@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { UploadOutlined, DollarOutlined, ArrowDownOutlined, ArrowUpOutlined, EditOutlined, BankOutlined } from "@ant-design/icons";
 import { FileText, Trash2 } from "lucide-react";
 import Filters from "../Filters/Filters";
+import StatementsSkeleton from "./StatementsSkeleton";
 import {
     getBankTransactionsApi, getCashStatementsApi, uploadCashStatementApi, getCashStatementSummaryApi, API_BASE_URL, getBanksApi, getAllBanksSummaryApi,
     addTransactionActionApi, updateTransactionActionApi, deleteTransactionActionApi, getReconciliationSummaryApi, createCashTransactionActionApi,
@@ -709,6 +710,10 @@ const Statements = () => {
             </div>
 
             <div className="statements-content">
+                {(banksLoading || summaryLoading) ? (
+                    <StatementsSkeleton />
+                ) : (
+                <>
                 <Row justify="center" gutter={[24, 24]}>
                     {/* Bank Statements Upload Table */}
                     <Col xs={24} lg={24}>
@@ -852,9 +857,11 @@ const Statements = () => {
                         }))}
                     />
                 </Card>
+                </>
+                )}
             </div>
 
-            {filteredTransactions.length > 0 && (
+            {!banksLoading && !summaryLoading && filteredTransactions.length > 0 && (
                 <div className="statement-pagination" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', alignItems: 'center', gap: '20px', padding: '10px 0', background: 'transparent' }}>
                     <div className="rows-per-page-container">
                         Rows per page:

@@ -13,30 +13,9 @@ export default function Filters({ onFilterChange, style }) {
             case "yesterday":
                 return [today.subtract(1, "day").startOf("day"), today.subtract(1, "day").endOf("day")];
             case "thisMonth":
-                // Financial month = 26th to 25th
-                if (today.date() >= 26) {
-                    return [
-                        today.date(26).startOf("day"),
-                        today.add(1, "month").date(25).endOf("day")
-                    ];
-                } else {
-                    return [
-                        today.subtract(1, "month").date(26).startOf("day"),
-                        today.date(25).endOf("day")
-                    ];
-                }
+                return [today.subtract(1, "month").date(26).startOf("day"), today.date(25).endOf("day")];
             case "lastMonth":
-                if (today.date() >= 26) {
-                    return [
-                        today.subtract(1, "month").date(26).startOf("day"),
-                        today.date(25).endOf("day")
-                    ];
-                } else {
-                    return [
-                        today.subtract(2, "month").date(26).startOf("day"),
-                        today.subtract(1, "month").date(25).endOf("day")
-                    ];
-                }
+                return [today.subtract(2, "month").date(26).startOf("day"), today.subtract(1, "month").date(25).endOf("day")];
             case "thisYear":
                 return [today.subtract(1, "year").month(11).date(26).startOf("day"), today.month(11).date(25).endOf("day")];
             default:
@@ -47,7 +26,7 @@ export default function Filters({ onFilterChange, style }) {
     // ✅ Load from sessionStorage or use defaults
     const getInitialState = () => {
         try {
-            const saved = sessionStorage.getItem("filterState_v2");
+            const saved = sessionStorage.getItem("filterState");
             if (saved) {
                 const parsed = JSON.parse(saved);
                 return {
@@ -61,8 +40,8 @@ export default function Filters({ onFilterChange, style }) {
             console.error("Error loading filter state:", e);
         }
         return {
-            filterType: "thisMonth",
-            selectedValue: getPresentRange("thisMonth")
+            filterType: "today",
+            selectedValue: getPresentRange("today")
         };
     };
 
@@ -89,7 +68,7 @@ export default function Filters({ onFilterChange, style }) {
                     ? selectedValue.map(d => d?.format?.("YYYY-MM-DD"))
                     : selectedValue?.format?.("YYYY-MM-DD")
             };
-            sessionStorage.setItem("filterState_v2", JSON.stringify(stateToSave));
+            sessionStorage.setItem("filterState", JSON.stringify(stateToSave));
         } catch (e) {
             console.error("Error saving filter state:", e);
         }

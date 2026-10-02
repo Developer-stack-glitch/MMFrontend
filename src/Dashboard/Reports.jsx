@@ -3,6 +3,7 @@ import { Card, Typography, Select, Button, Row, Col, Divider, message } from "an
 import { DownloadOutlined } from "@ant-design/icons";
 import { FileText } from "lucide-react";
 import Filters from "../Filters/Filters";
+import ReportsSkeleton from "./ReportsSkeleton";
 import "../css/Statement.css";
 import "../css/Report.css";
 import { getTransactionActionCategoriesApi, downloadBranchReportApi, downloadMonthReportApi, downloadOverallReportApi, getBranchesApi } from "../../Api/action";
@@ -24,7 +25,7 @@ const Reports = () => {
     const [branchSearch, setBranchSearch] = useState("");
     const [categorySearch, setCategorySearch] = useState("");
     const [transactionType, setTransactionType] = useState("Credit/Debit");
-    const [loadingCategories, setLoadingCategories] = useState(false);
+    const [loadingCategories, setLoadingCategories] = useState(true);
     const [downloading, setDownloading] = useState(false);
 
     const fetchCategories = async () => {
@@ -104,8 +105,13 @@ const Reports = () => {
         ? [...new Set(Object.values(groupedCategories).flat())]
         : [...new Set(selectedCategory.flatMap(cat => groupedCategories[cat] || []))];
 
+    if (loadingCategories) {
+        return <ReportsSkeleton />;
+    }
+
     return (
         <div className="reports-page-container">
+
             <Card
                 variant="borderless"
                 className="reports-premium-card"

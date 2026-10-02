@@ -90,13 +90,17 @@
 }
 
 .bank-tabs .ant-tabs-tab-active {
-    background: #eff6ff;
+    background: #fffcef;
     border-radius: 8px 8px 0 0;
 }
 
 .bank-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-    color: #2563eb !important;
+    color: #ad7f41 !important;
     font-weight: 600;
+}
+
+.bank-tabs .ant-tabs-ink-bar {
+    background: #1c2431 !important;
 }
 
 .statement-upload-btn {
